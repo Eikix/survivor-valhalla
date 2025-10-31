@@ -4,6 +4,9 @@ on:
   push:
     branches:
       - main
+    paths:
+      - 'contract/**'
+      - '.github/workflows/deploy-mainnet.yml'
   workflow_dispatch:
 
 jobs:
