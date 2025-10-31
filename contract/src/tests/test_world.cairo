@@ -7,15 +7,15 @@ mod tests {
         spawn_test_world
     };
     use starknet::testing::set_contract_address;
-    use dojo_starter::models::{BeastLineup, m_BeastLineup};
-    use dojo_starter::systems::beast_actions::{
+    use survivor_valhalla::models::{BeastLineup, m_BeastLineup};
+    use survivor_valhalla::systems::beast_actions::{
         IBeastActionsDispatcher, IBeastActionsDispatcherTrait, beast_actions
     };
     use starknet::ContractAddress;
 
     fn namespace_def() -> NamespaceDef {
         let ndef = NamespaceDef {
-            namespace: "dojo_starter",
+            namespace: "survivor_valhalla",
             resources: [
                 TestResource::Model(m_BeastLineup::TEST_CLASS_HASH),
                 TestResource::Event(beast_actions::e_BeastLineupRegistered::TEST_CLASS_HASH),
@@ -30,8 +30,8 @@ mod tests {
 
     fn contract_defs() -> Span<ContractDef> {
         [
-            ContractDefTrait::new(@"dojo_starter", @"beast_actions")
-                .with_writer_of([dojo::utils::bytearray_hash(@"dojo_starter")].span())
+            ContractDefTrait::new(@"survivor_valhalla", @"beast_actions")
+                .with_writer_of([dojo::utils::bytearray_hash(@"survivor_valhalla")].span())
         ]
             .span()
     }

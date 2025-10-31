@@ -8,7 +8,7 @@ pub trait IBeastActions<T> {
 pub mod beast_actions {
     use dojo::event::EventStorage;
     use dojo::model::ModelStorage;
-    use dojo_starter::models::BeastLineup;
+    use survivor_valhalla::models::BeastLineup;
     use starknet::{ContractAddress, get_caller_address};
     use super::IBeastActions;
 
@@ -86,10 +86,10 @@ pub mod beast_actions {
 
     #[generate_trait]
     impl InternalImpl of InternalTrait {
-        /// Use the default namespace "dojo_starter". This function is handy since the ByteArray
+        /// Use the default namespace "survivor_valhalla". This function is handy since the ByteArray
         /// can't be const.
         fn world_default(self: @ContractState) -> dojo::world::WorldStorage {
-            self.world(@"dojo_starter")
+            self.world(@"survivor_valhalla")
         }
     }
 }
