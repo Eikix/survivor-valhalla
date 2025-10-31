@@ -1,11 +1,11 @@
 [world]
-name = "dojo_starter"
+name = "survivor_valhalla"
 description = "Survivor Valhalla - Beast lineup management on Starknet"
 cover_uri = "file://assets/cover.png"
 icon_uri = "file://assets/icon.png"
 website = "https://github.com/survivor-valhalla"
 seed = "dojo_survivor_valhalla_sepolia"
-namespace = "dojo_starter"
+namespace = "survivor_valhalla"
 storage_snapshot_url = ""
 
 [env]
@@ -15,4 +15,4 @@ storage_snapshot_url = ""
 # world_address = ""   # will be set after first deployment
 
 [[writers]]
-"dojo_starter::systems::beast_actions::beast_actions" = ["dojo_starter"]
+"survivor_valhalla::systems::beast_actions::beast_actions" = ["survivor_valhalla"]
