@@ -14,7 +14,7 @@ default = "survivor_valhalla"
 # rpc_url = ""         # env: STARKNET_RPC_URL
 # account_address = "" # env: DOJO_ACCOUNT_ADDRESS
 # private_key = ""     # env: DOJO_PRIVATE_KEY
-# world_address = ""   # will be set after first deployment
+world_address = "0x01c549354a5324cf3a978f89eb60566b251740d85dada78a6f85246fe5684f96"
 
 [writers]
 "survivor_valhalla::systems::beast_actions::beast_actions" = ["survivor_valhalla"]
