@@ -16,23 +16,25 @@ jobs:
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
-    
+
     - name: Set up QEMU
       uses: docker/setup-qemu-action@v3
       
     - name: Set up Docker Buildx
       uses: docker/setup-buildx-action@v3
-    
+
+    # 1) build contracts (docker)
     - name: Build contracts
       working-directory: ./contract
       run: |
         docker run --rm \
           --platform linux/arm64 \
-          -v ${{ github.workspace }}/contract:/app \
+          -v "${{ github.workspace }}/contract:/app" \
           -w /app \
           ghcr.io/dojoengine/dojo:v1.7.1 \
           sozo -P mainnet build
-    
+
+    # 2) check env / secrets (host step, fine)
     - name: Check and set environment
       id: env
       run: |
@@ -47,10 +49,6 @@ jobs:
         # Check required secrets
         if [ -z "${{ vars.DOJO_ACCOUNT_ADDRESS }}" ]; then
           echo "Error: DOJO_ACCOUNT_ADDRESS variable is not set"
-          echo "Please set the following in your repository:"
-          echo "- Variable: DOJO_ACCOUNT_ADDRESS - Your Starknet account address"
-          echo "- Secret: DOJO_PRIVATE_KEY - Your account private key"
-          echo "- Secret: STARKNET_RPC_URL_MAINNET - (Optional) Custom RPC URL"
           exit 1
         fi
         if [ -z "${{ secrets.DOJO_PRIVATE_KEY }}" ]; then
@@ -58,7 +56,8 @@ jobs:
           exit 1
         fi
         echo "All required configuration is set"
-    
+
+    # 3) deploy contracts (docker)
     - name: Deploy contracts
       working-directory: ./contract
       env:
@@ -68,14 +67,15 @@ jobs:
       run: |
         docker run --rm \
           --platform linux/arm64 \
-          -v ${{ github.workspace }}/contract:/app \
+          -v "${{ github.workspace }}/contract:/app" \
           -w /app \
-          -e STARKNET_RPC_URL=$STARKNET_RPC_URL \
-          -e DOJO_ACCOUNT_ADDRESS=$DOJO_ACCOUNT_ADDRESS \
-          -e DOJO_PRIVATE_KEY=$DOJO_PRIVATE_KEY \
+          -e STARKNET_RPC_URL="$STARKNET_RPC_URL" \
+          -e DOJO_ACCOUNT_ADDRESS="$DOJO_ACCOUNT_ADDRESS" \
+          -e DOJO_PRIVATE_KEY="$DOJO_PRIVATE_KEY" \
           ghcr.io/dojoengine/dojo:v1.7.1 \
           sozo -P mainnet migrate
-        
+
+    # 4) read world address (host)
     - name: Extract World Address
       working-directory: ./contract
       id: world
@@ -83,53 +83,68 @@ jobs:
         WORLD_ADDRESS=$(grep "world_address" dojo_mainnet.toml | cut -d '"' -f 2)
         echo "world_address=$WORLD_ADDRESS" >> $GITHUB_OUTPUT
         echo "World Address: $WORLD_ADDRESS"
-    
-    - name: Install Slotup
-      run: |
-        curl -L https://slot.cartridge.sh | bash
-        echo "$HOME/.slotup/bin" >> $GITHUB_PATH
-        export PATH="$HOME/.slotup/bin:$PATH"
-        slotup --version || true
 
-    - name: Install Slot
+    # 5) build our slot-enabled image from ./contract/Dockerfile
+    #    (this is the Dockerfile you just rewrote to install slot)
+    - name: Build slot-enabled image
+      working-directory: ./contract
       run: |
-        export PATH="$HOME/.slotup/bin:$PATH"
-        slotup
-        echo "$HOME/.slot/bin" >> $GITHUB_PATH
+        # tag with latest, you can also push to GHCR here if you want
+        docker build -t torii-with-slot:latest .
 
-    - name: Deploy Torii with Slot
+    # 6) run slot inside docker
+    - name: Deploy Torii with Slot (docker)
       env:
-        SLOT_AUTH: ${{ secrets.SLOT_AUTH_TOKEN }}
+        SLOT_AUTH: ${{ secrets.SLOT_AUTH_TOKEN }}   # you already have this
         STARKNET_RPC_URL: https://api.cartridge.gg/x/starknet/mainnet
         WORLD_ADDRESS: ${{ steps.world.outputs.world_address }}
       run: |
-        # make sure both are on PATH in THIS step
-        export PATH="$HOME/.slot/bin:$HOME/.slotup/bin:$PATH"
+        # everything happens in the container now
+        docker run --rm \
+          -e SLOT_AUTH="$SLOT_AUTH" \
+          -e STARKNET_RPC_URL="$STARKNET_RPC_URL" \
+          -e WORLD_ADDRESS="$WORLD_ADDRESS" \
+          torii-with-slot:latest \
+          bash -lc '
+            set -e
+            # delete old deployment if exists
+            slot deployments delete survivor-valhalla torii || true
+            # create new
+            slot deployments create survivor-valhalla torii \
+              --version v1.7.1 \
+              --world "$WORLD_ADDRESS" \
+              --rpc "$STARKNET_RPC_URL"
+            # list to a file
+            slot deployments list survivor-valhalla > /tmp/deployment-info.txt
+            cat /tmp/deployment-info.txt
+          '
+        # copy file out of container? we can't after --rm, so we re-run below
 
-        # no interactive login needed because SLOT_AUTH is set
-        slot deployments delete survivor-valhalla torii || true
-
-        slot deployments create survivor-valhalla torii \
-          --version v1.7.1 \
-          --world "$WORLD_ADDRESS" \
-          --rpc "$STARKNET_RPC_URL"
-
-        slot deployments list survivor-valhalla > deployment-info.txt
+    # 7) re-run list in a short container to pull out the info as an artifact
+    - name: Dump deployment info to file
+      env:
+        SLOT_AUTH: ${{ secrets.SLOT_AUTH_TOKEN }}
+      run: |
+        docker run --rm \
+          -e SLOT_AUTH="$SLOT_AUTH" \
+          torii-with-slot:latest \
+          bash -lc 'slot deployments list survivor-valhalla' > deployment-info.txt
         cat deployment-info.txt
-    
+
     - name: Upload deployment info
       uses: actions/upload-artifact@v4
       with:
         name: deployment-info
         path: deployment-info.txt
-    
+
+    # 8) Walnut verify (still docker)
     - name: Verify contracts with Walnut
       working-directory: ./contract
       continue-on-error: true
       run: |
         docker run --rm \
           --platform linux/arm64 \
-          -v ${{ github.workspace }}/contract:/app \
+          -v "${{ github.workspace }}/contract:/app" \
           -w /app \
           ghcr.io/dojoengine/dojo:v1.7.1 \
           sozo walnut verify || echo "Walnut verification started - check the provided link"
