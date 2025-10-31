@@ -180,4 +180,82 @@ mod tests {
         assert(lineup.beast4_id == 40_u256, 'Beast 4 not overwritten');
         assert(lineup.beast5_id == 50_u256, 'Beast 5 not overwritten');
     }
+
+    #[test]
+    fn test_register_empty_lineup() {
+        let caller: ContractAddress = 0x1337.try_into().unwrap();
+
+        let ndef = namespace_def();
+        let mut world = spawn_test_world(world::TEST_CLASS_HASH, [ndef].span());
+        world.sync_perms_and_inits(contract_defs());
+
+        let (contract_address, _) = world.dns(@"beast_actions").unwrap();
+        let beast_actions_system = IBeastActionsDispatcher { contract_address };
+
+        // Set the contract address (which becomes the caller)
+        set_contract_address(caller);
+
+        // Register empty lineup (all beasts are 0)
+        beast_actions_system.register(0_u256, 0_u256, 0_u256, 0_u256, 0_u256);
+        
+        // Read the lineup from world
+        let lineup: BeastLineup = world.read_model(caller);
+        
+        // Assert all beasts are empty
+        assert(lineup.beast1_id == 0_u256, 'Beast 1 not empty');
+        assert(lineup.beast2_id == 0_u256, 'Beast 2 not empty');
+        assert(lineup.beast3_id == 0_u256, 'Beast 3 not empty');
+        assert(lineup.beast4_id == 0_u256, 'Beast 4 not empty');
+        assert(lineup.beast5_id == 0_u256, 'Beast 5 not empty');
+    }
+
+    #[test]
+    fn test_register_partial_lineup() {
+        let caller: ContractAddress = 0x1337.try_into().unwrap();
+
+        let ndef = namespace_def();
+        let mut world = spawn_test_world(world::TEST_CLASS_HASH, [ndef].span());
+        world.sync_perms_and_inits(contract_defs());
+
+        let (contract_address, _) = world.dns(@"beast_actions").unwrap();
+        let beast_actions_system = IBeastActionsDispatcher { contract_address };
+
+        // Set the contract address (which becomes the caller)
+        set_contract_address(caller);
+
+        // Register partial lineup (only 2 beasts)
+        beast_actions_system.register(10_u256, 20_u256, 0_u256, 0_u256, 0_u256);
+        
+        // Read the lineup from world
+        let lineup: BeastLineup = world.read_model(caller);
+        
+        // Assert lineup contains correct beasts
+        assert(lineup.beast1_id == 10_u256, 'Beast 1 incorrect');
+        assert(lineup.beast2_id == 20_u256, 'Beast 2 incorrect');
+        assert(lineup.beast3_id == 0_u256, 'Beast 3 not empty');
+        assert(lineup.beast4_id == 0_u256, 'Beast 4 not empty');
+        assert(lineup.beast5_id == 0_u256, 'Beast 5 not empty');
+    }
+
+    #[test]
+    #[should_panic(expected: ('Cannot swap to empty', 'ENTRYPOINT_FAILED'))]
+    fn test_swap_to_empty_fails() {
+        let caller: ContractAddress = 0x1337.try_into().unwrap();
+
+        let ndef = namespace_def();
+        let mut world = spawn_test_world(world::TEST_CLASS_HASH, [ndef].span());
+        world.sync_perms_and_inits(contract_defs());
+
+        let (contract_address, _) = world.dns(@"beast_actions").unwrap();
+        let beast_actions_system = IBeastActionsDispatcher { contract_address };
+
+        // Set the contract address (which becomes the caller)
+        set_contract_address(caller);
+
+        // Register lineup with some beasts
+        beast_actions_system.register(10_u256, 20_u256, 30_u256, 0_u256, 0_u256);
+        
+        // Try to swap position 1 to empty (0) - this should panic
+        beast_actions_system.swap(1_u8, 0_u256);
+    }
 }

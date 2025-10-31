@@ -10,23 +10,23 @@ A beast lineup management system on Starknet using the Dojo framework.
 
 ### Beast Actions Contract
 
-The main contract for managing beast lineups. Users can register their team of 5 beasts and swap them as needed.
+The main contract for managing beast lineups. Users can register their team of 0-5 beasts and swap them as needed.
 
 #### Functions
 
 ##### `register(beast1_id, beast2_id, beast3_id, beast4_id, beast5_id)`
-Registers a new beast lineup for the caller.
+Registers a new beast lineup for the caller. You can register anywhere from 0 to 5 beasts.
 
 **Parameters:**
-- `beast1_id`: u256 - ID of the first beast
-- `beast2_id`: u256 - ID of the second beast
-- `beast3_id`: u256 - ID of the third beast
-- `beast4_id`: u256 - ID of the fourth beast
-- `beast5_id`: u256 - ID of the fifth beast
+- `beast1_id`: u256 - ID of the first beast (0 for empty slot)
+- `beast2_id`: u256 - ID of the second beast (0 for empty slot)
+- `beast3_id`: u256 - ID of the third beast (0 for empty slot)
+- `beast4_id`: u256 - ID of the fourth beast (0 for empty slot)
+- `beast5_id`: u256 - ID of the fifth beast (0 for empty slot)
 
 **Requirements:**
-- Caller must own all 5 beasts (verified against the Beasts contract at `0x046dA8955829ADF2bDa310099A0063451923f02E648cF25A1203aac6335CF0e4`)
-- All beast IDs must be valid
+- Caller must own any non-zero beast IDs (verified against the Beasts contract at `0x046dA8955829ADF2bDa310099A0063451923f02E648cF25A1203aac6335CF0e4`)
+- Beast IDs can be 0 (empty slot) or valid owned beast IDs
 
 **Events:**
 - `BeastLineupRegistered` - Emitted when a lineup is successfully registered
@@ -40,6 +40,7 @@ Swaps a beast at a specific position in the lineup.
 
 **Requirements:**
 - Position must be between 0 and 4
+- `new_beast_id` cannot be 0 (use register to set empty slots)
 - Caller must own the new beast
 - Caller must have an existing lineup
 
@@ -64,9 +65,17 @@ Stores the lineup configuration for each player.
 ### Using sozo CLI
 
 ```bash
-# Register a lineup
+# Register a full lineup
 sozo execute survivor_valhalla-beast_actions register --wait \
   --calldata 1,2,3,4,5
+
+# Register a partial lineup (only 2 beasts)
+sozo execute survivor_valhalla-beast_actions register --wait \
+  --calldata 10,20,0,0,0
+
+# Register an empty lineup
+sozo execute survivor_valhalla-beast_actions register --wait \
+  --calldata 0,0,0,0,0
 
 # Swap a beast at position 2 (0-indexed) with beast ID 99
 sozo execute survivor_valhalla-beast_actions swap --wait \
