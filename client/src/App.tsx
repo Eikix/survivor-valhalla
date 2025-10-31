@@ -1,7 +1,7 @@
 // src/App.tsx
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
-import { LandingPage } from './pages/LandingPage';
-import { HomePage } from './pages/HomePage';
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { LandingPage } from "./pages/LandingPage";
+import { HomePage } from "./pages/HomePage";
 
 function App() {
   return (
