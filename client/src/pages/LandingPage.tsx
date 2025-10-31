@@ -1,8 +1,8 @@
 // src/pages/LandingPage.tsx
-import { motion } from 'framer-motion';
-import { Swords, Shield, Zap, Sparkles } from 'lucide-react';
-import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { motion } from "framer-motion";
+import { Swords, Shield, Zap, Sparkles } from "lucide-react";
+import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 
 export function LandingPage() {
   const navigate = useNavigate();
@@ -10,15 +10,18 @@ export function LandingPage() {
 
   const handleConnect = async () => {
     setIsConnecting(true);
-    
+
     // Mock wallet connection (2 second delay)
-    await new Promise(resolve => setTimeout(resolve, 2000));
-    
+    await new Promise((resolve) => setTimeout(resolve, 2000));
+
     // Mock setting a wallet address
-    localStorage.setItem('mockWalletAddress', '0x' + Math.random().toString(16).slice(2, 10));
-    
+    localStorage.setItem(
+      "mockWalletAddress",
+      "0x" + Math.random().toString(16).slice(2, 10),
+    );
+
     setIsConnecting(false);
-    navigate('/home');
+    navigate("/home");
   };
 
   return (
@@ -33,7 +36,7 @@ export function LandingPage() {
           transition={{
             duration: 8,
             repeat: Infinity,
-            ease: "easeInOut"
+            ease: "easeInOut",
           }}
           className="absolute top-1/4 left-1/4 w-96 h-96 bg-purple-600/20 rounded-full blur-3xl"
         />
@@ -46,7 +49,7 @@ export function LandingPage() {
             duration: 10,
             repeat: Infinity,
             ease: "easeInOut",
-            delay: 1
+            delay: 1,
           }}
           className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-pink-600/20 rounded-full blur-3xl"
         />
@@ -68,21 +71,22 @@ export function LandingPage() {
             transition={{ duration: 0.6, delay: 0.2 }}
             className="mb-8"
           >
-            <motion.h1 
+            <motion.h1
               className="text-6xl md:text-8xl font-black mb-4 leading-tight"
               style={{
-                background: 'linear-gradient(to right, #a78bfa, #ec4899, #ef4444)',
-                WebkitBackgroundClip: 'text',
-                WebkitTextFillColor: 'transparent',
-                backgroundClip: 'text',
+                background:
+                  "linear-gradient(to right, #a78bfa, #ec4899, #ef4444)",
+                WebkitBackgroundClip: "text",
+                WebkitTextFillColor: "transparent",
+                backgroundClip: "text",
               }}
             >
               CLASH OF
               <br />
               SURVIVORS
             </motion.h1>
-            
-            <motion.div 
+
+            <motion.div
               className="flex items-center justify-center gap-3 text-purple-300"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
@@ -104,15 +108,17 @@ export function LandingPage() {
             className="mb-12 space-y-2"
           >
             <p className="text-xl md:text-2xl text-gray-300">
-              Build your base with{' '}
-              <span className="text-purple-400 font-semibold">dead adventurers</span>
+              Build your base with{" "}
+              <span className="text-purple-400 font-semibold">
+                dead adventurers
+              </span>
             </p>
             <p className="text-xl md:text-2xl text-gray-300">
-              Attack with{' '}
+              Attack with{" "}
               <span className="text-pink-400 font-semibold">fierce beasts</span>
             </p>
             <p className="text-xl md:text-2xl text-gray-300">
-              Dominate the{' '}
+              Dominate the{" "}
               <span className="text-red-400 font-semibold">leaderboard</span>
             </p>
           </motion.div>
@@ -135,7 +141,11 @@ export function LandingPage() {
                   <>
                     <motion.div
                       animate={{ rotate: 360 }}
-                      transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                      transition={{
+                        duration: 1,
+                        repeat: Infinity,
+                        ease: "linear",
+                      }}
                     >
                       <Sparkles className="w-6 h-6 md:w-8 md:h-8" />
                     </motion.div>
@@ -149,9 +159,7 @@ export function LandingPage() {
                   </>
                 )}
               </span>
-              <motion.div
-                className="absolute inset-0 rounded-xl bg-gradient-to-r from-purple-400 to-pink-400 opacity-0 group-hover:opacity-20 blur-xl transition-opacity"
-              />
+              <motion.div className="absolute inset-0 rounded-xl bg-gradient-to-r from-purple-400 to-pink-400 opacity-0 group-hover:opacity-20 blur-xl transition-opacity" />
             </motion.button>
 
             <motion.p
@@ -160,7 +168,9 @@ export function LandingPage() {
               transition={{ delay: 1 }}
               className="mt-4 text-sm text-gray-400"
             >
-              {isConnecting ? 'Connecting to wallet...' : 'Connect your wallet to start playing'}
+              {isConnecting
+                ? "Connecting to wallet..."
+                : "Connect your wallet to start playing"}
             </motion.p>
           </motion.div>
         </motion.div>
@@ -175,26 +185,26 @@ export function LandingPage() {
           {[
             {
               icon: Shield,
-              title: 'Build Your Base',
-              description: 'Use dead Loot Survivor adventurers as defenders',
-              gradient: 'from-purple-500 to-purple-700',
-              delay: 0
+              title: "Build Your Base",
+              description: "Use dead Loot Survivor adventurers as defenders",
+              gradient: "from-purple-500 to-purple-700",
+              delay: 0,
             },
             {
               icon: Swords,
-              title: 'Attack & Conquer',
-              description: 'Deploy beasts to raid enemy bases strategically',
-              gradient: 'from-pink-500 to-red-600',
-              delay: 0.1
+              title: "Attack & Conquer",
+              description: "Deploy beasts to raid enemy bases strategically",
+              gradient: "from-pink-500 to-red-600",
+              delay: 0.1,
             },
             {
               icon: Zap,
-              title: 'Daily Energy',
-              description: 'Use 3 daily attacks to climb the leaderboard',
-              gradient: 'from-red-500 to-orange-600',
-              delay: 0.2
-            }
-          ].map((feature, index) => (
+              title: "Daily Energy",
+              description: "Use 3 daily attacks to climb the leaderboard",
+              gradient: "from-red-500 to-orange-600",
+              delay: 0.2,
+            },
+          ].map((feature) => (
             <motion.div
               key={feature.title}
               initial={{ opacity: 0, y: 30 }}
@@ -210,8 +220,12 @@ export function LandingPage() {
               >
                 <feature.icon className="w-7 h-7 md:w-8 md:h-8" />
               </motion.div>
-              <h3 className="text-lg md:text-xl font-bold mb-2">{feature.title}</h3>
-              <p className="text-sm md:text-base text-gray-400">{feature.description}</p>
+              <h3 className="text-lg md:text-xl font-bold mb-2">
+                {feature.title}
+              </h3>
+              <p className="text-sm md:text-base text-gray-400">
+                {feature.description}
+              </p>
             </motion.div>
           ))}
         </motion.div>
@@ -228,9 +242,21 @@ export function LandingPage() {
           </h2>
           <div className="space-y-4">
             {[
-              { num: 1, title: 'Setup Defense', desc: 'Choose 5 dead adventurers to guard your base' },
-              { num: 2, title: 'Launch Attacks', desc: 'Use daily energy to attack with your beasts' },
-              { num: 3, title: 'Watch Battles', desc: 'Experience auto-battler combat and climb ranks' }
+              {
+                num: 1,
+                title: "Setup Defense",
+                desc: "Choose 5 dead adventurers to guard your base",
+              },
+              {
+                num: 2,
+                title: "Launch Attacks",
+                desc: "Use daily energy to attack with your beasts",
+              },
+              {
+                num: 3,
+                title: "Watch Battles",
+                desc: "Experience auto-battler combat and climb ranks",
+              },
             ].map((step, index) => (
               <motion.div
                 key={step.num}
@@ -247,8 +273,12 @@ export function LandingPage() {
                   {step.num}
                 </motion.div>
                 <div>
-                  <h3 className="font-bold mb-1 text-base md:text-lg">{step.title}</h3>
-                  <p className="text-sm md:text-base text-gray-400">{step.desc}</p>
+                  <h3 className="font-bold mb-1 text-base md:text-lg">
+                    {step.title}
+                  </h3>
+                  <p className="text-sm md:text-base text-gray-400">
+                    {step.desc}
+                  </p>
                 </div>
               </motion.div>
             ))}
@@ -262,7 +292,10 @@ export function LandingPage() {
           transition={{ delay: 2, duration: 0.8 }}
           className="mt-16 md:mt-24 text-center text-xs md:text-sm text-gray-500 space-y-2"
         >
-          <p>Built on Starknet • Powered by Dojo • Integrates with Loot Survivor 2</p>
+          <p>
+            Built on Starknet • Powered by Dojo • Integrates with Loot Survivor
+            2
+          </p>
           <p>A Dojo/Cartridge Game Jam Creation</p>
         </motion.div>
       </div>
