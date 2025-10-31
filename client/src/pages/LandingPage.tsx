@@ -204,7 +204,7 @@ export function LandingPage() {
               gradient: "from-red-500 to-orange-600",
               delay: 0.2,
             },
-          ].map((feature, index) => (
+          ].map((feature, _) => (
             <motion.div
               key={feature.title}
               initial={{ opacity: 0, y: 30 }}
