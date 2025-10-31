@@ -14,21 +14,21 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v4
     
-    - name: Install Dojo
-      run: |
-        curl -L https://install.dojoengine.org | bash
-        source ~/.bashrc
-        dojoup -v 1.7.1
-    
-    - name: Install Scarb
-      uses: software-mansion/setup-scarb@v1
+    - name: Install Nix
+      uses: cachix/install-nix-action@v22
       with:
-        scarb-version: "2.6.5"
+        nix_path: nixpkgs=channel:nixos-unstable
+    
+    - name: Setup Nix binary cache
+      uses: cachix/cachix-action@v12
+      with:
+        name: survivor-valhalla
+        skipPush: true
     
     - name: Build contracts
       working-directory: ./contract
       run: |
-        sozo -P mainnet build
+        nix develop ..#default --command sozo -P mainnet build
     
     - name: Deploy contracts
       working-directory: ./contract
@@ -37,7 +37,7 @@ jobs:
         DOJO_ACCOUNT_ADDRESS: ${{ secrets.DOJO_ACCOUNT_ADDRESS }}
         DOJO_PRIVATE_KEY: ${{ secrets.DOJO_PRIVATE_KEY }}
       run: |
-        sozo -P mainnet migrate
+        nix develop ..#default --command sozo -P mainnet migrate
         
     - name: Extract World Address
       working-directory: ./contract
@@ -47,36 +47,27 @@ jobs:
         echo "world_address=$WORLD_ADDRESS" >> $GITHUB_OUTPUT
         echo "World Address: $WORLD_ADDRESS"
     
-    - name: Install Slot CLI
-      run: |
-        curl -L https://slot.cartridge.sh/install | bash
-        export PATH="$HOME/.slot/bin:$PATH"
-        slot --version
-    
     - name: Authenticate Slot
       env:
         SLOT_AUTH_TOKEN: ${{ secrets.SLOT_AUTH_TOKEN }}
       run: |
-        export PATH="$HOME/.slot/bin:$PATH"
-        echo "$SLOT_AUTH_TOKEN" | slot auth login --token
+        echo "$SLOT_AUTH_TOKEN" | nix develop --command slot auth login --token
     
     - name: Deploy Torii
       env:
         STARKNET_RPC_URL: https://api.cartridge.gg/x/starknet/mainnet
       run: |
-        export PATH="$HOME/.slot/bin:$PATH"
-        
         # Delete existing deployment if it exists
-        slot deployments delete survivor-valhalla torii || true
+        nix develop --command slot deployments delete survivor-valhalla torii || true
         
         # Create new Torii deployment
-        slot deployments create survivor-valhalla torii \
+        nix develop --command slot deployments create survivor-valhalla torii \
           --version v1.7.1 \
           --world ${{ steps.world.outputs.world_address }} \
           --rpc $STARKNET_RPC_URL
         
         # Save deployment info
-        slot deployments list survivor-valhalla > deployment-info.txt
+        nix develop --command slot deployments list survivor-valhalla > deployment-info.txt
         cat deployment-info.txt
     
     - name: Upload deployment info
@@ -89,4 +80,4 @@ jobs:
       working-directory: ./contract
       continue-on-error: true
       run: |
-        sozo walnut verify || echo "Walnut verification started - check the provided link"
+        nix develop ..#default --command sozo walnut verify || echo "Walnut verification started - check the provided link"
