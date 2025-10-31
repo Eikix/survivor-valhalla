@@ -87,7 +87,7 @@ jobs:
     - name: Install Slot CLI
       run: |
         curl -L https://slot.cartridge.sh | bash
-        source $HOME/.bashrc
+        export PATH="$HOME/.slotup/bin:$PATH"
         slotup
         echo "$HOME/.slot/bin" >> $GITHUB_PATH
         
