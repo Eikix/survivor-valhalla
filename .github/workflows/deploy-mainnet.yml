@@ -94,6 +94,7 @@ jobs:
         SLOT_AUTH_TOKEN: ${{ secrets.SLOT_AUTH_TOKEN }}
         STARKNET_RPC_URL: https://api.cartridge.gg/x/starknet/mainnet
       run: |
+        export PATH="$HOME/.slot/bin:$PATH"
         echo "$SLOT_AUTH_TOKEN" | slot auth login --token
         slot deployments delete survivor-valhalla torii || true
         slot deployments create survivor-valhalla torii \
