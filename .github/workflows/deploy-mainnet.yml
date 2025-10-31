@@ -30,10 +30,36 @@ jobs:
           ghcr.io/dojoengine/dojo:v1.7.1 \
           sozo -P mainnet build
     
+    - name: Check and set environment
+      id: env
+      run: |
+        # Use secret or default RPC URL
+        if [ -z "${{ secrets.STARKNET_RPC_URL_MAINNET }}" ]; then
+          echo "Warning: STARKNET_RPC_URL_MAINNET secret not set, using default"
+          echo "rpc_url=https://api.cartridge.gg/x/starknet/mainnet" >> $GITHUB_OUTPUT
+        else
+          echo "rpc_url=${{ secrets.STARKNET_RPC_URL_MAINNET }}" >> $GITHUB_OUTPUT
+        fi
+        
+        # Check required secrets
+        if [ -z "${{ secrets.DOJO_ACCOUNT_ADDRESS }}" ]; then
+          echo "Error: DOJO_ACCOUNT_ADDRESS secret is not set"
+          echo "Please set the following GitHub secrets:"
+          echo "- DOJO_ACCOUNT_ADDRESS: Your Starknet account address"
+          echo "- DOJO_PRIVATE_KEY: Your account private key"
+          echo "- STARKNET_RPC_URL_MAINNET: (Optional) Custom RPC URL"
+          exit 1
+        fi
+        if [ -z "${{ secrets.DOJO_PRIVATE_KEY }}" ]; then
+          echo "Error: DOJO_PRIVATE_KEY secret is not set"
+          exit 1
+        fi
+        echo "All required secrets are configured"
+    
     - name: Deploy contracts
       working-directory: ./contract
       env:
-        STARKNET_RPC_URL: ${{ secrets.STARKNET_RPC_URL_MAINNET }}
+        STARKNET_RPC_URL: ${{ steps.env.outputs.rpc_url }}
         DOJO_ACCOUNT_ADDRESS: ${{ secrets.DOJO_ACCOUNT_ADDRESS }}
         DOJO_PRIVATE_KEY: ${{ secrets.DOJO_PRIVATE_KEY }}
       run: |
