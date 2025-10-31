@@ -65,13 +65,18 @@ pub mod beast_actions {
             
             let mut lineup: BeastLineup = world.read_model(player);
             
-            match position {
-                1 => lineup.beast1_id = new_beast_id,
-                2 => lineup.beast2_id = new_beast_id,
-                3 => lineup.beast3_id = new_beast_id,
-                4 => lineup.beast4_id = new_beast_id,
-                5 => lineup.beast5_id = new_beast_id,
-                _ => panic!("Invalid position: must be between 1 and 5"),
+            if position == 0 {
+                lineup.beast1_id = new_beast_id;
+            } else if position == 1 {
+                lineup.beast2_id = new_beast_id;
+            } else if position == 2 {
+                lineup.beast3_id = new_beast_id;
+            } else if position == 3 {
+                lineup.beast4_id = new_beast_id;
+            } else if position == 4 {
+                lineup.beast5_id = new_beast_id;
+            } else {
+                panic!("Invalid position: must be between 0 and 4");
             }
             
             world.write_model(@lineup);
