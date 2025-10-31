@@ -1,23 +1,26 @@
 #[cfg(test)]
 mod tests {
-    use dojo::model::{ModelStorage, ModelStorageTest};
+    use dojo::model::ModelStorage;
     use dojo::world::{WorldStorageTrait, world};
     use dojo_cairo_test::{
         ContractDef, ContractDefTrait, NamespaceDef, TestResource, WorldStorageTestTrait,
-        spawn_test_world,
+        spawn_test_world
     };
-    use dojo_starter::models::{Direction, Moves, Position, m_Moves, m_Position};
-    use dojo_starter::systems::actions::{IActionsDispatcher, IActionsDispatcherTrait, actions};
+    use starknet::testing::set_contract_address;
+    use dojo_starter::models::{BeastLineup, m_BeastLineup};
+    use dojo_starter::systems::beast_actions::{
+        IBeastActionsDispatcher, IBeastActionsDispatcherTrait, beast_actions
+    };
     use starknet::ContractAddress;
 
     fn namespace_def() -> NamespaceDef {
         let ndef = NamespaceDef {
             namespace: "dojo_starter",
             resources: [
-                TestResource::Model(m_Position::TEST_CLASS_HASH),
-                TestResource::Model(m_Moves::TEST_CLASS_HASH),
-                TestResource::Event(actions::e_Moved::TEST_CLASS_HASH),
-                TestResource::Contract(actions::TEST_CLASS_HASH),
+                TestResource::Model(m_BeastLineup::TEST_CLASS_HASH),
+                TestResource::Event(beast_actions::e_BeastLineupRegistered::TEST_CLASS_HASH),
+                TestResource::Event(beast_actions::e_BeastSwapped::TEST_CLASS_HASH),
+                TestResource::Contract(beast_actions::TEST_CLASS_HASH),
             ]
                 .span(),
         };
@@ -27,73 +30,154 @@ mod tests {
 
     fn contract_defs() -> Span<ContractDef> {
         [
-            ContractDefTrait::new(@"dojo_starter", @"actions")
+            ContractDefTrait::new(@"dojo_starter", @"beast_actions")
                 .with_writer_of([dojo::utils::bytearray_hash(@"dojo_starter")].span())
         ]
             .span()
     }
 
     #[test]
-    fn test_world_test_set() {
-        // Initialize test environment
-        let caller: ContractAddress = 0.try_into().unwrap();
+    fn test_register_beast_lineup() {
+        let caller: ContractAddress = 0x1337.try_into().unwrap();
+
         let ndef = namespace_def();
-
-        // Register the resources.
         let mut world = spawn_test_world(world::TEST_CLASS_HASH, [ndef].span());
-
-        // Ensures permissions and initializations are synced.
         world.sync_perms_and_inits(contract_defs());
 
-        // Test initial position
-        let mut position: Position = world.read_model(caller);
-        assert(position.vec.x == 0 && position.vec.y == 0, 'initial position wrong');
+        let (contract_address, _) = world.dns(@"beast_actions").unwrap();
+        let beast_actions_system = IBeastActionsDispatcher { contract_address };
 
-        // Test write_model_test
-        position.vec.x = 122;
-        position.vec.y = 88;
+        // Set the contract address (which becomes the caller)
+        set_contract_address(caller);
 
-        world.write_model_test(@position);
-
-        let mut position: Position = world.read_model(caller);
-        assert(position.vec.y == 88, 'write_value_from_id failed');
-
-        // Test model deletion
-        world.erase_model(@position);
-        let position: Position = world.read_model(caller);
-        assert(position.vec.x == 0 && position.vec.y == 0, 'erase_model failed');
+        // Register a beast lineup
+        beast_actions_system.register(1_u256, 2_u256, 3_u256, 4_u256, 5_u256);
+        
+        // Read the lineup from world
+        let lineup: BeastLineup = world.read_model(caller);
+        
+        // Assert all beasts are registered correctly
+        assert(lineup.beast1_id == 1_u256, 'Beast 1 not registered');
+        assert(lineup.beast2_id == 2_u256, 'Beast 2 not registered');
+        assert(lineup.beast3_id == 3_u256, 'Beast 3 not registered');
+        assert(lineup.beast4_id == 4_u256, 'Beast 4 not registered');
+        assert(lineup.beast5_id == 5_u256, 'Beast 5 not registered');
     }
 
     #[test]
-    #[available_gas(30000000)]
-    fn test_move() {
-        let caller: ContractAddress = 0.try_into().unwrap();
+    fn test_swap_beast() {
+        let caller: ContractAddress = 0x1337.try_into().unwrap();
 
         let ndef = namespace_def();
         let mut world = spawn_test_world(world::TEST_CLASS_HASH, [ndef].span());
         world.sync_perms_and_inits(contract_defs());
 
-        let (contract_address, _) = world.dns(@"actions").unwrap();
-        let actions_system = IActionsDispatcher { contract_address };
+        let (contract_address, _) = world.dns(@"beast_actions").unwrap();
+        let beast_actions_system = IBeastActionsDispatcher { contract_address };
 
-        actions_system.spawn();
-        let initial_moves: Moves = world.read_model(caller);
-        let initial_position: Position = world.read_model(caller);
+        // Set the contract address (which becomes the caller)
+        set_contract_address(caller);
 
-        assert(
-            initial_position.vec.x == 10 && initial_position.vec.y == 10, 'wrong initial position',
-        );
+        // Register initial lineup
+        beast_actions_system.register(10_u256, 20_u256, 30_u256, 40_u256, 50_u256);
+        
+        // Swap beast at position 2 (0-indexed)
+        beast_actions_system.swap(2_u8, 99_u256);
+        
+        // Read the updated lineup
+        let lineup: BeastLineup = world.read_model(caller);
+        
+        // Assert the swap worked
+        assert(lineup.beast1_id == 10_u256, 'Beast 1 changed unexpectedly');
+        assert(lineup.beast2_id == 20_u256, 'Beast 2 changed unexpectedly');
+        assert(lineup.beast3_id == 99_u256, 'Beast 3 not swapped');
+        assert(lineup.beast4_id == 40_u256, 'Beast 4 changed unexpectedly');
+        assert(lineup.beast5_id == 50_u256, 'Beast 5 changed unexpectedly');
+    }
 
-        actions_system.move(Direction::Right.into());
+    #[test]
+    fn test_multiple_swaps() {
+        let caller: ContractAddress = 0x1337.try_into().unwrap();
 
-        let moves: Moves = world.read_model(caller);
-        let right_dir_felt: felt252 = Direction::Right.into();
+        let ndef = namespace_def();
+        let mut world = spawn_test_world(world::TEST_CLASS_HASH, [ndef].span());
+        world.sync_perms_and_inits(contract_defs());
 
-        assert(moves.remaining == initial_moves.remaining - 1, 'moves is wrong');
-        assert(moves.last_direction.unwrap().into() == right_dir_felt, 'last direction is wrong');
+        let (contract_address, _) = world.dns(@"beast_actions").unwrap();
+        let beast_actions_system = IBeastActionsDispatcher { contract_address };
 
-        let new_position: Position = world.read_model(caller);
-        assert(new_position.vec.x == initial_position.vec.x + 1, 'position x is wrong');
-        assert(new_position.vec.y == initial_position.vec.y, 'position y is wrong');
+        // Set the contract address (which becomes the caller)
+        set_contract_address(caller);
+
+        // Register initial lineup
+        beast_actions_system.register(1_u256, 2_u256, 3_u256, 4_u256, 5_u256);
+        
+        // Perform multiple swaps (0-indexed)
+        beast_actions_system.swap(0_u8, 100_u256);
+        beast_actions_system.swap(4_u8, 500_u256);
+        beast_actions_system.swap(1_u8, 200_u256);
+        
+        // Read the final lineup
+        let lineup: BeastLineup = world.read_model(caller);
+        
+        // Assert all swaps worked
+        assert(lineup.beast1_id == 100_u256, 'Beast 1 swap failed');
+        assert(lineup.beast2_id == 200_u256, 'Beast 2 swap failed');
+        assert(lineup.beast3_id == 3_u256, 'Beast 3 changed unexpectedly');
+        assert(lineup.beast4_id == 4_u256, 'Beast 4 changed unexpectedly');
+        assert(lineup.beast5_id == 500_u256, 'Beast 5 swap failed');
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_swap_invalid_position() {
+        let caller: ContractAddress = 0x1337.try_into().unwrap();
+
+        let ndef = namespace_def();
+        let mut world = spawn_test_world(world::TEST_CLASS_HASH, [ndef].span());
+        world.sync_perms_and_inits(contract_defs());
+
+        let (contract_address, _) = world.dns(@"beast_actions").unwrap();
+        let beast_actions_system = IBeastActionsDispatcher { contract_address };
+
+        // Set the contract address (which becomes the caller)
+        set_contract_address(caller);
+
+        // Register initial lineup
+        beast_actions_system.register(1_u256, 2_u256, 3_u256, 4_u256, 5_u256);
+        
+        // Try to swap at invalid position
+        beast_actions_system.swap(5_u8, 999_u256);
+    }
+
+    #[test]
+    fn test_overwrite_lineup() {
+        let caller: ContractAddress = 0x1337.try_into().unwrap();
+
+        let ndef = namespace_def();
+        let mut world = spawn_test_world(world::TEST_CLASS_HASH, [ndef].span());
+        world.sync_perms_and_inits(contract_defs());
+
+        let (contract_address, _) = world.dns(@"beast_actions").unwrap();
+        let beast_actions_system = IBeastActionsDispatcher { contract_address };
+
+        // Set the contract address (which becomes the caller)
+        set_contract_address(caller);
+
+        // Register first lineup
+        beast_actions_system.register(1_u256, 2_u256, 3_u256, 4_u256, 5_u256);
+        
+        // Register new lineup (overwrites the first)
+        beast_actions_system.register(10_u256, 20_u256, 30_u256, 40_u256, 50_u256);
+        
+        // Read the lineup
+        let lineup: BeastLineup = world.read_model(caller);
+        
+        // Assert new lineup is stored
+        assert(lineup.beast1_id == 10_u256, 'Beast 1 not overwritten');
+        assert(lineup.beast2_id == 20_u256, 'Beast 2 not overwritten');
+        assert(lineup.beast3_id == 30_u256, 'Beast 3 not overwritten');
+        assert(lineup.beast4_id == 40_u256, 'Beast 4 not overwritten');
+        assert(lineup.beast5_id == 50_u256, 'Beast 5 not overwritten');
     }
 }

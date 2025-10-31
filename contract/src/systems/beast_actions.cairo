@@ -1,5 +1,3 @@
-use dojo_starter::models::BeastLineup;
-
 #[starknet::interface]
 pub trait IBeastActions<T> {
     fn register(ref self: T, beast1_id: u256, beast2_id: u256, beast3_id: u256, beast4_id: u256, beast5_id: u256);
@@ -16,9 +14,14 @@ pub mod beast_actions {
 
     #[derive(Copy, Drop, Serde)]
     #[dojo::event]
-    pub struct BeastLineupRegistered { 
+    pub struct BeastLineupRegistered {
         #[key]
         pub player: ContractAddress,
+        pub beast1_id: u256,
+        pub beast2_id: u256,
+        pub beast3_id: u256,
+        pub beast4_id: u256,
+        pub beast5_id: u256,
     }
 
     #[derive(Copy, Drop, Serde)]
@@ -46,7 +49,14 @@ pub mod beast_actions {
             };
             
             world.write_model(@lineup);
-            world.emit_event(@BeastLineupRegistered { player });
+            world.emit_event(@BeastLineupRegistered { 
+                player,
+                beast1_id,
+                beast2_id,
+                beast3_id,
+                beast4_id,
+                beast5_id,
+            });
         }
 
         fn swap(ref self: ContractState, position: u8, new_beast_id: u256) {
