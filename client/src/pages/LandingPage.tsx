@@ -1,302 +1,150 @@
 // src/pages/LandingPage.tsx
 import { motion } from "framer-motion";
-import { Swords, Shield, Zap, Sparkles } from "lucide-react";
-import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 export function LandingPage() {
   const navigate = useNavigate();
-  const [isConnecting, setIsConnecting] = useState(false);
-
-  const handleConnect = async () => {
-    setIsConnecting(true);
-
-    // Mock wallet connection (2 second delay)
-    await new Promise((resolve) => setTimeout(resolve, 2000));
-
-    // Mock setting a wallet address
-    localStorage.setItem(
-      "mockWalletAddress",
-      "0x" + Math.random().toString(16).slice(2, 10),
-    );
-
-    setIsConnecting(false);
-    navigate("/home");
-  };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-purple-900 to-gray-900 text-white overflow-hidden relative">
-      {/* Animated background elements */}
-      <div className="absolute inset-0 overflow-hidden">
+    <div className="min-h-screen bg-black text-white overflow-hidden relative flex items-center justify-center">
+      {/* Dark Portal Background Effect */}
+      <div className="absolute inset-0">
+        {/* Fel green glow in center */}
         <motion.div
           animate={{
-            scale: [1, 1.2, 1],
-            opacity: [0.3, 0.5, 0.3],
+            scale: [1, 1.15, 1],
+            opacity: [0.2, 0.35, 0.2],
+          }}
+          transition={{
+            duration: 6,
+            repeat: Infinity,
+            ease: "easeInOut",
+          }}
+          className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-emerald-500/30 rounded-full blur-[120px]"
+        />
+
+        {/* Darker outer glow */}
+        <motion.div
+          animate={{
+            scale: [1, 1.1, 1],
+            opacity: [0.1, 0.2, 0.1],
           }}
           transition={{
             duration: 8,
             repeat: Infinity,
             ease: "easeInOut",
+            delay: 0.5,
           }}
-          className="absolute top-1/4 left-1/4 w-96 h-96 bg-purple-600/20 rounded-full blur-3xl"
+          className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-emerald-700/20 rounded-full blur-[150px]"
         />
-        <motion.div
-          animate={{
-            scale: [1, 1.3, 1],
-            opacity: [0.2, 0.4, 0.2],
-          }}
-          transition={{
-            duration: 10,
-            repeat: Infinity,
-            ease: "easeInOut",
-            delay: 1,
-          }}
-          className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-pink-600/20 rounded-full blur-3xl"
-        />
+
+        {/* Vignette */}
+        <div className="absolute inset-0 bg-gradient-radial from-transparent via-black/50 to-black" />
       </div>
 
-      {/* Main content */}
-      <div className="relative z-10 container mx-auto px-4 py-12 md:py-20">
-        {/* Hero section */}
+      {/* Main Portal Content */}
+      <div className="relative z-10 text-center px-4">
+        {/* Portal Frame/Gate */}
+        <motion.div
+          initial={{ opacity: 0, scale: 0.9 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ duration: 1.2, ease: "easeOut" }}
+          className="mb-16"
+        >
+          {/* Top decorative line */}
+          <motion.div
+            initial={{ scaleX: 0 }}
+            animate={{ scaleX: 1 }}
+            transition={{ duration: 1, delay: 0.3 }}
+            className="h-[2px] w-32 mx-auto mb-8 bg-gradient-to-r from-transparent via-emerald-500/60 to-transparent"
+          />
+
+          {/* Title with fel green glow */}
+          <motion.h1
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.8, delay: 0.5 }}
+            className="text-6xl md:text-8xl font-bold tracking-wider mb-6"
+            style={{
+              textShadow: "0 0 40px rgba(16, 185, 129, 0.5), 0 0 80px rgba(16, 185, 129, 0.2)",
+              fontFamily: "serif",
+            }}
+          >
+            <span className="text-emerald-500">SURVIVOR</span>
+            <br />
+            <span className="text-gray-300">VALHALLA</span>
+          </motion.h1>
+
+          {/* Subtitle */}
+          <motion.p
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.8, delay: 0.8 }}
+            className="text-emerald-200/60 text-sm md:text-base tracking-[0.3em] uppercase"
+          >
+            Where legends are forged
+          </motion.p>
+
+          {/* Bottom decorative line */}
+          <motion.div
+            initial={{ scaleX: 0 }}
+            animate={{ scaleX: 1 }}
+            transition={{ duration: 1, delay: 0.3 }}
+            className="h-[2px] w-32 mx-auto mt-8 bg-gradient-to-r from-transparent via-emerald-500/60 to-transparent"
+          />
+        </motion.div>
+
+        {/* Enter Button */}
         <motion.div
           initial={{ opacity: 0, y: 30 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.8 }}
-          className="text-center max-w-4xl mx-auto"
+          transition={{ duration: 0.8, delay: 1 }}
         >
-          {/* Logo/Title */}
-          <motion.div
-            initial={{ scale: 0.9, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            transition={{ duration: 0.6, delay: 0.2 }}
-            className="mb-8"
+          <motion.button
+            onClick={() => navigate("/home")}
+            whileHover={{
+              scale: 1.05,
+              textShadow: "0 0 20px rgba(16, 185, 129, 0.8)",
+            }}
+            whileTap={{ scale: 0.95 }}
+            className="group relative px-12 py-4 text-xl font-bold tracking-wider uppercase border-2 border-emerald-500/50 hover:border-emerald-500 transition-all duration-300"
+            style={{
+              background: "linear-gradient(to bottom, rgba(16, 185, 129, 0.1), rgba(0, 0, 0, 0.4))",
+              textShadow: "0 0 10px rgba(16, 185, 129, 0.5)",
+            }}
           >
-            <motion.h1
-              className="text-6xl md:text-8xl font-black mb-4 leading-tight"
-              style={{
-                background:
-                  "linear-gradient(to right, #a78bfa, #ec4899, #ef4444)",
-                WebkitBackgroundClip: "text",
-                WebkitTextFillColor: "transparent",
-                backgroundClip: "text",
-              }}
-            >
-              CLASH OF
-              <br />
-              SURVIVORS
-            </motion.h1>
+            <span className="relative z-10 text-emerald-500">
+              ENTER ARENA
+            </span>
 
+            {/* Hover glow effect */}
             <motion.div
-              className="flex items-center justify-center gap-3 text-purple-300"
+              className="absolute inset-0 bg-emerald-500/0 group-hover:bg-emerald-500/10 transition-all duration-300"
               initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ delay: 0.5 }}
-            >
-              <Swords className="w-6 h-6" />
-              <span className="text-sm md:text-lg tracking-widest font-semibold">
-                ON-CHAIN BATTLES
-              </span>
-              <Shield className="w-6 h-6" />
-            </motion.div>
-          </motion.div>
+              whileHover={{ opacity: 1 }}
+            />
+          </motion.button>
 
-          {/* Tagline */}
+          {/* Pulsing indicator */}
           <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.6, duration: 0.6 }}
-            className="mb-12 space-y-2"
+            animate={{ opacity: [0.4, 0.8, 0.4] }}
+            transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
+            className="mt-6 text-emerald-500/60 text-xs tracking-widest uppercase"
           >
-            <p className="text-xl md:text-2xl text-gray-300">
-              Build your base with{" "}
-              <span className="text-purple-400 font-semibold">
-                dead adventurers
-              </span>
-            </p>
-            <p className="text-xl md:text-2xl text-gray-300">
-              Attack with{" "}
-              <span className="text-pink-400 font-semibold">fierce beasts</span>
-            </p>
-            <p className="text-xl md:text-2xl text-gray-300">
-              Dominate the{" "}
-              <span className="text-red-400 font-semibold">leaderboard</span>
-            </p>
-          </motion.div>
-
-          {/* CTA Button */}
-          <motion.div
-            initial={{ opacity: 0, scale: 0.8 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ delay: 0.8, duration: 0.5 }}
-          >
-            <motion.button
-              onClick={handleConnect}
-              disabled={isConnecting}
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-              className="group relative px-8 md:px-12 py-4 md:py-6 text-lg md:text-2xl font-bold rounded-xl bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 transition-all shadow-2xl shadow-purple-500/50 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              <span className="relative z-10 flex items-center gap-3">
-                {isConnecting ? (
-                  <>
-                    <motion.div
-                      animate={{ rotate: 360 }}
-                      transition={{
-                        duration: 1,
-                        repeat: Infinity,
-                        ease: "linear",
-                      }}
-                    >
-                      <Sparkles className="w-6 h-6 md:w-8 md:h-8" />
-                    </motion.div>
-                    CONNECTING...
-                  </>
-                ) : (
-                  <>
-                    <Zap className="w-6 h-6 md:w-8 md:h-8" />
-                    ENTER ARENA
-                    <Zap className="w-6 h-6 md:w-8 md:h-8" />
-                  </>
-                )}
-              </span>
-              <motion.div className="absolute inset-0 rounded-xl bg-gradient-to-r from-purple-400 to-pink-400 opacity-0 group-hover:opacity-20 blur-xl transition-opacity" />
-            </motion.button>
-
-            <motion.p
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ delay: 1 }}
-              className="mt-4 text-sm text-gray-400"
-            >
-              {isConnecting
-                ? "Connecting to wallet..."
-                : "Connect your wallet to start playing"}
-            </motion.p>
+            Press to continue
           </motion.div>
         </motion.div>
 
-        {/* Features */}
-        <motion.div
-          initial={{ opacity: 0, y: 50 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 1, duration: 0.8 }}
-          className="mt-16 md:mt-24 grid md:grid-cols-3 gap-6 max-w-5xl mx-auto"
-        >
-          {[
-            {
-              icon: Shield,
-              title: "Build Your Base",
-              description: "Use dead Loot Survivor adventurers as defenders",
-              gradient: "from-purple-500 to-purple-700",
-              delay: 0,
-            },
-            {
-              icon: Swords,
-              title: "Attack & Conquer",
-              description: "Deploy beasts to raid enemy bases strategically",
-              gradient: "from-pink-500 to-red-600",
-              delay: 0.1,
-            },
-            {
-              icon: Zap,
-              title: "Daily Energy",
-              description: "Use 3 daily attacks to climb the leaderboard",
-              gradient: "from-red-500 to-orange-600",
-              delay: 0.2,
-            },
-          ].map((feature) => (
-            <motion.div
-              key={feature.title}
-              initial={{ opacity: 0, y: 30 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 1.2 + feature.delay, duration: 0.5 }}
-              whileHover={{ y: -8, transition: { duration: 0.2 } }}
-              className="bg-gray-800/40 backdrop-blur-sm border border-gray-700/50 rounded-xl p-6 md:p-8"
-            >
-              <motion.div
-                whileHover={{ rotate: [0, -10, 10, -10, 0] }}
-                transition={{ duration: 0.5 }}
-                className={`w-14 h-14 md:w-16 md:h-16 mx-auto mb-4 bg-gradient-to-br ${feature.gradient} rounded-full flex items-center justify-center shadow-lg`}
-              >
-                <feature.icon className="w-7 h-7 md:w-8 md:h-8" />
-              </motion.div>
-              <h3 className="text-lg md:text-xl font-bold mb-2">
-                {feature.title}
-              </h3>
-              <p className="text-sm md:text-base text-gray-400">
-                {feature.description}
-              </p>
-            </motion.div>
-          ))}
-        </motion.div>
-
-        {/* How it works */}
+        {/* Bottom atmospheric text */}
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
-          transition={{ delay: 1.5, duration: 0.8 }}
-          className="mt-16 md:mt-24 max-w-2xl mx-auto"
+          transition={{ duration: 1, delay: 1.5 }}
+          className="absolute bottom-8 left-1/2 -translate-x-1/2 text-center"
         >
-          <h2 className="text-2xl md:text-3xl font-bold text-center mb-8 text-purple-300">
-            How It Works
-          </h2>
-          <div className="space-y-4">
-            {[
-              {
-                num: 1,
-                title: "Setup Defense",
-                desc: "Choose 5 dead adventurers to guard your base",
-              },
-              {
-                num: 2,
-                title: "Launch Attacks",
-                desc: "Use daily energy to attack with your beasts",
-              },
-              {
-                num: 3,
-                title: "Watch Battles",
-                desc: "Experience auto-battler combat and climb ranks",
-              },
-            ].map((step, index) => (
-              <motion.div
-                key={step.num}
-                initial={{ opacity: 0, x: -30 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: 1.7 + index * 0.1, duration: 0.5 }}
-                whileHover={{ x: 8, transition: { duration: 0.2 } }}
-                className="flex items-start gap-4 bg-gray-800/30 backdrop-blur-sm p-4 md:p-6 rounded-lg border border-gray-700/30"
-              >
-                <motion.div
-                  whileHover={{ scale: 1.1 }}
-                  className="flex-shrink-0 w-8 h-8 bg-gradient-to-br from-purple-500 to-pink-500 rounded-full flex items-center justify-center font-bold shadow-lg"
-                >
-                  {step.num}
-                </motion.div>
-                <div>
-                  <h3 className="font-bold mb-1 text-base md:text-lg">
-                    {step.title}
-                  </h3>
-                  <p className="text-sm md:text-base text-gray-400">
-                    {step.desc}
-                  </p>
-                </div>
-              </motion.div>
-            ))}
-          </div>
-        </motion.div>
-
-        {/* Footer */}
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 2, duration: 0.8 }}
-          className="mt-16 md:mt-24 text-center text-xs md:text-sm text-gray-500 space-y-2"
-        >
-          <p>
-            Built on Starknet • Powered by Dojo • Integrates with Loot Survivor
-            2
+          <p className="text-emerald-900/60 text-xs tracking-wider">
+            Starknet • Dojo • Loot Survivor
           </p>
-          <p>A Dojo/Cartridge Game Jam Creation</p>
         </motion.div>
       </div>
     </div>
