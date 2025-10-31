@@ -14,15 +14,14 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v4
     
-    - name: Install Nix
-      uses: cachix/install-nix-action@v22
-      with:
-        nix_path: nixpkgs=channel:nixos-unstable
-    
     - name: Build contracts
       working-directory: ./contract
       run: |
-        nix develop ..#default --command sozo -P mainnet build
+        docker run --rm \
+          -v ${{ github.workspace }}/contract:/app \
+          -w /app \
+          ghcr.io/dojoengine/dojo:v1.7.1 \
+          sozo -P mainnet build
     
     - name: Deploy contracts
       working-directory: ./contract
@@ -31,7 +30,14 @@ jobs:
         DOJO_ACCOUNT_ADDRESS: ${{ secrets.DOJO_ACCOUNT_ADDRESS }}
         DOJO_PRIVATE_KEY: ${{ secrets.DOJO_PRIVATE_KEY }}
       run: |
-        nix develop ..#default --command sozo -P mainnet migrate
+        docker run --rm \
+          -v ${{ github.workspace }}/contract:/app \
+          -w /app \
+          -e STARKNET_RPC_URL=$STARKNET_RPC_URL \
+          -e DOJO_ACCOUNT_ADDRESS=$DOJO_ACCOUNT_ADDRESS \
+          -e DOJO_PRIVATE_KEY=$DOJO_PRIVATE_KEY \
+          ghcr.io/dojoengine/dojo:v1.7.1 \
+          sozo -P mainnet migrate
         
     - name: Extract World Address
       working-directory: ./contract
@@ -41,27 +47,36 @@ jobs:
         echo "world_address=$WORLD_ADDRESS" >> $GITHUB_OUTPUT
         echo "World Address: $WORLD_ADDRESS"
     
+    - name: Install Slot CLI
+      run: |
+        curl -L https://slot.cartridge.sh/install | bash
+        export PATH="$HOME/.slot/bin:$PATH"
+        slot --version
+    
     - name: Authenticate Slot
       env:
         SLOT_AUTH_TOKEN: ${{ secrets.SLOT_AUTH_TOKEN }}
       run: |
-        echo "$SLOT_AUTH_TOKEN" | nix develop --command slot auth login --token
+        export PATH="$HOME/.slot/bin:$PATH"
+        echo "$SLOT_AUTH_TOKEN" | slot auth login --token
     
     - name: Deploy Torii
       env:
         STARKNET_RPC_URL: https://api.cartridge.gg/x/starknet/mainnet
       run: |
+        export PATH="$HOME/.slot/bin:$PATH"
+        
         # Delete existing deployment if it exists
-        nix develop --command slot deployments delete survivor-valhalla torii || true
+        slot deployments delete survivor-valhalla torii || true
         
         # Create new Torii deployment
-        nix develop --command slot deployments create survivor-valhalla torii \
+        slot deployments create survivor-valhalla torii \
           --version v1.7.1 \
           --world ${{ steps.world.outputs.world_address }} \
           --rpc $STARKNET_RPC_URL
         
         # Save deployment info
-        nix develop --command slot deployments list survivor-valhalla > deployment-info.txt
+        slot deployments list survivor-valhalla > deployment-info.txt
         cat deployment-info.txt
     
     - name: Upload deployment info
@@ -74,4 +89,8 @@ jobs:
       working-directory: ./contract
       continue-on-error: true
       run: |
-        nix develop ..#default --command sozo walnut verify || echo "Walnut verification started - check the provided link"
+        docker run --rm \
+          -v ${{ github.workspace }}/contract:/app \
+          -w /app \
+          ghcr.io/dojoengine/dojo:v1.7.1 \
+          sozo walnut verify || echo "Walnut verification started - check the provided link"
