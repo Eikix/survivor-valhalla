@@ -2,14 +2,14 @@
 import { motion } from "framer-motion";
 import { Shield, Trophy, Skull } from "lucide-react";
 import { useState } from "react";
-import { useConnect, useAccount, useDisconnect } from "@starknet-react/core";
+import { useConnect, useAccount } from "@starknet-react/core";
+import { Navbar } from "../components/navbar";
 
 export function HomePage() {
   const [hasBase, setHasBase] = useState(false);
 
-  const { connect, connectors, error: _connectError } = useConnect();
-  const { address, status } = useAccount();
-  const { disconnect, error: _disconnectError } = useDisconnect();
+  const { connect, connectors } = useConnect();
+  const { status } = useAccount();
   const cartridgeConnector = connectors.find(
     (connector) => connector.id === "controller",
   );
@@ -72,6 +72,9 @@ export function HomePage() {
         />
       </div>
 
+      {/* Navbar */}
+      <Navbar />
+
       {/* Main content */}
       <div className="relative z-10 container mx-auto px-4 py-12 max-w-4xl">
         {/* Title */}
@@ -127,35 +130,6 @@ export function HomePage() {
           </motion.div>
         ) : (
           <>
-            {/* Wallet Connected Header */}
-            <motion.div
-              initial={{ opacity: 0, y: -10 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="border-b border-emerald-500/20 pb-6 mb-12"
-            >
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="w-2 h-2 bg-emerald-500 rounded-full" />
-                  <span className="text-emerald-400/80 text-sm tracking-wider uppercase">
-                    {address?.slice(0, 6)}...{address?.slice(-4)}
-                  </span>
-                </div>
-              </div>
-              <motion.button
-                onClick={() => disconnect()}
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-                className="px-4 py-2 text-sm font-bold tracking-wider uppercase border-2 border-emerald-500/50 hover:border-emerald-500 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                style={{
-                  background:
-                    "linear-gradient(to bottom, rgba(16, 185, 129, 0.1), rgba(0, 0, 0, 0.4))",
-                  textShadow: "0 0 10px rgba(16, 185, 129, 0.5)",
-                }}
-              >
-                <span className="text-emerald-500">DISCONNECT WALLET</span>
-              </motion.button>
-            </motion.div>
-
             {/* Create Base Section */}
             <motion.div
               initial={{ opacity: 0, y: 20 }}
