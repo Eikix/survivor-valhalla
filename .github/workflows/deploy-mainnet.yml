@@ -14,16 +14,16 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v4
     
+    - name: Set up QEMU
+      uses: docker/setup-qemu-action@v3
+      
     - name: Set up Docker Buildx
       uses: docker/setup-buildx-action@v3
-      with:
-        platforms: linux/arm64,linux/amd64
     
     - name: Build contracts
       working-directory: ./contract
       run: |
         docker run --rm \
-          --platform linux/amd64 \
           -v ${{ github.workspace }}/contract:/app \
           -w /app \
           ghcr.io/dojoengine/dojo:v1.7.1 \
@@ -37,7 +37,6 @@ jobs:
         DOJO_PRIVATE_KEY: ${{ secrets.DOJO_PRIVATE_KEY }}
       run: |
         docker run --rm \
-          --platform linux/amd64 \
           -v ${{ github.workspace }}/contract:/app \
           -w /app \
           -e STARKNET_RPC_URL=$STARKNET_RPC_URL \
@@ -60,7 +59,6 @@ jobs:
         STARKNET_RPC_URL: https://api.cartridge.gg/x/starknet/mainnet
       run: |
         docker run --rm \
-          --platform linux/amd64 \
           -v ${{ github.workspace }}/contract:/app \
           -w /app \
           -e SLOT_AUTH_TOKEN=$SLOT_AUTH_TOKEN \
@@ -87,7 +85,6 @@ jobs:
       continue-on-error: true
       run: |
         docker run --rm \
-          --platform linux/amd64 \
           -v ${{ github.workspace }}/contract:/app \
           -w /app \
           ghcr.io/dojoengine/dojo:v1.7.1 \
