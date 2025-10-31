@@ -12,56 +12,43 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    
+
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
 
     - name: Set up QEMU
       uses: docker/setup-qemu-action@v3
-      
+
     - name: Set up Docker Buildx
       uses: docker/setup-buildx-action@v3
 
-    # 1) build contracts (docker)
-    - name: Build contracts
-      working-directory: ./contract
-      run: |
-        docker run --rm \
-          --platform linux/arm64 \
-          -v "${{ github.workspace }}/contract:/app" \
-          -w /app \
-          ghcr.io/dojoengine/dojo:v1.7.1 \
-          sozo -P mainnet build
-
-    # 2) check env / secrets
     - name: Check and set environment
       id: env
       run: |
         if [ -z "${{ secrets.STARKNET_RPC_URL_MAINNET }}" ]; then
-          echo "Warning: STARKNET_RPC_URL_MAINNET secret not set, using default"
           echo "rpc_url=https://api.cartridge.gg/x/starknet/mainnet" >> $GITHUB_OUTPUT
         else
           echo "rpc_url=${{ secrets.STARKNET_RPC_URL_MAINNET }}" >> $GITHUB_OUTPUT
         fi
 
         if [ -z "${{ vars.DOJO_ACCOUNT_ADDRESS }}" ]; then
-          echo "Error: DOJO_ACCOUNT_ADDRESS variable is not set"
+          echo "Error: DOJO_ACCOUNT_ADDRESS is not set"
           exit 1
         fi
         if [ -z "${{ secrets.DOJO_PRIVATE_KEY }}" ]; then
-          echo "Error: DOJO_PRIVATE_KEY secret is not set"
+          echo "Error: DOJO_PRIVATE_KEY is not set"
           exit 1
         fi
         echo "All required configuration is set"
 
-    # 3) deploy contracts (docker)
-    - name: Deploy contracts
+    - name: Build + Deploy + Slot + Walnut (single container)
       working-directory: ./contract
       env:
         STARKNET_RPC_URL: ${{ steps.env.outputs.rpc_url }}
         DOJO_ACCOUNT_ADDRESS: ${{ vars.DOJO_ACCOUNT_ADDRESS }}
         DOJO_PRIVATE_KEY: ${{ secrets.DOJO_PRIVATE_KEY }}
+        SLOT_AUTH: ${{ secrets.SLOT_AUTH_TOKEN }}
       run: |
         docker run --rm \
           --platform linux/arm64 \
@@ -70,81 +57,48 @@ jobs:
           -e STARKNET_RPC_URL="$STARKNET_RPC_URL" \
           -e DOJO_ACCOUNT_ADDRESS="$DOJO_ACCOUNT_ADDRESS" \
           -e DOJO_PRIVATE_KEY="$DOJO_PRIVATE_KEY" \
-          ghcr.io/dojoengine/dojo:v1.7.1 \
-          sozo -P mainnet migrate
-
-    # 4) extract world address
-    - name: Extract World Address
-      working-directory: ./contract
-      id: world
-      run: |
-        WORLD_ADDRESS=$(grep "world_address" dojo_mainnet.toml | cut -d '"' -f 2)
-        echo "world_address=$WORLD_ADDRESS" >> $GITHUB_OUTPUT
-        echo "World Address: $WORLD_ADDRESS"
-
-    # 5) build slot-enabled image (your Dockerfile in ./contract)
-    - name: Build slot-enabled image
-      working-directory: ./contract
-      run: |
-        docker buildx build \
-          --platform linux/arm64 \
-          -t torii-with-slot:latest \
-          --load \
-          .
-
-    # 6) run slot inside docker (also arm64)
-    - name: Deploy Torii with Slot (docker)
-      env:
-        SLOT_AUTH: ${{ secrets.SLOT_AUTH_TOKEN }}
-        STARKNET_RPC_URL: https://api.cartridge.gg/x/starknet/mainnet
-        WORLD_ADDRESS: ${{ steps.world.outputs.world_address }}
-      run: |
-        docker run --rm -t \
-          --platform linux/arm64 \
           -e SLOT_AUTH="$SLOT_AUTH" \
-          -e STARKNET_RPC_URL="$STARKNET_RPC_URL" \
-          -e WORLD_ADDRESS="$WORLD_ADDRESS" \
-          torii-with-slot:latest \
+          ghcr.io/dojoengine/dojo:v1.7.1 \
           bash -lc '
             set -e
-            # delete might need a TTY, hence -t on docker run
+
+            echo "[1/7] sozo build"
+            sozo -P mainnet build
+
+            echo "[2/7] sozo migrate"
+            sozo -P mainnet migrate
+
+            echo "[3/7] extract world address"
+            WORLD_ADDRESS=$(grep "world_address" /app/dojo_mainnet.toml | cut -d '"' -f 2)
+            echo "World address: $WORLD_ADDRESS"
+
+            echo "[4/7] install slot (in container)"
+            apt-get update -y >/dev/null 2>&1
+            apt-get install -y curl jq ca-certificates git >/dev/null 2>&1
+            curl -L https://slot.cartridge.sh | bash
+            export PATH="/root/.slot/bin:$PATH"
+            # slotup already ran in script, but make sure slot is installed
+            /root/.slot/bin/slotup || true
+
+            echo "[5/7] deploy torii via slot"
+            # delete might fail if it doesnt exist, thats ok
             slot deployments delete survivor-valhalla torii || true
             slot deployments create survivor-valhalla torii \
               --version v1.7.1 \
               --world "$WORLD_ADDRESS" \
               --rpc "$STARKNET_RPC_URL"
-            # describe is the correct subcommand with project + service
-            slot deployments describe survivor-valhalla torii > /tmp/deployment-info.txt
-            cat /tmp/deployment-info.txt
+
+            # write deployment info back to mounted /app so GH can pick it up
+            slot deployments describe survivor-valhalla torii > /app/deployment-info.txt
+
+            echo "[6/7] walnut verify (best-effort)"
+            sozo walnut verify || echo "Walnut verification started - check link"
+
+            echo "[7/7] done"
           '
-
-    # 7) dump deployment info to file (no bad args)
-    - name: Dump deployment info to file
-      env:
-        SLOT_AUTH: ${{ secrets.SLOT_AUTH_TOKEN }}
-      run: |
-        docker run --rm -t \
-          --platform linux/arm64 \
-          -e SLOT_AUTH="$SLOT_AUTH" \
-          torii-with-slot:latest \
-          bash -lc 'slot deployments describe survivor-valhalla torii' > deployment-info.txt
-        cat deployment-info.txt
-
 
     - name: Upload deployment info
       uses: actions/upload-artifact@v4
       with:
         name: deployment-info
-        path: deployment-info.txt
-
-    # 8) Walnut verify (docker)
-    - name: Verify contracts with Walnut
-      working-directory: ./contract
-      continue-on-error: true
-      run: |
-        docker run --rm \
-          --platform linux/arm64 \
-          -v "${{ github.workspace }}/contract:/app" \
-          -w /app \
-          ghcr.io/dojoengine/dojo:v1.7.1 \
-          sozo walnut verify || echo "Walnut verification started - check the provided link"
+        path: ./contract/deployment-info.txt
