@@ -34,19 +34,17 @@ jobs:
           ghcr.io/dojoengine/dojo:v1.7.1 \
           sozo -P mainnet build
 
-    # 2) check env / secrets (host step, fine)
+    # 2) check env / secrets
     - name: Check and set environment
       id: env
       run: |
-        # Use secret or default RPC URL
         if [ -z "${{ secrets.STARKNET_RPC_URL_MAINNET }}" ]; then
           echo "Warning: STARKNET_RPC_URL_MAINNET secret not set, using default"
           echo "rpc_url=https://api.cartridge.gg/x/starknet/mainnet" >> $GITHUB_OUTPUT
         else
           echo "rpc_url=${{ secrets.STARKNET_RPC_URL_MAINNET }}" >> $GITHUB_OUTPUT
         fi
-        
-        # Check required secrets
+
         if [ -z "${{ vars.DOJO_ACCOUNT_ADDRESS }}" ]; then
           echo "Error: DOJO_ACCOUNT_ADDRESS variable is not set"
           exit 1
@@ -75,7 +73,7 @@ jobs:
           ghcr.io/dojoengine/dojo:v1.7.1 \
           sozo -P mainnet migrate
 
-    # 4) read world address (host)
+    # 4) extract world address
     - name: Extract World Address
       working-directory: ./contract
       id: world
@@ -84,48 +82,47 @@ jobs:
         echo "world_address=$WORLD_ADDRESS" >> $GITHUB_OUTPUT
         echo "World Address: $WORLD_ADDRESS"
 
-    # 5) build our slot-enabled image from ./contract/Dockerfile
-    #    (this is the Dockerfile you just rewrote to install slot)
+    # 5) build slot-enabled image (your Dockerfile in ./contract)
     - name: Build slot-enabled image
       working-directory: ./contract
       run: |
-        # tag with latest, you can also push to GHCR here if you want
-        docker build -t torii-with-slot:latest .
+        docker buildx build \
+          --platform linux/arm64 \
+          -t torii-with-slot:latest \
+          --load \
+          .
 
-    # 6) run slot inside docker
+    # 6) deploy Torii with slot (in docker)
     - name: Deploy Torii with Slot (docker)
       env:
-        SLOT_AUTH: ${{ secrets.SLOT_AUTH_TOKEN }}   # you already have this
+        SLOT_AUTH: ${{ secrets.SLOT_AUTH_TOKEN }}   # or secrets.SLOT_AUTH
         STARKNET_RPC_URL: https://api.cartridge.gg/x/starknet/mainnet
         WORLD_ADDRESS: ${{ steps.world.outputs.world_address }}
       run: |
-        # everything happens in the container now
         docker run --rm \
+          --platform linux/arm64 \
           -e SLOT_AUTH="$SLOT_AUTH" \
           -e STARKNET_RPC_URL="$STARKNET_RPC_URL" \
           -e WORLD_ADDRESS="$WORLD_ADDRESS" \
           torii-with-slot:latest \
           bash -lc '
             set -e
-            # delete old deployment if exists
             slot deployments delete survivor-valhalla torii || true
-            # create new
             slot deployments create survivor-valhalla torii \
               --version v1.7.1 \
               --world "$WORLD_ADDRESS" \
               --rpc "$STARKNET_RPC_URL"
-            # list to a file
             slot deployments list survivor-valhalla > /tmp/deployment-info.txt
             cat /tmp/deployment-info.txt
           '
-        # copy file out of container? we can't after --rm, so we re-run below
 
-    # 7) re-run list in a short container to pull out the info as an artifact
+    # 7) dump deployment info to artifact (also docker + arm64)
     - name: Dump deployment info to file
       env:
         SLOT_AUTH: ${{ secrets.SLOT_AUTH_TOKEN }}
       run: |
         docker run --rm \
+          --platform linux/arm64 \
           -e SLOT_AUTH="$SLOT_AUTH" \
           torii-with-slot:latest \
           bash -lc 'slot deployments list survivor-valhalla' > deployment-info.txt
@@ -137,7 +134,7 @@ jobs:
         name: deployment-info
         path: deployment-info.txt
 
-    # 8) Walnut verify (still docker)
+    # 8) Walnut verify (docker)
     - name: Verify contracts with Walnut
       working-directory: ./contract
       continue-on-error: true
