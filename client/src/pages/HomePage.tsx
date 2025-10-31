@@ -2,12 +2,46 @@
 import { motion } from "framer-motion";
 import { Shield, Trophy, Skull } from "lucide-react";
 import { useState } from "react";
+import { useConnect, useAccount, useDisconnect } from "@starknet-react/core";
 
 export function HomePage() {
-  const [walletConnected, setWalletConnected] = useState(false);
-  const [isConnecting, setIsConnecting] = useState(false);
   const [hasBase, setHasBase] = useState(false);
-  const [walletAddress, setWalletAddress] = useState("");
+
+  const { connect, connectors, error: _connectError } = useConnect();
+  const { address, status } = useAccount();
+  const { disconnect, error: _disconnectError } = useDisconnect();
+  const cartridgeConnector = connectors.find(
+    (connector) => connector.id === "controller",
+  );
+
+  // Check if cartridge connector is undefined
+  if (!cartridgeConnector) {
+    return (
+      <div className="min-h-screen bg-black text-white relative overflow-hidden">
+        <div className="relative z-10 container mx-auto px-4 py-12 max-w-4xl">
+          <motion.div
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="text-center"
+          >
+            <div className="border border-red-500/30 bg-red-950/20 p-12">
+              <Shield className="w-16 h-16 text-red-500/50 mx-auto mb-6" />
+              <h2 className="text-2xl font-bold text-red-400 mb-4 tracking-wider uppercase">
+                Connector Not Found
+              </h2>
+              <p className="text-red-200/60 mb-4 text-sm tracking-wide">
+                The Cartridge Controller connector is not available.
+              </p>
+              <p className="text-red-200/40 text-xs">
+                Please ensure the Cartridge wallet is installed and properly
+                configured.
+              </p>
+            </div>
+          </motion.div>
+        </div>
+      </div>
+    );
+  }
 
   // Mock stats (only shown when wallet is connected)
   const stats = {
@@ -16,26 +50,9 @@ export function HomePage() {
     base: hasBase ? "Base Created" : "No Base",
   };
 
-  const handleConnectWallet = async () => {
-    setIsConnecting(true);
-    // Mock wallet connection delay
-    await new Promise((resolve) => setTimeout(resolve, 1500));
-
-    const mockAddress = "0x" + Math.random().toString(16).slice(2, 10);
-    setWalletAddress(mockAddress);
-    setWalletConnected(true);
-    setIsConnecting(false);
-  };
-
   const handleCreateBase = async () => {
-    if (!walletConnected) return;
-
-    // Mock base creation
+    if (status !== "connected") return;
     setHasBase(true);
-  };
-
-  const truncateAddress = (addr: string) => {
-    return `${addr.slice(0, 6)}...${addr.slice(-4)}`;
   };
 
   return (
@@ -78,7 +95,7 @@ export function HomePage() {
         </motion.div>
 
         {/* Wallet Connection Section */}
-        {!walletConnected ? (
+        {status !== "connected" ? (
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -91,18 +108,19 @@ export function HomePage() {
                 Connect your wallet to enter
               </p>
               <motion.button
-                onClick={handleConnectWallet}
-                disabled={isConnecting}
+                onClick={() => connect({ connector: connectors[0] })}
+                disabled={status === "connecting"}
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
                 className="px-10 py-4 text-lg font-bold tracking-wider uppercase border-2 border-emerald-500/50 hover:border-emerald-500 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                 style={{
-                  background: "linear-gradient(to bottom, rgba(16, 185, 129, 0.1), rgba(0, 0, 0, 0.4))",
+                  background:
+                    "linear-gradient(to bottom, rgba(16, 185, 129, 0.1), rgba(0, 0, 0, 0.4))",
                   textShadow: "0 0 10px rgba(16, 185, 129, 0.5)",
                 }}
               >
                 <span className="text-emerald-500">
-                  {isConnecting ? "CONNECTING..." : "CONNECT WALLET"}
+                  {status === "connecting" ? "CONNECTING..." : "CONNECT WALLET"}
                 </span>
               </motion.button>
             </div>
@@ -119,10 +137,23 @@ export function HomePage() {
                 <div className="flex items-center gap-3">
                   <div className="w-2 h-2 bg-emerald-500 rounded-full" />
                   <span className="text-emerald-400/80 text-sm tracking-wider uppercase">
-                    {truncateAddress(walletAddress)}
+                    {address?.slice(0, 6)}...{address?.slice(-4)}
                   </span>
                 </div>
               </div>
+              <motion.button
+                onClick={() => disconnect()}
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                className="px-4 py-2 text-sm font-bold tracking-wider uppercase border-2 border-emerald-500/50 hover:border-emerald-500 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                style={{
+                  background:
+                    "linear-gradient(to bottom, rgba(16, 185, 129, 0.1), rgba(0, 0, 0, 0.4))",
+                  textShadow: "0 0 10px rgba(16, 185, 129, 0.5)",
+                }}
+              >
+                <span className="text-emerald-500">DISCONNECT WALLET</span>
+              </motion.button>
             </motion.div>
 
             {/* Create Base Section */}
@@ -150,7 +181,8 @@ export function HomePage() {
                         whileTap={{ scale: 0.95 }}
                         className="px-8 py-3 text-base font-bold tracking-wider uppercase border-2 border-emerald-500/50 hover:border-emerald-500 transition-all"
                         style={{
-                          background: "linear-gradient(to bottom, rgba(16, 185, 129, 0.1), rgba(0, 0, 0, 0.4))",
+                          background:
+                            "linear-gradient(to bottom, rgba(16, 185, 129, 0.1), rgba(0, 0, 0, 0.4))",
                           textShadow: "0 0 10px rgba(16, 185, 129, 0.5)",
                         }}
                       >
