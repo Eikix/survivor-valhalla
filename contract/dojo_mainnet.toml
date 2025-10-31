@@ -5,8 +5,10 @@ cover_uri = "file://assets/cover.png"
 icon_uri = "file://assets/icon.png"
 website = "https://github.com/survivor-valhalla"
 seed = "dojo_survivor_valhalla_mainnet"
-namespace = "survivor_valhalla"
 storage_snapshot_url = ""
+
+[namespace]
+default = "survivor_valhalla"
 
 [env]
 # rpc_url = ""         # env: STARKNET_RPC_URL
@@ -14,5 +16,5 @@ storage_snapshot_url = ""
 # private_key = ""     # env: DOJO_PRIVATE_KEY
 # world_address = ""   # will be set after first deployment
 
-[[writers]]
+[writers]
 "survivor_valhalla::systems::beast_actions::beast_actions" = ["survivor_valhalla"]
