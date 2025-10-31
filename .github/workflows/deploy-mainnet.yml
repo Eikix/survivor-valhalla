@@ -92,14 +92,14 @@ jobs:
           --load \
           .
 
-    # 6) deploy Torii with slot (in docker)
+    # 6) run slot inside docker (also arm64)
     - name: Deploy Torii with Slot (docker)
       env:
-        SLOT_AUTH: ${{ secrets.SLOT_AUTH_TOKEN }}   # or secrets.SLOT_AUTH
+        SLOT_AUTH: ${{ secrets.SLOT_AUTH_TOKEN }}
         STARKNET_RPC_URL: https://api.cartridge.gg/x/starknet/mainnet
         WORLD_ADDRESS: ${{ steps.world.outputs.world_address }}
       run: |
-        docker run --rm \
+        docker run --rm -t \
           --platform linux/arm64 \
           -e SLOT_AUTH="$SLOT_AUTH" \
           -e STARKNET_RPC_URL="$STARKNET_RPC_URL" \
@@ -107,26 +107,29 @@ jobs:
           torii-with-slot:latest \
           bash -lc '
             set -e
+            # delete might need a TTY, hence -t on docker run
             slot deployments delete survivor-valhalla torii || true
             slot deployments create survivor-valhalla torii \
               --version v1.7.1 \
               --world "$WORLD_ADDRESS" \
               --rpc "$STARKNET_RPC_URL"
-            slot deployments list survivor-valhalla > /tmp/deployment-info.txt
+            # describe is the correct subcommand with project + service
+            slot deployments describe survivor-valhalla torii > /tmp/deployment-info.txt
             cat /tmp/deployment-info.txt
           '
 
-    # 7) dump deployment info to artifact (also docker + arm64)
+    # 7) dump deployment info to file (no bad args)
     - name: Dump deployment info to file
       env:
         SLOT_AUTH: ${{ secrets.SLOT_AUTH_TOKEN }}
       run: |
-        docker run --rm \
+        docker run --rm -t \
           --platform linux/arm64 \
           -e SLOT_AUTH="$SLOT_AUTH" \
           torii-with-slot:latest \
-          bash -lc 'slot deployments list survivor-valhalla' > deployment-info.txt
+          bash -lc 'slot deployments describe survivor-valhalla torii' > deployment-info.txt
         cat deployment-info.txt
+
 
     - name: Upload deployment info
       uses: actions/upload-artifact@v4
