@@ -38,7 +38,7 @@
         udev
         libusb1
         pkgs.stdenv.cc.cc
-
+        docker_28
         # Protobuf for torii
         protobuf
 
