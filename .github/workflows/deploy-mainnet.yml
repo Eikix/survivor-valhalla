@@ -27,6 +27,7 @@ jobs:
       working-directory: ./contract
       run: |
         docker run --rm \
+          --platform linux/arm64 \
           -v ${{ github.workspace }}/contract:/app \
           -w /app \
           ghcr.io/dojoengine/dojo:v1.7.1 \
@@ -87,7 +88,7 @@ jobs:
       run: |
         curl -L https://slot.cartridge.sh | bash
         echo "$HOME/.slot/bin" >> $GITHUB_PATH
-    
+        
     - name: Deploy Torii with Slot
       env:
         SLOT_AUTH_TOKEN: ${{ secrets.SLOT_AUTH_TOKEN }}
