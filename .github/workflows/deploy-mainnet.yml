@@ -23,6 +23,11 @@ jobs:
     - name: Set up Docker Buildx
       uses: docker/setup-buildx-action@v3
     
+    - name: Build Docker image with slot
+      working-directory: ./contract
+      run: |
+        docker build -f Dockerfile -t dojo-with-slot:latest --target dojo .
+    
     - name: Build contracts
       working-directory: ./contract
       run: |
@@ -30,7 +35,7 @@ jobs:
           --platform linux/arm64 \
           -v ${{ github.workspace }}/contract:/app \
           -w /app \
-          ghcr.io/dojoengine/dojo:v1.7.1 \
+          dojo-with-slot:latest \
           sozo -P mainnet build
     
     - name: Check and set environment
@@ -73,7 +78,7 @@ jobs:
           -e STARKNET_RPC_URL=$STARKNET_RPC_URL \
           -e DOJO_ACCOUNT_ADDRESS=$DOJO_ACCOUNT_ADDRESS \
           -e DOJO_PRIVATE_KEY=$DOJO_PRIVATE_KEY \
-          ghcr.io/dojoengine/dojo:v1.7.1 \
+          dojo-with-slot:latest \
           sozo -P mainnet migrate
         
     - name: Extract World Address
@@ -95,7 +100,7 @@ jobs:
           -w /app \
           -e SLOT_AUTH_TOKEN=$SLOT_AUTH_TOKEN \
           -e STARKNET_RPC_URL=$STARKNET_RPC_URL \
-          ghcr.io/dojoengine/dojo:v1.7.1 bash -c "
+          dojo-with-slot:latest bash -c "
             echo \"\$SLOT_AUTH_TOKEN\" | slot auth login --token
             slot deployments delete survivor-valhalla torii || true
             slot deployments create survivor-valhalla torii \
@@ -120,5 +125,5 @@ jobs:
           --platform linux/arm64 \
           -v ${{ github.workspace }}/contract:/app \
           -w /app \
-          ghcr.io/dojoengine/dojo:v1.7.1 \
+          dojo-with-slot:latest \
           sozo walnut verify || echo "Walnut verification started - check the provided link"
