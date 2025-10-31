@@ -40,6 +40,7 @@ jobs:
           echo "Error: DOJO_PRIVATE_KEY is not set"
           exit 1
         fi
+
         echo "All required configuration is set"
 
     - name: Build + Deploy + Slot + Walnut (single container)
@@ -59,43 +60,40 @@ jobs:
           -e DOJO_PRIVATE_KEY="$DOJO_PRIVATE_KEY" \
           -e SLOT_AUTH="$SLOT_AUTH" \
           ghcr.io/dojoengine/dojo:v1.7.1 \
-          bash -lc '
+          bash -lc "
             set -e
 
-            echo "[1/7] sozo build"
+            echo '[1/7] sozo build'
             sozo -P mainnet build
 
-            echo "[2/7] sozo migrate"
+            echo '[2/7] sozo migrate'
             sozo -P mainnet migrate
 
-            echo "[3/7] extract world address"
-            WORLD_ADDRESS=$(grep "world_address" /app/dojo_mainnet.toml | cut -d '"' -f 2)
-            echo "World address: $WORLD_ADDRESS"
+            echo '[3/7] extract world address'
+            WORLD_ADDRESS=\$(grep world_address /app/dojo_mainnet.toml | awk -F\\\" '{print \$2}')
+            echo \"World address: \$WORLD_ADDRESS\"
 
-            echo "[4/7] install slot (in container)"
+            echo '[4/7] install slot (in container)'
             apt-get update -y >/dev/null 2>&1
             apt-get install -y curl jq ca-certificates git >/dev/null 2>&1
             curl -L https://slot.cartridge.sh | bash
-            export PATH="/root/.slot/bin:$PATH"
-            # slotup already ran in script, but make sure slot is installed
+            export PATH=\"/root/.slot/bin:\$PATH\"
             /root/.slot/bin/slotup || true
 
-            echo "[5/7] deploy torii via slot"
-            # delete might fail if it doesnt exist, thats ok
+            echo '[5/7] deploy torii via slot'
             slot deployments delete survivor-valhalla torii || true
             slot deployments create survivor-valhalla torii \
               --version v1.7.1 \
-              --world "$WORLD_ADDRESS" \
-              --rpc "$STARKNET_RPC_URL"
+              --world \"\$WORLD_ADDRESS\" \
+              --rpc \"\$STARKNET_RPC_URL\"
 
-            # write deployment info back to mounted /app so GH can pick it up
             slot deployments describe survivor-valhalla torii > /app/deployment-info.txt
 
-            echo "[6/7] walnut verify (best-effort)"
-            sozo walnut verify || echo "Walnut verification started - check link"
+            echo '[6/7] walnut verify (best-effort)'
+            sozo walnut verify || echo 'Walnut verification started - check link'
 
-            echo "[7/7] done"
-          '
+            echo '[7/7] done'
+          "
 
     - name: Upload deployment info
       uses: actions/upload-artifact@v4
