@@ -1,5 +1,5 @@
 pub mod systems {
-    pub mod actions;
+    pub mod beast_actions;
 }
 
 pub mod models;
