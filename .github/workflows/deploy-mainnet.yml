@@ -84,25 +84,36 @@ jobs:
         echo "world_address=$WORLD_ADDRESS" >> $GITHUB_OUTPUT
         echo "World Address: $WORLD_ADDRESS"
     
-    - name: Install Slot CLI
+    - name: Install Slotup
       run: |
         curl -L https://slot.cartridge.sh | bash
+        echo "$HOME/.slotup/bin" >> $GITHUB_PATH
+        export PATH="$HOME/.slotup/bin:$PATH"
+        slotup --version || true
+
+    - name: Install Slot
+      run: |
         export PATH="$HOME/.slotup/bin:$PATH"
         slotup
         echo "$HOME/.slot/bin" >> $GITHUB_PATH
-        
+
     - name: Deploy Torii with Slot
       env:
-        SLOT_AUTH_TOKEN: ${{ secrets.SLOT_AUTH_TOKEN }}
+        SLOT_AUTH: ${{ secrets.SLOT_AUTH_TOKEN }}
         STARKNET_RPC_URL: https://api.cartridge.gg/x/starknet/mainnet
+        WORLD_ADDRESS: ${{ steps.world.outputs.world_address }}
       run: |
-        export PATH="$HOME/.slot/bin:$PATH"
-        echo "$SLOT_AUTH_TOKEN" | slot auth login --token
+        # make sure both are on PATH in THIS step
+        export PATH="$HOME/.slot/bin:$HOME/.slotup/bin:$PATH"
+
+        # no interactive login needed because SLOT_AUTH is set
         slot deployments delete survivor-valhalla torii || true
+
         slot deployments create survivor-valhalla torii \
           --version v1.7.1 \
-          --world ${{ steps.world.outputs.world_address }} \
-          --rpc $STARKNET_RPC_URL
+          --world "$WORLD_ADDRESS" \
+          --rpc "$STARKNET_RPC_URL"
+
         slot deployments list survivor-valhalla > deployment-info.txt
         cat deployment-info.txt
     
