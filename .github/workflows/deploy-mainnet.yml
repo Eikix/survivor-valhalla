@@ -14,14 +14,22 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v4
     
+    - name: Install Dojo
+      run: |
+        curl -L https://install.dojoengine.org | bash
+        source ~/.bashrc
+        ~/.dojo/bin/dojoup -v v1.7.1
+        echo "$HOME/.dojo/bin" >> $GITHUB_PATH
+    
+    - name: Install Scarb
+      uses: software-mansion/setup-scarb@v1
+      with:
+        scarb-version: "2.6.5"
+    
     - name: Build contracts
       working-directory: ./contract
       run: |
-        docker run --rm \
-          -v ${{ github.workspace }}/contract:/app \
-          -w /app \
-          ghcr.io/dojoengine/dojo:v1.7.1 \
-          sozo -P mainnet build
+        sozo -P mainnet build
     
     - name: Deploy contracts
       working-directory: ./contract
@@ -30,14 +38,7 @@ jobs:
         DOJO_ACCOUNT_ADDRESS: ${{ secrets.DOJO_ACCOUNT_ADDRESS }}
         DOJO_PRIVATE_KEY: ${{ secrets.DOJO_PRIVATE_KEY }}
       run: |
-        docker run --rm \
-          -v ${{ github.workspace }}/contract:/app \
-          -w /app \
-          -e STARKNET_RPC_URL=$STARKNET_RPC_URL \
-          -e DOJO_ACCOUNT_ADDRESS=$DOJO_ACCOUNT_ADDRESS \
-          -e DOJO_PRIVATE_KEY=$DOJO_PRIVATE_KEY \
-          ghcr.io/dojoengine/dojo:v1.7.1 \
-          sozo -P mainnet migrate
+        sozo -P mainnet migrate
         
     - name: Extract World Address
       working-directory: ./contract
@@ -89,8 +90,4 @@ jobs:
       working-directory: ./contract
       continue-on-error: true
       run: |
-        docker run --rm \
-          -v ${{ github.workspace }}/contract:/app \
-          -w /app \
-          ghcr.io/dojoengine/dojo:v1.7.1 \
-          sozo walnut verify || echo "Walnut verification started - check the provided link"
+        sozo walnut verify || echo "Walnut verification started - check the provided link"
