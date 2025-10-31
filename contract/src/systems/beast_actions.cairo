@@ -46,16 +46,27 @@ pub mod beast_actions {
             let mut world = self.world_default();
             let player = get_caller_address();
             
-            // Verify ownership of all beasts (skip in test mode)
+            // Verify ownership of non-zero beasts only (skip in test mode)
             if BEASTS_CONTRACT != 0x0 {
                 let beasts_contract: ContractAddress = BEASTS_CONTRACT.try_into().unwrap();
                 let beasts_dispatcher = IBeastsDispatcher { contract_address: beasts_contract };
                 
-                assert(beasts_dispatcher.owner_of(beast1_id) == player, 'Not owner of beast 1');
-                assert(beasts_dispatcher.owner_of(beast2_id) == player, 'Not owner of beast 2');
-                assert(beasts_dispatcher.owner_of(beast3_id) == player, 'Not owner of beast 3');
-                assert(beasts_dispatcher.owner_of(beast4_id) == player, 'Not owner of beast 4');
-                assert(beasts_dispatcher.owner_of(beast5_id) == player, 'Not owner of beast 5');
+                // Only check ownership for non-zero beast IDs
+                if beast1_id != 0 {
+                    assert(beasts_dispatcher.owner_of(beast1_id) == player, 'Not owner of beast 1');
+                }
+                if beast2_id != 0 {
+                    assert(beasts_dispatcher.owner_of(beast2_id) == player, 'Not owner of beast 2');
+                }
+                if beast3_id != 0 {
+                    assert(beasts_dispatcher.owner_of(beast3_id) == player, 'Not owner of beast 3');
+                }
+                if beast4_id != 0 {
+                    assert(beasts_dispatcher.owner_of(beast4_id) == player, 'Not owner of beast 4');
+                }
+                if beast5_id != 0 {
+                    assert(beasts_dispatcher.owner_of(beast5_id) == player, 'Not owner of beast 5');
+                }
             }
             
             let lineup = BeastLineup {
@@ -81,6 +92,9 @@ pub mod beast_actions {
         fn swap(ref self: ContractState, position: u8, new_beast_id: u256) {
             let mut world = self.world_default();
             let player = get_caller_address();
+            
+            // Cannot swap to empty (0)
+            assert(new_beast_id != 0, 'Cannot swap to empty');
             
             // Verify ownership of the new beast (skip in test mode)
             if BEASTS_CONTRACT != 0x0 {
