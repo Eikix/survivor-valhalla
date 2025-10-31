@@ -1,2 +1,4 @@
 target
-dojo_mainnet.toml
+.env.mainnet
+.env.sepolia
+.env.*

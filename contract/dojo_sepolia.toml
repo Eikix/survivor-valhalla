@@ -1,0 +1,18 @@
+[world]
+name = "dojo_starter"
+description = "Survivor Valhalla - Beast lineup management on Starknet"
+cover_uri = "file://assets/cover.png"
+icon_uri = "file://assets/icon.png"
+website = "https://github.com/survivor-valhalla"
+seed = "dojo_survivor_valhalla_sepolia"
+namespace = "dojo_starter"
+storage_snapshot_url = ""
+
+[env]
+# rpc_url = ""         # env: STARKNET_RPC_URL
+# account_address = "" # env: DOJO_ACCOUNT_ADDRESS
+# private_key = ""     # env: DOJO_PRIVATE_KEY
+# world_address = ""   # will be set after first deployment
+
+[[writers]]
+"dojo_starter::systems::beast_actions::beast_actions" = ["dojo_starter"]
