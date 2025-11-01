@@ -4,12 +4,21 @@ import { Shield, Trophy, Skull } from "lucide-react";
 import { useState } from "react";
 import { useConnect, useAccount } from "@starknet-react/core";
 import { Navbar } from "../components/navbar";
+import { WorldBeastLineups } from "../components/WorldBeastLineups";
+import { useBeasts } from "../hooks/useBeasts";
 
 export function HomePage() {
   const [hasBase, setHasBase] = useState(false);
 
   const { connect, connectors } = useConnect();
-  const { status } = useAccount();
+  const { status, address } = useAccount();
+  const {
+    data: beasts = [],
+    isLoading: isLoadingBeasts,
+    error,
+  } = useBeasts(address, {
+    enabled: status === "connected",
+  });
   const cartridgeConnector = connectors.find(
     (connector) => connector.id === "controller",
   );
@@ -172,50 +181,125 @@ export function HomePage() {
               </div>
             </motion.div>
 
-            {/* Stats Section */}
+            {/* Beasts Collection Section */}
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.3 }}
+              transition={{ delay: 0.4 }}
+              className="mb-16"
             >
               <h2 className="text-center text-xl font-bold text-emerald-400 mb-6 tracking-wider uppercase">
-                Combat Records
+                Your Beasts
               </h2>
-              <div className="grid grid-cols-3 gap-4">
-                {/* Wins */}
-                <div className="border border-emerald-500/20 bg-emerald-950/10 p-6 text-center">
-                  <Trophy className="w-8 h-8 text-emerald-500/50 mx-auto mb-3" />
-                  <div className="text-3xl font-bold text-emerald-400 mb-1">
-                    {stats.wins}
-                  </div>
-                  <div className="text-xs text-emerald-200/40 tracking-wider uppercase">
-                    Wins
-                  </div>
+              {isLoadingBeasts ? (
+                <div className="border border-emerald-500/30 bg-emerald-950/20 p-8 text-center">
+                  <p className="text-emerald-200/60 text-sm tracking-wide uppercase">
+                    Loading beasts...
+                  </p>
                 </div>
-
-                {/* Losses */}
-                <div className="border border-emerald-500/20 bg-emerald-950/10 p-6 text-center">
-                  <Skull className="w-8 h-8 text-emerald-500/50 mx-auto mb-3" />
-                  <div className="text-3xl font-bold text-emerald-400 mb-1">
-                    {stats.losses}
-                  </div>
-                  <div className="text-xs text-emerald-200/40 tracking-wider uppercase">
-                    Losses
-                  </div>
+              ) : error ? (
+                <div className="border border-red-500/30 bg-red-950/20 p-8 text-center">
+                  <p className="text-red-200/60 text-sm tracking-wide uppercase">
+                    Error loading beasts
+                  </p>
                 </div>
-
-                {/* Base Status */}
-                <div className="border border-emerald-500/20 bg-emerald-950/10 p-6 text-center">
-                  <Shield className="w-8 h-8 text-emerald-500/50 mx-auto mb-3" />
-                  <div className="text-lg font-bold text-emerald-400 mb-1">
-                    {stats.base}
-                  </div>
-                  <div className="text-xs text-emerald-200/40 tracking-wider uppercase">
-                    Base
-                  </div>
+              ) : beasts.length > 0 ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {beasts.map((beast) => (
+                    <motion.div
+                      key={beast.id}
+                      initial={{ opacity: 0, scale: 0.9 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      className="border border-emerald-500/20 bg-emerald-950/10 p-6"
+                    >
+                      <div className="text-center">
+                        <h3 className="text-lg font-bold text-emerald-400 mb-2">
+                          {beast.name}
+                        </h3>
+                        <div className="text-xs text-emerald-200/60 space-y-1">
+                          <div>
+                            <span className="text-emerald-200/40">Level:</span>{" "}
+                            {beast.level}
+                          </div>
+                          <div>
+                            <span className="text-emerald-200/40">Health:</span>{" "}
+                            {beast.health}
+                          </div>
+                          <div>
+                            <span className="text-emerald-200/40">Power:</span>{" "}
+                            {beast.power}
+                          </div>
+                          <div>
+                            <span className="text-emerald-200/40">Tier:</span>{" "}
+                            {beast.tier}
+                          </div>
+                          <div>
+                            <span className="text-emerald-200/40">Type:</span>{" "}
+                            {beast.type}
+                          </div>
+                        </div>
+                      </div>
+                    </motion.div>
+                  ))}
                 </div>
-              </div>
+              ) : (
+                <div className="border border-emerald-500/30 bg-emerald-950/20 p-8 text-center">
+                  <p className="text-emerald-200/60 text-sm tracking-wide uppercase">
+                    No beasts found
+                  </p>
+                </div>
+              )}
             </motion.div>
+
+            {/* World's Beast Lineups Section */}
+            <WorldBeastLineups />
+
+            {/* Stats Section */}
+            {hasBase && (
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.3 }}
+              >
+                <h2 className="text-center text-xl font-bold text-emerald-400 mb-6 tracking-wider uppercase">
+                  Combat Records
+                </h2>
+                <div className="grid grid-cols-3 gap-4">
+                  {/* Wins */}
+                  <div className="border border-emerald-500/20 bg-emerald-950/10 p-6 text-center">
+                    <Trophy className="w-8 h-8 text-emerald-500/50 mx-auto mb-3" />
+                    <div className="text-3xl font-bold text-emerald-400 mb-1">
+                      {stats.wins}
+                    </div>
+                    <div className="text-xs text-emerald-200/40 tracking-wider uppercase">
+                      Wins
+                    </div>
+                  </div>
+
+                  {/* Losses */}
+                  <div className="border border-emerald-500/20 bg-emerald-950/10 p-6 text-center">
+                    <Skull className="w-8 h-8 text-emerald-500/50 mx-auto mb-3" />
+                    <div className="text-3xl font-bold text-emerald-400 mb-1">
+                      {stats.losses}
+                    </div>
+                    <div className="text-xs text-emerald-200/40 tracking-wider uppercase">
+                      Losses
+                    </div>
+                  </div>
+
+                  {/* Base Status */}
+                  <div className="border border-emerald-500/20 bg-emerald-950/10 p-6 text-center">
+                    <Shield className="w-8 h-8 text-emerald-500/50 mx-auto mb-3" />
+                    <div className="text-lg font-bold text-emerald-400 mb-1">
+                      {stats.base}
+                    </div>
+                    <div className="text-xs text-emerald-200/40 tracking-wider uppercase">
+                      Base
+                    </div>
+                  </div>
+                </div>
+              </motion.div>
+            )}
           </>
         )}
       </div>
