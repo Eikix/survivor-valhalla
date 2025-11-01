@@ -56,7 +56,7 @@ export function Navbar() {
                 }}
                 whileHover={{ scale: 1.1 }}
                 whileTap={{ scale: 0.9 }}
-                className="p-1.5 text-emerald-500/60 hover:text-emerald-500 hover:bg-emerald-500/10 rounded transition-all"
+                className="p-1.5 text-emerald-500/60 hover:text-emerald-500 hover:bg-emerald-500/10 rounded transition-all cursor-pointer"
                 title="Copy address"
               >
                 {copied ? (
@@ -73,7 +73,7 @@ export function Navbar() {
                 }
                 whileHover={{ scale: 1.1 }}
                 whileTap={{ scale: 0.9 }}
-                className="p-1.5 text-emerald-500/60 hover:text-emerald-500 hover:bg-emerald-500/10 rounded transition-all"
+                className="p-1.5 text-emerald-500/60 hover:text-emerald-500 hover:bg-emerald-500/10 rounded transition-all cursor-pointer"
                 title="View profile"
               >
                 <ExternalLink className="w-3.5 h-3.5" />
@@ -87,7 +87,7 @@ export function Navbar() {
                 onClick={() => disconnect()}
                 whileHover={{ scale: 1.1 }}
                 whileTap={{ scale: 0.9 }}
-                className="p-1.5 text-emerald-500/60 hover:text-emerald-500 hover:bg-emerald-500/10 rounded transition-all"
+                className="p-1.5 text-emerald-500/60 hover:text-emerald-500 hover:bg-emerald-500/10 rounded transition-all cursor-pointer"
                 title="Disconnect wallet"
               >
                 <LogOut className="w-3.5 h-3.5" />
@@ -99,7 +99,7 @@ export function Navbar() {
               disabled={status === "connecting"}
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
-              className="px-6 py-2 text-sm font-bold tracking-wider uppercase border-2 border-emerald-500/50 hover:border-emerald-500 transition-all disabled:opacity-50 disabled:cursor-not-allowed rounded"
+              className="px-6 py-2 text-sm font-bold tracking-wider uppercase border-2 border-emerald-500/50 hover:border-emerald-500 transition-all disabled:opacity-50 disabled:cursor-not-allowed rounded cursor-pointer"
               style={{
                 background:
                   "linear-gradient(to bottom, rgba(16, 185, 129, 0.1), rgba(0, 0, 0, 0.4))",

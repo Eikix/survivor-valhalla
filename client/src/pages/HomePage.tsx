@@ -115,7 +115,7 @@ export function HomePage() {
                 disabled={status === "connecting"}
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
-                className="px-10 py-4 text-lg font-bold tracking-wider uppercase border-2 border-emerald-500/50 hover:border-emerald-500 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                className="px-10 py-4 text-lg font-bold tracking-wider uppercase border-2 border-emerald-500/50 hover:border-emerald-500 transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
                 style={{
                   background:
                     "linear-gradient(to bottom, rgba(16, 185, 129, 0.1), rgba(0, 0, 0, 0.4))",
@@ -153,7 +153,7 @@ export function HomePage() {
                         onClick={handleCreateBase}
                         whileHover={{ scale: 1.05 }}
                         whileTap={{ scale: 0.95 }}
-                        className="px-8 py-3 text-base font-bold tracking-wider uppercase border-2 border-emerald-500/50 hover:border-emerald-500 transition-all"
+                        className="px-8 py-3 text-base font-bold tracking-wider uppercase border-2 border-emerald-500/50 hover:border-emerald-500 transition-all cursor-pointer"
                         style={{
                           background:
                             "linear-gradient(to bottom, rgba(16, 185, 129, 0.1), rgba(0, 0, 0, 0.4))",
