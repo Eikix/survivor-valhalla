@@ -6,4 +6,4 @@ contracts = [
   "erc721:0x046da8955829adf2bda310099a0063451923f02e648cf25a1203aac6335cf0e4", # beasts
 ]
 [sql]
-historical = ["survivor_valhalla-Moves", "survivor_valhalla-Moved"]
+historical = ["survivor_valhalla-BeastLineupRegistered", "survivor_valhalla-BeastSwapped"]
