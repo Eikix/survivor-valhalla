@@ -148,7 +148,6 @@ jobs:
           # Copy the manifest to the archive directory
           mkdir -p manifests/mainnet
           cp ./contract/manifest_mainnet.json ./manifests/mainnet/manifest_mainnet_${TIMESTAMP}.json
-          cp ./contract/manifest_mainnet.json ./contract/manifest_mainnet.json
           
           # Configure git
           git config user.name "GitHub Actions"
