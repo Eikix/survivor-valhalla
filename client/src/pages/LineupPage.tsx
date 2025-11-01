@@ -3,7 +3,7 @@ import { motion } from "framer-motion";
 import { Shield, Trophy, Skull } from "lucide-react";
 import { useState, useEffect, useMemo } from "react";
 import { useConnect, useAccount } from "@starknet-react/core";
-import { useEntityQuery, useModels } from "@dojoengine/sdk/react";
+import { useDojoSDK, useEntityQuery, useModels } from "@dojoengine/sdk/react";
 import { ToriiQueryBuilder } from "@dojoengine/sdk";
 import { Navbar } from "../components/navbar";
 import { WorldBeastLineups } from "../components/WorldBeastLineups";
@@ -30,6 +30,31 @@ export function LineupPage() {
   } = useBeasts(address, {
     enabled: status === "connected",
   });
+
+  const { client } = useDojoSDK();
+
+  const createLineup = async () => {
+    if (!client) return;
+    await client.client.actions.register(
+      ...baseBeasts.map((b) => b?.token_id || 0),
+    );
+  };
+
+  const handleRandomFill = () => {
+    if (beasts.length === 0) return;
+
+    // Shuffle beasts array and take first 5
+    const shuffled = [...beasts].sort(() => Math.random() - 0.5);
+    const randomBeasts = shuffled.slice(0, 5);
+
+    // Fill remaining slots with null if we have fewer than 5 beasts
+    const filledSlots = [
+      ...randomBeasts,
+      ...Array(5 - randomBeasts.length).fill(null),
+    ].slice(0, 5);
+
+    setBaseBeasts(filledSlots);
+  };
 
   // Query on-chain base
   useEntityQuery(new ToriiQueryBuilder().includeHashedKeys());
@@ -254,20 +279,36 @@ export function LineupPage() {
               className="mb-16"
             >
               <div className="border border-emerald-500/30 bg-emerald-950/20 p-8 relative">
-                {baseBeasts.some((b) => b !== null) && (
-                  <motion.button
-                    onClick={() => setBaseBeasts(Array(5).fill(null))}
-                    whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.95 }}
-                    className="absolute top-4 right-4 px-4 py-2 text-xs font-bold tracking-wider uppercase border border-red-500/50 hover:border-red-500 transition-all cursor-pointer text-red-400"
-                    style={{
-                      background:
-                        "linear-gradient(to bottom, rgba(239, 68, 68, 0.1), rgba(0, 0, 0, 0.4))",
-                    }}
-                  >
-                    Clear Lineup
-                  </motion.button>
-                )}
+                <div className="absolute top-4 right-4 flex gap-2">
+                  {beasts.length > 0 && (
+                    <motion.button
+                      onClick={handleRandomFill}
+                      whileHover={{ scale: 1.05 }}
+                      whileTap={{ scale: 0.95 }}
+                      className="px-4 py-2 text-xs font-bold tracking-wider uppercase border border-emerald-500/50 hover:border-emerald-500 transition-all cursor-pointer text-emerald-400"
+                      style={{
+                        background:
+                          "linear-gradient(to bottom, rgba(16, 185, 129, 0.1), rgba(0, 0, 0, 0.4))",
+                      }}
+                    >
+                      Random Fill
+                    </motion.button>
+                  )}
+                  {baseBeasts.some((b) => b !== null) && (
+                    <motion.button
+                      onClick={() => setBaseBeasts(Array(5).fill(null))}
+                      whileHover={{ scale: 1.05 }}
+                      whileTap={{ scale: 0.95 }}
+                      className="px-4 py-2 text-xs font-bold tracking-wider uppercase border border-red-500/50 hover:border-red-500 transition-all cursor-pointer text-red-400"
+                      style={{
+                        background:
+                          "linear-gradient(to bottom, rgba(239, 68, 68, 0.1), rgba(0, 0, 0, 0.4))",
+                      }}
+                    >
+                      Clear Lineup
+                    </motion.button>
+                  )}
+                </div>
                 <div className="text-center">
                   <Shield className="w-12 h-12 text-emerald-500/50 mx-auto mb-4" />
                   <h2 className="text-2xl font-bold text-emerald-400 mb-4 tracking-wider uppercase">
@@ -337,6 +378,7 @@ export function LineupPage() {
                   </div>
                   {!hasBase && (
                     <motion.button
+                      onClick={createLineup}
                       disabled={!baseBeasts.every((b) => b !== null)}
                       whileHover={
                         baseBeasts.every((b) => b !== null)

@@ -77,13 +77,6 @@ const getBeastCollection = async (
 
   const url = `${toriiUrl}/sql?query=${encodeURIComponent(q)}`;
 
-  console.log("[useBeasts] Fetching beasts:", {
-    accountAddress,
-    toriiUrl,
-    beastsContract,
-    url,
-  });
-
   try {
     const sql = await fetch(url, {
       method: "GET",
@@ -104,8 +97,6 @@ const getBeastCollection = async (
     }
 
     let data = await sql.json();
-    console.log("[useBeasts] Raw response data:", data);
-    console.log("[useBeasts] Response count:", data?.length || 0);
 
     let beasts: Beast[] = data
       .filter((data: any) => data["Beast"])
@@ -135,9 +126,6 @@ const getBeastCollection = async (
 
         return beast;
       });
-
-    console.log("[useBeasts] Processed beasts:", beasts);
-    console.log("[useBeasts] Total beasts found:", beasts.length);
 
     return beasts;
   } catch (error) {

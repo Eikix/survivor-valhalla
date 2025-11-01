@@ -5,25 +5,18 @@ import { ToriiQueryBuilder } from "@dojoengine/sdk";
 import { ModelsMapping } from "../bindings/typescript/models.gen";
 
 export function WorldBeastLineups() {
-  console.log("[WorldBeastLineups] Component rendering");
-
   // Subscribe to all entities - data automatically goes into the Zustand store
   useEntityQuery(new ToriiQueryBuilder().includeHashedKeys());
-  console.log("[WorldBeastLineups] Entity query initialized");
 
   // Get all BeastLineup models from the store (filtered by model type)
   const beastLineups = useModels(ModelsMapping.BeastLineup);
-  console.log("[WorldBeastLineups] Raw beastLineups from store:", beastLineups);
-  console.log(
-    "[WorldBeastLineups] Number of entries:",
-    Object.keys(beastLineups).length,
-  );
 
   // Convert to array format for easier rendering
   const lineupsArray = Object.entries(beastLineups)
     .filter(
       (entry): entry is [string, NonNullable<(typeof entry)[1]>] =>
-        entry[1] !== undefined && entry[1].models?.survivor_valhalla?.BeastLineup !== undefined,
+        entry[1] !== undefined &&
+        entry[1].models?.survivor_valhalla?.BeastLineup !== undefined,
     )
     .map(([entityId, entity]) => ({
       entityId,
@@ -34,12 +27,6 @@ export function WorldBeastLineups() {
       beast4_id: entity.models?.survivor_valhalla?.BeastLineup?.beast4_id,
       beast5_id: entity.models?.survivor_valhalla?.BeastLineup?.beast5_id,
     }));
-
-  console.log("[WorldBeastLineups] Processed lineupsArray:", lineupsArray);
-  console.log(
-    "[WorldBeastLineups] Number of lineups to display:",
-    lineupsArray.length,
-  );
 
   return (
     <motion.div
