@@ -25,8 +25,8 @@ jobs:
       - name: Check if version changed
         id: version-check
         run: |
-          # Get current version from Scarb.toml
-          CURRENT_VERSION=$(grep "^version" contract/Scarb.toml | cut -d'"' -f2)
+          # Get current version from dojo_mainnet.toml
+          CURRENT_VERSION=$(grep "^version" contract/dojo_mainnet.toml | grep -v "cairo-version" | cut -d'"' -f2)
           echo "Current version: $CURRENT_VERSION"
           echo "version=$CURRENT_VERSION" >> $GITHUB_OUTPUT
           
@@ -38,9 +38,9 @@ jobs:
           fi
           
           # Get previous version
-          git checkout HEAD~1 contract/Scarb.toml 2>/dev/null || true
-          PREVIOUS_VERSION=$(grep "^version" contract/Scarb.toml | cut -d'"' -f2) || echo ""
-          git checkout HEAD contract/Scarb.toml
+          git checkout HEAD~1 contract/dojo_mainnet.toml 2>/dev/null || true
+          PREVIOUS_VERSION=$(grep "^version" contract/dojo_mainnet.toml | grep -v "cairo-version" | cut -d'"' -f2) || echo ""
+          git checkout HEAD contract/dojo_mainnet.toml
           
           echo "Previous version: $PREVIOUS_VERSION"
           
