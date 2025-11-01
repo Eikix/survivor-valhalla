@@ -1490,8 +1490,237 @@
   },
   "contracts": [
     {
+      "address": "0x62017dad4ca883ecef6180eefcb1929272fc3c31d11a7bc9d7df31602d30897",
+      "class_hash": "0x1c66c9dd7e72c542c0ede10472c8048654562536a363faa6b86589ae621899a",
+      "abi": [
+        {
+          "type": "impl",
+          "name": "battle_actions__ContractImpl",
+          "interface_name": "dojo::contract::interface::IContract"
+        },
+        {
+          "type": "interface",
+          "name": "dojo::contract::interface::IContract",
+          "items": []
+        },
+        {
+          "type": "impl",
+          "name": "DojoDeployedContractImpl",
+          "interface_name": "dojo::meta::interface::IDeployedResource"
+        },
+        {
+          "type": "struct",
+          "name": "core::byte_array::ByteArray",
+          "members": [
+            {
+              "name": "data",
+              "type": "core::array::Array::<core::bytes_31::bytes31>"
+            },
+            {
+              "name": "pending_word",
+              "type": "core::felt252"
+            },
+            {
+              "name": "pending_word_len",
+              "type": "core::integer::u32"
+            }
+          ]
+        },
+        {
+          "type": "interface",
+          "name": "dojo::meta::interface::IDeployedResource",
+          "items": [
+            {
+              "type": "function",
+              "name": "dojo_name",
+              "inputs": [],
+              "outputs": [
+                {
+                  "type": "core::byte_array::ByteArray"
+                }
+              ],
+              "state_mutability": "view"
+            }
+          ]
+        },
+        {
+          "type": "impl",
+          "name": "BattleActionsImpl",
+          "interface_name": "survivor_valhalla::systems::battle_actions::IBattleActions"
+        },
+        {
+          "type": "interface",
+          "name": "survivor_valhalla::systems::battle_actions::IBattleActions",
+          "items": [
+            {
+              "type": "function",
+              "name": "battle",
+              "inputs": [
+                {
+                  "name": "defender",
+                  "type": "core::starknet::contract_address::ContractAddress"
+                }
+              ],
+              "outputs": [],
+              "state_mutability": "external"
+            },
+            {
+              "type": "function",
+              "name": "set_attack_lineup",
+              "inputs": [
+                {
+                  "name": "adventurer1_id",
+                  "type": "core::integer::u64"
+                },
+                {
+                  "name": "adventurer2_id",
+                  "type": "core::integer::u64"
+                },
+                {
+                  "name": "adventurer3_id",
+                  "type": "core::integer::u64"
+                },
+                {
+                  "name": "adventurer4_id",
+                  "type": "core::integer::u64"
+                },
+                {
+                  "name": "adventurer5_id",
+                  "type": "core::integer::u64"
+                }
+              ],
+              "outputs": [],
+              "state_mutability": "external"
+            }
+          ]
+        },
+        {
+          "type": "function",
+          "name": "dojo_init",
+          "inputs": [],
+          "outputs": [],
+          "state_mutability": "view"
+        },
+        {
+          "type": "impl",
+          "name": "WorldProviderImpl",
+          "interface_name": "dojo::contract::components::world_provider::IWorldProvider"
+        },
+        {
+          "type": "struct",
+          "name": "dojo::world::iworld::IWorldDispatcher",
+          "members": [
+            {
+              "name": "contract_address",
+              "type": "core::starknet::contract_address::ContractAddress"
+            }
+          ]
+        },
+        {
+          "type": "interface",
+          "name": "dojo::contract::components::world_provider::IWorldProvider",
+          "items": [
+            {
+              "type": "function",
+              "name": "world_dispatcher",
+              "inputs": [],
+              "outputs": [
+                {
+                  "type": "dojo::world::iworld::IWorldDispatcher"
+                }
+              ],
+              "state_mutability": "view"
+            }
+          ]
+        },
+        {
+          "type": "impl",
+          "name": "UpgradeableImpl",
+          "interface_name": "dojo::contract::components::upgradeable::IUpgradeable"
+        },
+        {
+          "type": "interface",
+          "name": "dojo::contract::components::upgradeable::IUpgradeable",
+          "items": [
+            {
+              "type": "function",
+              "name": "upgrade",
+              "inputs": [
+                {
+                  "name": "new_class_hash",
+                  "type": "core::starknet::class_hash::ClassHash"
+                }
+              ],
+              "outputs": [],
+              "state_mutability": "external"
+            }
+          ]
+        },
+        {
+          "type": "constructor",
+          "name": "constructor",
+          "inputs": []
+        },
+        {
+          "type": "event",
+          "name": "dojo::contract::components::upgradeable::upgradeable_cpt::Upgraded",
+          "kind": "struct",
+          "members": [
+            {
+              "name": "class_hash",
+              "type": "core::starknet::class_hash::ClassHash",
+              "kind": "data"
+            }
+          ]
+        },
+        {
+          "type": "event",
+          "name": "dojo::contract::components::upgradeable::upgradeable_cpt::Event",
+          "kind": "enum",
+          "variants": [
+            {
+              "name": "Upgraded",
+              "type": "dojo::contract::components::upgradeable::upgradeable_cpt::Upgraded",
+              "kind": "nested"
+            }
+          ]
+        },
+        {
+          "type": "event",
+          "name": "dojo::contract::components::world_provider::world_provider_cpt::Event",
+          "kind": "enum",
+          "variants": []
+        },
+        {
+          "type": "event",
+          "name": "survivor_valhalla::systems::battle_actions::battle_actions::Event",
+          "kind": "enum",
+          "variants": [
+            {
+              "name": "UpgradeableEvent",
+              "type": "dojo::contract::components::upgradeable::upgradeable_cpt::Event",
+              "kind": "nested"
+            },
+            {
+              "name": "WorldProviderEvent",
+              "type": "dojo::contract::components::world_provider::world_provider_cpt::Event",
+              "kind": "nested"
+            }
+          ]
+        }
+      ],
+      "init_calldata": [],
+      "tag": "survivor_valhalla-battle_actions",
+      "selector": "0x4a4b098d74ae07023f8cd1781bc65af1793f27453f3fc3a1c74b28601e742da",
+      "systems": [
+        "battle",
+        "set_attack_lineup",
+        "upgrade"
+      ]
+    },
+    {
       "address": "0x2f04f10a45afce1c2b7f5681d81c736680059c4dcd39bc23192a4ff9223afae",
-      "class_hash": "0x73ce328a5eaba0c5985695c32edc356133af7fd998f4ba806b9aba10af816f6",
+      "class_hash": "0x3253172b895729876c601ff0a1a871717e750a04c4c27040f51c830105a648e",
       "abi": [
         {
           "type": "impl",
@@ -1735,18 +1964,257 @@
         "swap",
         "upgrade"
       ]
+    },
+    {
+      "address": "0x7f2b4731065637d14c4cc1d035f82236f12fd718c15213430e1af63f32e79be",
+      "class_hash": "0x458cda4fb1d2db0904e088bb72f6ef93795a78ade119c8dd4c85a7838d91740",
+      "abi": [
+        {
+          "type": "impl",
+          "name": "energy_actions__ContractImpl",
+          "interface_name": "dojo::contract::interface::IContract"
+        },
+        {
+          "type": "interface",
+          "name": "dojo::contract::interface::IContract",
+          "items": []
+        },
+        {
+          "type": "impl",
+          "name": "DojoDeployedContractImpl",
+          "interface_name": "dojo::meta::interface::IDeployedResource"
+        },
+        {
+          "type": "struct",
+          "name": "core::byte_array::ByteArray",
+          "members": [
+            {
+              "name": "data",
+              "type": "core::array::Array::<core::bytes_31::bytes31>"
+            },
+            {
+              "name": "pending_word",
+              "type": "core::felt252"
+            },
+            {
+              "name": "pending_word_len",
+              "type": "core::integer::u32"
+            }
+          ]
+        },
+        {
+          "type": "interface",
+          "name": "dojo::meta::interface::IDeployedResource",
+          "items": [
+            {
+              "type": "function",
+              "name": "dojo_name",
+              "inputs": [],
+              "outputs": [
+                {
+                  "type": "core::byte_array::ByteArray"
+                }
+              ],
+              "state_mutability": "view"
+            }
+          ]
+        },
+        {
+          "type": "impl",
+          "name": "EnergyActionsImpl",
+          "interface_name": "survivor_valhalla::systems::energy_actions::IEnergyActions"
+        },
+        {
+          "type": "interface",
+          "name": "survivor_valhalla::systems::energy_actions::IEnergyActions",
+          "items": [
+            {
+              "type": "function",
+              "name": "get_energy",
+              "inputs": [
+                {
+                  "name": "player",
+                  "type": "core::starknet::contract_address::ContractAddress"
+                }
+              ],
+              "outputs": [
+                {
+                  "type": "core::integer::u8"
+                }
+              ],
+              "state_mutability": "view"
+            }
+          ]
+        },
+        {
+          "type": "function",
+          "name": "dojo_init",
+          "inputs": [],
+          "outputs": [],
+          "state_mutability": "view"
+        },
+        {
+          "type": "impl",
+          "name": "WorldProviderImpl",
+          "interface_name": "dojo::contract::components::world_provider::IWorldProvider"
+        },
+        {
+          "type": "struct",
+          "name": "dojo::world::iworld::IWorldDispatcher",
+          "members": [
+            {
+              "name": "contract_address",
+              "type": "core::starknet::contract_address::ContractAddress"
+            }
+          ]
+        },
+        {
+          "type": "interface",
+          "name": "dojo::contract::components::world_provider::IWorldProvider",
+          "items": [
+            {
+              "type": "function",
+              "name": "world_dispatcher",
+              "inputs": [],
+              "outputs": [
+                {
+                  "type": "dojo::world::iworld::IWorldDispatcher"
+                }
+              ],
+              "state_mutability": "view"
+            }
+          ]
+        },
+        {
+          "type": "impl",
+          "name": "UpgradeableImpl",
+          "interface_name": "dojo::contract::components::upgradeable::IUpgradeable"
+        },
+        {
+          "type": "interface",
+          "name": "dojo::contract::components::upgradeable::IUpgradeable",
+          "items": [
+            {
+              "type": "function",
+              "name": "upgrade",
+              "inputs": [
+                {
+                  "name": "new_class_hash",
+                  "type": "core::starknet::class_hash::ClassHash"
+                }
+              ],
+              "outputs": [],
+              "state_mutability": "external"
+            }
+          ]
+        },
+        {
+          "type": "constructor",
+          "name": "constructor",
+          "inputs": []
+        },
+        {
+          "type": "event",
+          "name": "dojo::contract::components::upgradeable::upgradeable_cpt::Upgraded",
+          "kind": "struct",
+          "members": [
+            {
+              "name": "class_hash",
+              "type": "core::starknet::class_hash::ClassHash",
+              "kind": "data"
+            }
+          ]
+        },
+        {
+          "type": "event",
+          "name": "dojo::contract::components::upgradeable::upgradeable_cpt::Event",
+          "kind": "enum",
+          "variants": [
+            {
+              "name": "Upgraded",
+              "type": "dojo::contract::components::upgradeable::upgradeable_cpt::Upgraded",
+              "kind": "nested"
+            }
+          ]
+        },
+        {
+          "type": "event",
+          "name": "dojo::contract::components::world_provider::world_provider_cpt::Event",
+          "kind": "enum",
+          "variants": []
+        },
+        {
+          "type": "event",
+          "name": "survivor_valhalla::systems::energy_actions::energy_actions::Event",
+          "kind": "enum",
+          "variants": [
+            {
+              "name": "UpgradeableEvent",
+              "type": "dojo::contract::components::upgradeable::upgradeable_cpt::Event",
+              "kind": "nested"
+            },
+            {
+              "name": "WorldProviderEvent",
+              "type": "dojo::contract::components::world_provider::world_provider_cpt::Event",
+              "kind": "nested"
+            }
+          ]
+        }
+      ],
+      "init_calldata": [],
+      "tag": "survivor_valhalla-energy_actions",
+      "selector": "0x2e6eddfdf203a86f4a80c31e451ce13e738970f1392ecf3e570b56e42cb597",
+      "systems": [
+        "upgrade"
+      ]
     }
   ],
   "libraries": [],
   "models": [
     {
       "members": [],
+      "class_hash": "0x300faff6f27d485481e3e20f3a7570c7914bdec7e7b87a96a4e1b1e41fc9267",
+      "tag": "survivor_valhalla-AttackLineup",
+      "selector": "0x655c894eee886ce69954e3720c75e9603234a07d4782c576ad71daaa8b8b21"
+    },
+    {
+      "members": [],
+      "class_hash": "0x4b91e8655c800b5089727f2551c9ca0aad8dbe6e13949cbf9ed63b1b6afcfa9",
+      "tag": "survivor_valhalla-Battle",
+      "selector": "0x70efea6812ebf6db52fbe72cdc585d647e92fb320d73c370c4d4e6cbc501a71"
+    },
+    {
+      "members": [],
+      "class_hash": "0x42157e8474d205ddb8df8b7f8bb5d4fc702f85f7eddcd71c678896e730cbd30",
+      "tag": "survivor_valhalla-Beast",
+      "selector": "0x3a387730a05b87daef26e36a33cf52b67ca1379ccd73374e9231a237f98b833"
+    },
+    {
+      "members": [],
       "class_hash": "0x6d75385f6decc9b678b03d90e5390c2259e02aa7eab5c23bf267b53bd6fdefc",
       "tag": "survivor_valhalla-BeastLineup",
       "selector": "0x5c434ed363fddce1ca69eaf527e8f6680dd320930f2535ef3c1beada4e736cf"
+    },
+    {
+      "members": [],
+      "class_hash": "0x608023e8c12ab19aeb69734c344e1ddb8179583682f3eb70bbc933f351bd00",
+      "tag": "survivor_valhalla-CachedAdventurer",
+      "selector": "0x4aa85ee515e8dae00b62d7ca73fa6db68790d9c3b4e329bddeba69da716f616"
+    },
+    {
+      "members": [],
+      "class_hash": "0x3516f4d74077f215a421949cfc5976a76c3e1554b2c17728271bd15cb2fa1a1",
+      "tag": "survivor_valhalla-PlayerEnergy",
+      "selector": "0x1eab8776ea3d478cc50b51b59274105a5a0402713a66f9967b07928cbcffaaf"
     }
   ],
   "events": [
+    {
+      "members": [],
+      "class_hash": "0xd531d5018a07800b1af50d47ca4be0cfdfcbc5af10cf7d32861c921fbc0b8d",
+      "tag": "survivor_valhalla-BattleCompleted",
+      "selector": "0x7ed8fa6fb7e0ba3f378d64608891a8fd2331d8a7fc136f8c824619cc6c5da7d"
+    },
     {
       "members": [],
       "class_hash": "0x1adfac596b4b0919e7284f11d73db1fd68773cfa94176df7cb6a3b408c79fc0",
@@ -1758,6 +2226,12 @@
       "class_hash": "0xcced10e038d94ce837c64fd7d47c452d54a4cb703a00ab4c12de1da595395e",
       "tag": "survivor_valhalla-BeastSwapped",
       "selector": "0x156fd4853b3ae65335424643ccc88544993fc7a0147843e4d3e26dc1799670b"
+    },
+    {
+      "members": [],
+      "class_hash": "0x2f3a8a0c3e8aef700d99864d1ba47302022c96563bbf1614609858a4edf37e0",
+      "tag": "survivor_valhalla-EnergyConsumed",
+      "selector": "0xa0a7b2a7954d9406d6afabbe414ec201bc079b1e820890d3f1dcec4a293ddb"
     }
   ],
   "external_contracts": []
