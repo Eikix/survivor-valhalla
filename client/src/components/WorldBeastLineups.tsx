@@ -1,38 +1,15 @@
 // src/components/WorldBeastLineups.tsx
 import { motion } from "framer-motion";
-import { useEntityQuery, useModels } from "@dojoengine/sdk/react";
-import { KeysClause, ToriiQueryBuilder } from "@dojoengine/sdk";
-import { ModelsMapping } from "../bindings/typescript/models.gen";
+import { type BeastLineup } from "../bindings/typescript/models.gen";
 
-export function WorldBeastLineups() {
-  // Subscribe to all entities - data automatically goes into the Zustand store
-  useEntityQuery(
-    new ToriiQueryBuilder()
-      .includeHashedKeys()
-      .withClause(
-        KeysClause([ModelsMapping.BeastLineupRegistered], []).build(),
-      ),
-  );
+type BeastLineupWithId = BeastLineup & { entityId: string };
 
-  // Get all BeastLineup models from the store (filtered by model type)
-  const beastLineups = useModels(ModelsMapping.BeastLineupRegistered);
-
-  // Convert to array format for easier rendering
-  const lineupsArray = Object.entries(beastLineups)
-    .filter(
-      (entry): entry is [string, NonNullable<(typeof entry)[1]>] =>
-        entry[1] !== undefined &&
-        entry[1].models?.survivor_valhalla?.BeastLineupRegistered !== undefined,
-    )
-    .map(([entityId, entity]) => ({
-      entityId,
-      player: entity.models?.survivor_valhalla?.BeastLineupRegistered?.player,
-      beast1_id: entity.models?.survivor_valhalla?.BeastLineup?.beast1_id,
-      beast2_id: entity.models?.survivor_valhalla?.BeastLineup?.beast2_id,
-      beast3_id: entity.models?.survivor_valhalla?.BeastLineup?.beast3_id,
-      beast4_id: entity.models?.survivor_valhalla?.BeastLineup?.beast4_id,
-      beast5_id: entity.models?.survivor_valhalla?.BeastLineup?.beast5_id,
-    }));
+export function WorldBeastLineups(props: {
+  lineups: BeastLineupWithId[];
+  beastImages: Record<string, string>;
+}) {
+  const lineupsArray = props.lineups.filter((lineup) => lineup !== undefined);
+  const { beastImages } = props;
 
   return (
     <motion.div
@@ -70,17 +47,26 @@ export function WorldBeastLineups() {
                       const beastId =
                         lineup[`beast${pos}_id` as keyof typeof lineup];
                       const hasBeast = beastId && Number(beastId) > 0;
+                      const imageUrl = hasBeast
+                        ? beastImages[String(beastId)]
+                        : null;
                       return (
                         <div
                           key={pos}
-                          className={`aspect-square border-2 rounded flex items-center justify-center text-xs ${
+                          className={`aspect-square border-2 rounded flex items-center justify-center text-xs overflow-hidden ${
                             hasBeast
                               ? "border-emerald-500/50 bg-emerald-500/10"
                               : "border-emerald-500/20 bg-emerald-950/20"
                           }`}
                         >
-                          {hasBeast ? (
-                            <span className="text-emerald-400">
+                          {hasBeast && imageUrl ? (
+                            <img
+                              src={imageUrl}
+                              alt={`Beast ${beastId}`}
+                              className="w-full h-full object-cover"
+                            />
+                          ) : hasBeast ? (
+                            <span className="text-emerald-400 text-[8px]">
                               {String(beastId).slice(0, 3)}
                             </span>
                           ) : (

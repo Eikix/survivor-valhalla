@@ -163,3 +163,89 @@ export const useBeasts = (
     staleTime: 100000, // Consider data fresh for 100 seconds
   });
 };
+
+/**
+ * Fetch beast images by token IDs
+ * Returns a map of token_id -> image URL
+ */
+const getBeastLineupImages = async (
+  tokenIds: (string | number | bigint)[],
+  toriiUrl: string = TORII_URL,
+): Promise<Record<string, string>> => {
+  if (tokenIds.length === 0) return {};
+
+  // Convert all token IDs to numbers and filter out zeros
+  const validTokenIds = tokenIds.map((id) => Number(id)).filter((id) => id > 0);
+
+  if (validTokenIds.length === 0) return {};
+
+  // Convert token IDs to hex format for the SQL query
+  const tokenIdList = validTokenIds
+    .map((id) => `'0x${id.toString(16)}'`)
+    .join(",");
+  const q = `
+    SELECT
+      t.id as token_id,
+      json_extract(t.metadata, '$.image') as image
+    FROM tokens t
+    WHERE t.id IN (${tokenIdList})
+  `;
+
+  const url = `${toriiUrl}/sql?query=${encodeURIComponent(q)}`;
+
+  try {
+    const sql = await fetch(url, {
+      method: "GET",
+      headers: {
+        "Content-Type": "application/json",
+      },
+    });
+
+    if (!sql.ok) {
+      console.error("[getBeastLineupImages] Fetch failed:", {
+        status: sql.status,
+        statusText: sql.statusText,
+        url,
+      });
+      throw new Error(
+        `Failed to fetch beast images: ${sql.status} ${sql.statusText}`,
+      );
+    }
+
+    const data = await sql.json();
+
+    // Convert array to map of token_id -> image
+    // Parse hex token_id from database and convert to decimal string for consistency
+    const imageMap: Record<string, string> = {};
+    data.forEach((row: any) => {
+      if (row.token_id && row.image) {
+        // Parse hex token_id (e.g., "0x1234" -> 4660)
+        const tokenIdDecimal = parseInt(row.token_id, 16);
+        imageMap[String(tokenIdDecimal)] = row.image;
+      }
+    });
+
+    return imageMap;
+  } catch (error) {
+    console.error("[getBeastLineupImages] Error fetching images:", error);
+    throw error;
+  }
+};
+
+/**
+ * Hook to fetch beast images for lineup display
+ */
+export const useBeastLineupImages = (
+  tokenIds: (string | number | bigint)[],
+  options?: {
+    toriiUrl?: string;
+    enabled?: boolean;
+  },
+) => {
+  return useQuery({
+    queryKey: ["beastLineupImages", tokenIds.join(","), options?.toriiUrl],
+    queryFn: () => getBeastLineupImages(tokenIds, options?.toriiUrl),
+    enabled: options?.enabled ?? tokenIds.length > 0,
+    staleTime: 100000, // Consider data fresh for 100 seconds
+  });
+};

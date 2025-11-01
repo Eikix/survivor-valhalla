@@ -7,9 +7,12 @@ import { useDojoSDK, useEntityQuery, useModels } from "@dojoengine/sdk/react";
 import { ToriiQueryBuilder } from "@dojoengine/sdk";
 import { Navbar } from "../components/navbar";
 import { WorldBeastLineups } from "../components/WorldBeastLineups";
-import { useBeasts } from "../hooks/useBeasts";
+import { useBeasts, useBeastLineupImages } from "../hooks/useBeasts";
 import type { Beast } from "../hooks/useBeasts";
-import { ModelsMapping } from "../bindings/typescript/models.gen";
+import {
+  ModelsMapping,
+  type BeastLineup,
+} from "../bindings/typescript/models.gen";
 import { addAddressPadding } from "starknet";
 
 export function LineupPage() {
@@ -62,41 +65,111 @@ export function LineupPage() {
   };
 
   // Query on-chain base
-  useEntityQuery(new ToriiQueryBuilder().includeHashedKeys());
+  // Query all BeastLineup entities using VariableLen pattern matching with empty key
+  // See: https://dojoengine.org/toolchain/torii/grpc#quick-start
+  useEntityQuery(
+    new ToriiQueryBuilder()
+      .includeHashedKeys()
+      .withEntityModels([ModelsMapping.BeastLineup]),
+  );
   const allLineups = useModels(ModelsMapping.BeastLineup);
-  const userLineup = useMemo(
-    () =>
-      address
-        ? Object.values(allLineups).find(
-            (entity) =>
-              entity?.models?.survivor_valhalla?.BeastLineup?.player?.toLowerCase() ===
-              addAddressPadding(address.toLowerCase()).toLowerCase(),
-          )
-        : null,
-    [allLineups, address],
-  );
 
-  const hasBase = !!userLineup?.models?.survivor_valhalla?.BeastLineup;
-  const lastProcessedLineupRef = useRef<string>("");
-  const beastsIdsString = useMemo(
-    () => beasts.map((b) => b.id).sort().join(","),
-    [beasts],
-  );
+  // Type for lineup objects returned by useModels
+  type LineupObj = Record<string, BeastLineup>;
+  type BeastLineupWithId = BeastLineup & { entityId: string };
 
-  // Load base beasts from on-chain data when lineup exists
-  useEffect(() => {
-    if (
-      hasBase &&
-      userLineup?.models?.survivor_valhalla?.BeastLineup &&
-      beasts.length > 0
-    ) {
-      const lineup = userLineup.models.survivor_valhalla.BeastLineup;
-      const lineupBeastIds = [
+  const userLineup = useMemo((): BeastLineupWithId | null => {
+    if (!address) return null;
+
+    const paddedAddress = addAddressPadding(
+      address.toLowerCase(),
+    ).toLowerCase();
+
+    if (!Array.isArray(allLineups)) return null;
+
+    const found = allLineups.find((lineupObj: LineupObj) => {
+      const entityId = Object.keys(lineupObj)[0];
+      const lineup = lineupObj[entityId];
+      return lineup?.player?.toLowerCase() === paddedAddress;
+    });
+
+    if (!found) return null;
+
+    const entityId = Object.keys(found)[0];
+    return {
+      entityId,
+      ...found[entityId],
+    };
+  }, [allLineups, address]);
+
+  const worldLineups = useMemo((): BeastLineupWithId[] => {
+    if (!Array.isArray(allLineups)) return [];
+
+    return allLineups
+      .map((lineupObj: LineupObj) => {
+        // Get the first (and only) key from the object
+        const entityId = Object.keys(lineupObj)[0];
+        const lineup = lineupObj[entityId];
+
+        if (!lineup) return null;
+
+        return {
+          entityId,
+          player: lineup.player,
+          beast1_id: lineup.beast1_id,
+          beast2_id: lineup.beast2_id,
+          beast3_id: lineup.beast3_id,
+          beast4_id: lineup.beast4_id,
+          beast5_id: lineup.beast5_id,
+        };
+      })
+      .filter((lineup): lineup is BeastLineupWithId => lineup !== null);
+  }, [allLineups]);
+
+  // Extract all unique token IDs from world lineups for fetching images
+  const allLineupTokenIds = useMemo(() => {
+    const tokenIds: (string | number | bigint)[] = [];
+    worldLineups.forEach((lineup) => {
+      [
         lineup.beast1_id,
         lineup.beast2_id,
         lineup.beast3_id,
         lineup.beast4_id,
         lineup.beast5_id,
+      ].forEach((id) => {
+        if (id && Number(id) > 0) {
+          tokenIds.push(id);
+        }
+      });
+    });
+    return tokenIds;
+  }, [worldLineups]);
+
+  // Fetch images for all lineup beasts
+  const { data: lineupImages = {} } = useBeastLineupImages(allLineupTokenIds, {
+    enabled: allLineupTokenIds.length > 0,
+  });
+
+  const hasBase = !!userLineup;
+  const lastProcessedLineupRef = useRef<string>("");
+  const beastsIdsString = useMemo(
+    () =>
+      beasts
+        .map((b) => b.id)
+        .sort()
+        .join(","),
+    [beasts],
+  );
+
+  // Load base beasts from on-chain data when lineup exists
+  useEffect(() => {
+    if (hasBase && userLineup && beasts.length > 0) {
+      const lineupBeastIds = [
+        userLineup.beast1_id,
+        userLineup.beast2_id,
+        userLineup.beast3_id,
+        userLineup.beast4_id,
+        userLineup.beast5_id,
       ];
 
       // Create a stable key for this lineup + beasts combination
@@ -556,7 +629,10 @@ export function LineupPage() {
             </motion.div>
 
             {/* World's Beast Lineups Section */}
-            <WorldBeastLineups />
+            <WorldBeastLineups
+              lineups={worldLineups}
+              beastImages={lineupImages}
+            />
 
             {/* Stats Section */}
             {hasBase && (
