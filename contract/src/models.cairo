@@ -75,4 +75,12 @@ pub struct CachedAdventurer {
     pub wisdom: u8,
     pub charisma: u8,
     pub luck: u8,
+    pub weapon_id: u8,
+    pub chest_id: u8,
+    pub head_id: u8,
+    pub waist_id: u8,
+    pub foot_id: u8,
+    pub hand_id: u8,
+    pub neck_id: u8,
+    pub ring_id: u8,
 }

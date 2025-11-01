@@ -8,10 +8,11 @@ pub trait IBattleActions<T> {
 pub mod battle_actions {
     use dojo::event::EventStorage;
     use dojo::model::ModelStorage;
-    use survivor_valhalla::models::{BeastLineup, PlayerEnergy, Battle, AttackLineup, CachedAdventurer};
+    use survivor_valhalla::models::{BeastLineup, PlayerEnergy, Battle, AttackLineup, CachedAdventurer, Beast};
     use survivor_valhalla::interfaces::adventurer::{IAdventurerSystemsDispatcher, IAdventurerSystemsDispatcherTrait, IERC721Dispatcher, IERC721DispatcherTrait};
     use survivor_valhalla::constants::BEASTMODE_CONTRACT;
     use starknet::{ContractAddress, get_caller_address, get_block_timestamp};
+    use survivor_valhalla::systems::combat::simulate_battle;
     use super::IBattleActions;
 
     const MAX_ENERGY: u8 = 5;
@@ -68,10 +69,35 @@ pub mod battle_actions {
                 timestamp: current_time 
             });
             
-            // Simple battle simulation (50/50 for now)
-            // TODO: Implement actual battle logic based on beast stats
-            let battle_seed: u256 = current_time.into() + Into::<ContractAddress, felt252>::into(attacker).into() + Into::<ContractAddress, felt252>::into(defender).into();
-            let winner = if battle_seed % 2 == 0 { attacker } else { defender };
+            // Load attacker's adventurers
+            let mut adventurers: Array<CachedAdventurer> = ArrayTrait::new();
+            adventurers.append(world.read_model((attacker, attack_lineup.adventurer1_id)));
+            adventurers.append(world.read_model((attacker, attack_lineup.adventurer2_id)));
+            adventurers.append(world.read_model((attacker, attack_lineup.adventurer3_id)));
+            adventurers.append(world.read_model((attacker, attack_lineup.adventurer4_id)));
+            adventurers.append(world.read_model((attacker, attack_lineup.adventurer5_id)));
+            
+            // Load defender's beasts
+            let mut beasts: Array<Beast> = ArrayTrait::new();
+            if defender_lineup.beast1_id != 0 {
+                beasts.append(world.read_model((defender, 1_u8)));
+            }
+            if defender_lineup.beast2_id != 0 {
+                beasts.append(world.read_model((defender, 2_u8)));
+            }
+            if defender_lineup.beast3_id != 0 {
+                beasts.append(world.read_model((defender, 3_u8)));
+            }
+            if defender_lineup.beast4_id != 0 {
+                beasts.append(world.read_model((defender, 4_u8)));
+            }
+            if defender_lineup.beast5_id != 0 {
+                beasts.append(world.read_model((defender, 5_u8)));
+            }
+            
+            // Run the battle simulation
+            let attacker_won = simulate_battle(adventurers, beasts);
+            let winner = if attacker_won { attacker } else { defender };
             
             // Create battle record
             let battle_id = 1; // TODO: Implement proper ID generation
@@ -136,7 +162,7 @@ pub mod battle_actions {
                     // Calculate level from XP (roughly following Death Mountain logic)
                     let level = if adventurer.xp == 0 { 1 } else { ((adventurer.xp / 100) + 1).try_into().unwrap() };
                     
-                    // Cache adventurer stats
+                    // Cache adventurer stats and equipment
                     let cached = CachedAdventurer {
                         player,
                         adventurer_id,
@@ -149,6 +175,14 @@ pub mod battle_actions {
                         wisdom: adventurer.stats.wisdom,
                         charisma: adventurer.stats.charisma,
                         luck: adventurer.stats.luck,
+                        weapon_id: adventurer.equipment.weapon,
+                        chest_id: adventurer.equipment.chest,
+                        head_id: adventurer.equipment.head,
+                        waist_id: adventurer.equipment.waist,
+                        foot_id: adventurer.equipment.foot,
+                        hand_id: adventurer.equipment.hand,
+                        neck_id: adventurer.equipment.neck,
+                        ring_id: adventurer.equipment.ring,
                     };
                     world.write_model(@cached);
                 }

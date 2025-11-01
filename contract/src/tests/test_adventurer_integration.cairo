@@ -40,6 +40,14 @@ mod test_adventurer_integration {
             wisdom: 6,
             charisma: 7,
             luck: 9,
+            weapon_id: 1,
+            chest_id: 2,
+            head_id: 3,
+            waist_id: 4,
+            foot_id: 5,
+            hand_id: 6,
+            neck_id: 7,
+            ring_id: 8,
         };
         
         assert(cached_adventurer.health == 150, 'Health mismatch');
