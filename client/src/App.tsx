@@ -10,7 +10,7 @@ import { dojoConfig } from "./dojoConfig.ts";
 import { setupWorld } from "./bindings/typescript/contracts.gen.ts";
 import type { SchemaType } from "./bindings/typescript/models.gen.ts";
 
-export const TORII_URL = "http://localhost:8080";
+export const TORII_URL = "https://api.cartridge.gg/x/survivor-valhalla/torii";
 
 const queryClient = new QueryClient({
   defaultOptions: {

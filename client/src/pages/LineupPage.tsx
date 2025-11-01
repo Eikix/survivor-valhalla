@@ -23,6 +23,7 @@ export function LineupPage() {
   const [isDraggingOver, setIsDraggingOver] = useState<number>(-1);
   const [sortBy, setSortBy] = useState<keyof Beast | "">("");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
+  const [swappedPosition, setSwappedPosition] = useState<number | null>(null);
 
   const { connect, connectors } = useConnect();
   const { status, address, account } = useAccount();
@@ -46,6 +47,19 @@ export function LineupPage() {
       baseBeasts[3]?.token_id || 0,
       baseBeasts[4]?.token_id || 0,
     );
+  };
+
+  const swapBeast = async () => {
+    if (!client || !account || swappedPosition === null) return;
+    const newBeast = baseBeasts[swappedPosition];
+    if (!newBeast) return;
+
+    await client.beast_actions.swap(
+      account,
+      swappedPosition,
+      newBeast.token_id,
+    );
+    setSwappedPosition(null);
   };
 
   const handleRandomFill = () => {
@@ -192,11 +206,13 @@ export function LineupPage() {
       });
 
       setBaseBeasts(loadedBeasts);
+      setSwappedPosition(null); // Reset swap state when loading lineup
       lastProcessedLineupRef.current = combinedKey;
     } else if (!hasBase) {
       // Only clear if we haven't already cleared it
       if (lastProcessedLineupRef.current !== "empty") {
         setBaseBeasts(Array(5).fill(null));
+        setSwappedPosition(null); // Reset swap state
         lastProcessedLineupRef.current = "empty";
       }
     }
@@ -451,8 +467,14 @@ export function LineupPage() {
                           );
                           if (beastToAdd && !isAlreadyInBase) {
                             const newBaseBeasts = [...baseBeasts];
+                            const originalBeast = newBaseBeasts[index];
                             newBaseBeasts[index] = beastToAdd;
                             setBaseBeasts(newBaseBeasts);
+
+                            // If lineup is registered and we're swapping a beast, track it
+                            if (hasBase && originalBeast) {
+                              setSwappedPosition(index);
+                            }
                           }
                         }}
                       >
@@ -482,7 +504,7 @@ export function LineupPage() {
                       </div>
                     ))}
                   </div>
-                  {!hasBase && (
+                  {!hasBase ? (
                     <motion.button
                       onClick={createLineup}
                       disabled={!baseBeasts.every((b) => b !== null)}
@@ -521,7 +543,24 @@ export function LineupPage() {
                           : "Lineup Incomplete"}
                       </span>
                     </motion.button>
-                  )}
+                  ) : swappedPosition !== null ? (
+                    <motion.button
+                      onClick={swapBeast}
+                      whileHover={{ scale: 1.05 }}
+                      whileTap={{ scale: 0.95 }}
+                      className="mt-6 px-8 py-3 text-base font-bold tracking-wider uppercase border-2 transition-all cursor-pointer"
+                      style={{
+                        borderColor: "rgba(16, 185, 129, 0.5)",
+                        background:
+                          "linear-gradient(to bottom, rgba(16, 185, 129, 0.1), rgba(0, 0, 0, 0.4))",
+                        textShadow: "0 0 10px rgba(16, 185, 129, 0.5)",
+                      }}
+                    >
+                      <span className="text-emerald-500">
+                        Swap Beast (Position {swappedPosition + 1})
+                      </span>
+                    </motion.button>
+                  ) : null}
                 </div>
               </div>
             </motion.div>

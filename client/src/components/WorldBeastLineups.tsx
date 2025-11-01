@@ -25,7 +25,7 @@ export function WorldBeastLineups(props: {
         World's Beast Lineups
       </h2>
       {lineupsArray.length > 0 ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {lineupsArray.map((lineup) => (
             <motion.div
               key={lineup.entityId}
@@ -33,19 +33,11 @@ export function WorldBeastLineups(props: {
               animate={{ opacity: 1, scale: 1 }}
               className="border border-emerald-500/20 bg-emerald-950/10 p-6"
             >
-              <div className="text-center">
-                <h3 className="text-lg font-bold text-emerald-400 mb-3">
-                  Base
-                </h3>
-                <div className="text-xs text-emerald-200/60 space-y-2">
-                  <div className="pb-2 border-b border-emerald-500/20">
-                    <span className="text-emerald-200/40">Player:</span>
-                    <div className="text-emerald-300/80 font-mono text-[10px] break-all mt-1">
-                      {lineup.player?.slice(0, 10)}...
-                      {lineup.player?.slice(-8)}
-                    </div>
-                  </div>
-                  <div className="grid grid-cols-5 gap-1 pt-2">
+              <div className="space-y-4">
+                <div className="text-emerald-300/70 font-mono text-xs text-center">
+                  {lineup.player?.slice(0, 6)}...{lineup.player?.slice(-4)}
+                </div>
+                <div className="grid grid-cols-5 gap-2">
                     {[1, 2, 3, 4, 5].map((pos) => {
                       const beastId =
                         lineup[`beast${pos}_id` as keyof typeof lineup];
@@ -88,10 +80,6 @@ export function WorldBeastLineups(props: {
                       );
                     })}
                   </div>
-                  <div className="pt-2 text-emerald-200/40 text-[10px]">
-                    Active lineup
-                  </div>
-                </div>
               </div>
             </motion.div>
           ))}
