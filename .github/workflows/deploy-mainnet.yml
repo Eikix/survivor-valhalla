@@ -121,19 +121,19 @@ jobs:
               TIMESTAMP=$(date -u +%Y-%m-%d_%H%M%S)
               cp manifest_mainnet.json manifest_mainnet_${TIMESTAMP}.json
               
-              echo '[4/6] install slot (in container)'
-              apt-get update -y >/dev/null 2>&1
-              apt-get install -y curl jq ca-certificates git >/dev/null 2>&1
-              curl -L https://slot.cartridge.sh | bash
-              export PATH=\"/root/.slot/bin:\$PATH\"
-              /root/.slot/bin/slotup || true
+              # echo '[4/6] install slot (in container)'
+              # apt-get update -y >/dev/null 2>&1
+              # apt-get install -y curl jq ca-certificates git >/dev/null 2>&1
+              # curl -L https://slot.cartridge.sh | bash
+              # export PATH=\"/root/.slot/bin:\$PATH\"
+              # /root/.slot/bin/slotup || true
 
-              echo '[5/6] deploy torii via slot'
-              slot deployments update survivor-valhalla torii \
-                --version v1.7.1 \
-                --config /app/torii.toml
+              # echo '[5/6] deploy torii via slot'
+              # slot deployments update survivor-valhalla torii \
+              #   --version v1.7.1 \
+              #   --config /app/torii.toml
 
-              slot deployments describe survivor-valhalla torii > /app/deployment-info.txt
+              # slot deployments describe survivor-valhalla torii > /app/deployment-info.txt
 
               echo '[6/6] walnut verify (best-effort)'
               sozo walnut verify || echo 'Walnut verification started - check link'
