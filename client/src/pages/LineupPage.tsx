@@ -14,7 +14,9 @@ import { addAddressPadding } from "starknet";
 
 export function LineupPage() {
   const [inspectedBeast, setInspectedBeast] = useState<Beast | null>(null);
-  const [baseBeasts, setBaseBeasts] = useState<(Beast | null)[]>(Array(5).fill(null));
+  const [baseBeasts, setBaseBeasts] = useState<(Beast | null)[]>(
+    Array(5).fill(null),
+  );
   const [isDraggingOver, setIsDraggingOver] = useState<number>(-1);
   const [sortBy, setSortBy] = useState<keyof Beast | "">("");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
@@ -44,7 +46,11 @@ export function LineupPage() {
 
   // Load base beasts from on-chain data when lineup exists
   useEffect(() => {
-    if (hasBase && userLineup?.models?.survivor_valhalla?.BeastLineup && beasts.length > 0) {
+    if (
+      hasBase &&
+      userLineup?.models?.survivor_valhalla?.BeastLineup &&
+      beasts.length > 0
+    ) {
       const lineup = userLineup.models.survivor_valhalla.BeastLineup;
       const lineupBeastIds = [
         lineup.beast1_id,
@@ -71,23 +77,23 @@ export function LineupPage() {
   const sortedBeasts = useMemo(() => {
     // Remove duplicates first (by id)
     const uniqueBeasts = Array.from(
-      new Map(beasts.map((beast) => [beast.id, beast])).values()
+      new Map(beasts.map((beast) => [beast.id, beast])).values(),
     );
-    
+
     if (!sortBy) {
       return uniqueBeasts;
     }
-    
+
     const sorted = [...uniqueBeasts];
     sorted.sort((a, b) => {
       const aVal = a[sortBy];
       const bVal = b[sortBy];
-      
+
       // Handle null/undefined
       if (aVal == null && bVal == null) return a.id - b.id; // Stable sort tiebreaker
       if (aVal == null) return 1;
       if (bVal == null) return -1;
-      
+
       // Number comparison
       if (typeof aVal === "number" && typeof bVal === "number") {
         // Handle NaN cases
@@ -98,19 +104,20 @@ export function LineupPage() {
         // If values are equal, use ID as tiebreaker for stable sort
         return result !== 0 ? result : a.id - b.id;
       }
-      
+
       // String comparison
       if (typeof aVal === "string" && typeof bVal === "string") {
-        const result = sortDirection === "asc"
-          ? aVal.localeCompare(bVal)
-          : bVal.localeCompare(aVal);
+        const result =
+          sortDirection === "asc"
+            ? aVal.localeCompare(bVal)
+            : bVal.localeCompare(aVal);
         // If values are equal, use ID as tiebreaker for stable sort
         return result !== 0 ? result : a.id - b.id;
       }
-      
+
       return a.id - b.id; // Default stable sort tiebreaker
     });
-    
+
     return sorted;
   }, [beasts, sortBy, sortDirection]);
 
@@ -157,11 +164,11 @@ export function LineupPage() {
     if (!inspectedBeast) return;
 
     const handleEscape = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setInspectedBeast(null);
+      if (e.key === "Escape") setInspectedBeast(null);
     };
 
-    document.addEventListener('keydown', handleEscape);
-    return () => document.removeEventListener('keydown', handleEscape);
+    document.addEventListener("keydown", handleEscape);
+    return () => document.removeEventListener("keydown", handleEscape);
   }, [inspectedBeast]);
 
   return (
@@ -285,10 +292,16 @@ export function LineupPage() {
                         onDrop={(e: React.DragEvent) => {
                           e.preventDefault();
                           setIsDraggingOver(-1);
-                          const beastId = parseInt(e.dataTransfer.getData("beastId"));
-                          const beastToAdd = beasts.find((b) => b.id === beastId);
+                          const beastId = parseInt(
+                            e.dataTransfer.getData("beastId"),
+                          );
+                          const beastToAdd = beasts.find(
+                            (b) => b.id === beastId,
+                          );
                           // Check if beast is already in lineup
-                          const isAlreadyInBase = baseBeasts.some((b) => b?.id === beastId);
+                          const isAlreadyInBase = baseBeasts.some(
+                            (b) => b?.id === beastId,
+                          );
                           if (beastToAdd && !isAlreadyInBase) {
                             const newBaseBeasts = [...baseBeasts];
                             newBaseBeasts[index] = beastToAdd;
@@ -331,7 +344,9 @@ export function LineupPage() {
                           : {}
                       }
                       whileTap={
-                        baseBeasts.every((b) => b !== null) ? { scale: 0.95 } : {}
+                        baseBeasts.every((b) => b !== null)
+                          ? { scale: 0.95 }
+                          : {}
                       }
                       className="mt-6 px-8 py-3 text-base font-bold tracking-wider uppercase border-2 transition-all cursor-pointer disabled:opacity-50"
                       style={{
@@ -401,7 +416,9 @@ export function LineupPage() {
                           key={key}
                           onClick={() => {
                             if (sortBy === key) {
-                              setSortDirection(sortDirection === "asc" ? "desc" : "asc");
+                              setSortDirection(
+                                sortDirection === "asc" ? "desc" : "asc",
+                              );
                             } else {
                               setSortBy(key);
                               setSortDirection("asc");
@@ -443,7 +460,10 @@ export function LineupPage() {
                               className="w-32 h-auto cursor-pointer"
                               draggable
                               onDragStart={(e: React.DragEvent) => {
-                                e.dataTransfer.setData("beastId", beast.id.toString());
+                                e.dataTransfer.setData(
+                                  "beastId",
+                                  beast.id.toString(),
+                                );
                               }}
                               onClick={(e) => {
                                 e.stopPropagation();
