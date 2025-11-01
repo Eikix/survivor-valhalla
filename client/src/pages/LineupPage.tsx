@@ -1,7 +1,7 @@
 // src/pages/LineupPage.tsx
 import { motion } from "framer-motion";
 import { Shield, Trophy, Skull } from "lucide-react";
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { useConnect, useAccount } from "@starknet-react/core";
 import { useDojoSDK, useEntityQuery, useModels } from "@dojoengine/sdk/react";
 import { ToriiQueryBuilder } from "@dojoengine/sdk";
@@ -22,7 +22,7 @@ export function LineupPage() {
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
 
   const { connect, connectors } = useConnect();
-  const { status, address } = useAccount();
+  const { status, address, account } = useAccount();
   const {
     data: beasts = [],
     isLoading: isLoadingBeasts,
@@ -34,9 +34,14 @@ export function LineupPage() {
   const { client } = useDojoSDK();
 
   const createLineup = async () => {
-    if (!client) return;
-    await client.client.actions.register(
-      ...baseBeasts.map((b) => b?.token_id || 0),
+    if (!client || !account) return;
+    await client.beast_actions.register(
+      account,
+      baseBeasts[0]?.token_id || 0,
+      baseBeasts[1]?.token_id || 0,
+      baseBeasts[2]?.token_id || 0,
+      baseBeasts[3]?.token_id || 0,
+      baseBeasts[4]?.token_id || 0,
     );
   };
 
@@ -59,15 +64,24 @@ export function LineupPage() {
   // Query on-chain base
   useEntityQuery(new ToriiQueryBuilder().includeHashedKeys());
   const allLineups = useModels(ModelsMapping.BeastLineup);
-  const userLineup = address
-    ? Object.values(allLineups).find(
-        (entity) =>
-          entity?.models?.survivor_valhalla?.BeastLineup?.player?.toLowerCase() ===
-          addAddressPadding(address.toLowerCase()).toLowerCase(),
-      )
-    : null;
+  const userLineup = useMemo(
+    () =>
+      address
+        ? Object.values(allLineups).find(
+            (entity) =>
+              entity?.models?.survivor_valhalla?.BeastLineup?.player?.toLowerCase() ===
+              addAddressPadding(address.toLowerCase()).toLowerCase(),
+          )
+        : null,
+    [allLineups, address],
+  );
 
   const hasBase = !!userLineup?.models?.survivor_valhalla?.BeastLineup;
+  const lastProcessedLineupRef = useRef<string>("");
+  const beastsIdsString = useMemo(
+    () => beasts.map((b) => b.id).sort().join(","),
+    [beasts],
+  );
 
   // Load base beasts from on-chain data when lineup exists
   useEffect(() => {
@@ -85,6 +99,15 @@ export function LineupPage() {
         lineup.beast5_id,
       ];
 
+      // Create a stable key for this lineup + beasts combination
+      const lineupKey = lineupBeastIds.map((id) => String(id || 0)).join(",");
+      const combinedKey = `${lineupKey}:${beastsIdsString}`;
+
+      // Skip if we've already processed this exact lineup with the same beasts
+      if (lastProcessedLineupRef.current === combinedKey) {
+        return;
+      }
+
       const loadedBeasts = lineupBeastIds.map((beastId) => {
         if (beastId && Number(beastId) > 0) {
           return beasts.find((b) => b.id === Number(beastId)) || null;
@@ -93,10 +116,15 @@ export function LineupPage() {
       });
 
       setBaseBeasts(loadedBeasts);
+      lastProcessedLineupRef.current = combinedKey;
     } else if (!hasBase) {
-      setBaseBeasts(Array(5).fill(null));
+      // Only clear if we haven't already cleared it
+      if (lastProcessedLineupRef.current !== "empty") {
+        setBaseBeasts(Array(5).fill(null));
+        lastProcessedLineupRef.current = "empty";
+      }
     }
-  }, [hasBase, userLineup, beasts]);
+  }, [hasBase, userLineup, beastsIdsString, beasts]);
 
   // Sort beasts based on sortBy and sortDirection
   const sortedBeasts = useMemo(() => {
