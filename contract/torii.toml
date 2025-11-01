@@ -1,4 +1,4 @@
-world = "0x01c549354a5324cf3a978f89eb60566b251740d85dada78a6f85246fe5684f96"
+world_address = "0x01c549354a5324cf3a978f89eb60566b251740d85dada78a6f85246fe5684f96"
 rpc = "https://api.cartridge.gg/x/starknet/mainnet"
 
 [indexing]
