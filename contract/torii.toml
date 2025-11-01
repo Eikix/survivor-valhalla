@@ -1,3 +1,6 @@
+world = "0x01c549354a5324cf3a978f89eb60566b251740d85dada78a6f85246fe5684f96"
+rpc = "https://api.cartridge.gg/x/starknet/mainnet"
+
 [indexing]
 contracts = [
   "erc20:0x49d36570d4e46f48e99674bd3fcc84644ddd6b96f7c741b1562b82f9e004dc7",   # ETH fee token

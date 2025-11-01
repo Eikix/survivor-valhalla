@@ -69,22 +69,16 @@ jobs:
               echo '[2/7] sozo migrate'
               sozo -P mainnet migrate
 
-              echo '[3/7] extract world address'
-              WORLD_ADDRESS=\$(grep world_address /app/dojo_mainnet.toml | awk -F\\\" '{print \$2}')
-              echo \"World address: \$WORLD_ADDRESS\"
-
-              echo '[4/7] install slot (in container)'
+              echo '[3/7] install slot (in container)'
               apt-get update -y >/dev/null 2>&1
               apt-get install -y curl jq ca-certificates git >/dev/null 2>&1
               curl -L https://slot.cartridge.sh | bash
               export PATH=\"/root/.slot/bin:\$PATH\"
               /root/.slot/bin/slotup || true
 
-              echo '[5/7] deploy torii via slot'
+              echo '[4/7] deploy torii via slot'
               slot deployments update survivor-valhalla torii \
                 --version v1.7.1 \
-                --world \"\$WORLD_ADDRESS\" \
-                --rpc \"\$STARKNET_RPC_URL\"
                 --config /app/torii.toml
 
               slot deployments describe survivor-valhalla torii > /app/deployment-info.txt
