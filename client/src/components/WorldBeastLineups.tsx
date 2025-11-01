@@ -23,16 +23,16 @@ export function WorldBeastLineups() {
   const lineupsArray = Object.entries(beastLineups)
     .filter(
       (entry): entry is [string, NonNullable<(typeof entry)[1]>] =>
-        entry[1] !== undefined,
+        entry[1] !== undefined && entry[1].models?.survivor_valhalla?.BeastLineup !== undefined,
     )
     .map(([entityId, entity]) => ({
       entityId,
-      player: entity.models.survivor_valhalla.BeastLineup?.player,
-      beast1_id: entity.models.survivor_valhalla.BeastLineup?.beast1_id,
-      beast2_id: entity.models.survivor_valhalla.BeastLineup?.beast2_id,
-      beast3_id: entity.models.survivor_valhalla.BeastLineup?.beast3_id,
-      beast4_id: entity.models.survivor_valhalla.BeastLineup?.beast4_id,
-      beast5_id: entity.models.survivor_valhalla.BeastLineup?.beast5_id,
+      player: entity.models?.survivor_valhalla?.BeastLineup?.player,
+      beast1_id: entity.models?.survivor_valhalla?.BeastLineup?.beast1_id,
+      beast2_id: entity.models?.survivor_valhalla?.BeastLineup?.beast2_id,
+      beast3_id: entity.models?.survivor_valhalla?.BeastLineup?.beast3_id,
+      beast4_id: entity.models?.survivor_valhalla?.BeastLineup?.beast4_id,
+      beast5_id: entity.models?.survivor_valhalla?.BeastLineup?.beast5_id,
     }));
 
   console.log("[WorldBeastLineups] Processed lineupsArray:", lineupsArray);
