@@ -1,14 +1,23 @@
 // src/pages/HomePage.tsx
 import { motion } from "framer-motion";
 import { Shield, Trophy, Skull } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useConnect, useAccount } from "@starknet-react/core";
+import { useEntityQuery, useModels } from "@dojoengine/sdk/react";
+import { ToriiQueryBuilder } from "@dojoengine/sdk";
 import { Navbar } from "../components/navbar";
 import { WorldBeastLineups } from "../components/WorldBeastLineups";
 import { useBeasts } from "../hooks/useBeasts";
+import type { Beast } from "../hooks/useBeasts";
+import { ModelsMapping } from "../bindings/typescript/models.gen";
+import { addAddressPadding } from "starknet";
 
 export function HomePage() {
-  const [hasBase, setHasBase] = useState(false);
+  const [inspectedBeast, setInspectedBeast] = useState<Beast | null>(null);
+  const [baseBeasts, setBaseBeasts] = useState<(Beast | null)[]>(Array(5).fill(null));
+  const [isDraggingOver, setIsDraggingOver] = useState<number>(-1);
+  const [sortBy, setSortBy] = useState<keyof Beast | "">("");
+  const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
 
   const { connect, connectors } = useConnect();
   const { status, address } = useAccount();
@@ -19,6 +28,92 @@ export function HomePage() {
   } = useBeasts(address, {
     enabled: status === "connected",
   });
+
+  // Query on-chain base
+  useEntityQuery(new ToriiQueryBuilder().includeHashedKeys());
+  const allLineups = useModels(ModelsMapping.BeastLineup);
+  const userLineup = address
+    ? Object.values(allLineups).find(
+        (entity) =>
+          entity?.models?.survivor_valhalla?.BeastLineup?.player?.toLowerCase() ===
+          addAddressPadding(address.toLowerCase()).toLowerCase(),
+      )
+    : null;
+
+  const hasBase = !!userLineup?.models?.survivor_valhalla?.BeastLineup;
+
+  // Load base beasts from on-chain data when lineup exists
+  useEffect(() => {
+    if (hasBase && userLineup?.models?.survivor_valhalla?.BeastLineup && beasts.length > 0) {
+      const lineup = userLineup.models.survivor_valhalla.BeastLineup;
+      const lineupBeastIds = [
+        lineup.beast1_id,
+        lineup.beast2_id,
+        lineup.beast3_id,
+        lineup.beast4_id,
+        lineup.beast5_id,
+      ];
+
+      const loadedBeasts = lineupBeastIds.map((beastId) => {
+        if (beastId && Number(beastId) > 0) {
+          return beasts.find((b) => b.id === Number(beastId)) || null;
+        }
+        return null;
+      });
+
+      setBaseBeasts(loadedBeasts);
+    } else if (!hasBase) {
+      setBaseBeasts(Array(5).fill(null));
+    }
+  }, [hasBase, userLineup, beasts]);
+
+  // Sort beasts based on sortBy and sortDirection
+  const sortedBeasts = useMemo(() => {
+    // Remove duplicates first (by id)
+    const uniqueBeasts = Array.from(
+      new Map(beasts.map((beast) => [beast.id, beast])).values()
+    );
+    
+    if (!sortBy) {
+      return uniqueBeasts;
+    }
+    
+    const sorted = [...uniqueBeasts];
+    sorted.sort((a, b) => {
+      const aVal = a[sortBy];
+      const bVal = b[sortBy];
+      
+      // Handle null/undefined
+      if (aVal == null && bVal == null) return a.id - b.id; // Stable sort tiebreaker
+      if (aVal == null) return 1;
+      if (bVal == null) return -1;
+      
+      // Number comparison
+      if (typeof aVal === "number" && typeof bVal === "number") {
+        // Handle NaN cases
+        if (isNaN(aVal) && isNaN(bVal)) return a.id - b.id; // Stable sort tiebreaker
+        if (isNaN(aVal)) return 1;
+        if (isNaN(bVal)) return -1;
+        const result = sortDirection === "asc" ? aVal - bVal : bVal - aVal;
+        // If values are equal, use ID as tiebreaker for stable sort
+        return result !== 0 ? result : a.id - b.id;
+      }
+      
+      // String comparison
+      if (typeof aVal === "string" && typeof bVal === "string") {
+        const result = sortDirection === "asc"
+          ? aVal.localeCompare(bVal)
+          : bVal.localeCompare(aVal);
+        // If values are equal, use ID as tiebreaker for stable sort
+        return result !== 0 ? result : a.id - b.id;
+      }
+      
+      return a.id - b.id; // Default stable sort tiebreaker
+    });
+    
+    return sorted;
+  }, [beasts, sortBy, sortDirection]);
+
   const cartridgeConnector = connectors.find(
     (connector) => connector.id === "controller",
   );
@@ -56,13 +151,18 @@ export function HomePage() {
   const stats = {
     wins: 0,
     losses: 0,
-    base: hasBase ? "Base Created" : "No Base",
   };
 
-  const handleCreateBase = async () => {
-    if (status !== "connected") return;
-    setHasBase(true);
-  };
+  useEffect(() => {
+    if (!inspectedBeast) return;
+
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setInspectedBeast(null);
+    };
+
+    document.addEventListener('keydown', handleEscape);
+    return () => document.removeEventListener('keydown', handleEscape);
+  }, [inspectedBeast]);
 
   return (
     <div className="min-h-screen bg-black text-white relative overflow-hidden">
@@ -139,43 +239,125 @@ export function HomePage() {
           </motion.div>
         ) : (
           <>
-            {/* Create Base Section */}
+            {/* Create Lineup Section */}
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.2 }}
               className="mb-16"
             >
-              <div className="border border-emerald-500/30 bg-emerald-950/20 p-8">
+              <div className="border border-emerald-500/30 bg-emerald-950/20 p-8 relative">
+                {baseBeasts.some((b) => b !== null) && (
+                  <motion.button
+                    onClick={() => setBaseBeasts(Array(5).fill(null))}
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                    className="absolute top-4 right-4 px-4 py-2 text-xs font-bold tracking-wider uppercase border border-red-500/50 hover:border-red-500 transition-all cursor-pointer text-red-400"
+                    style={{
+                      background:
+                        "linear-gradient(to bottom, rgba(239, 68, 68, 0.1), rgba(0, 0, 0, 0.4))",
+                    }}
+                  >
+                    Clear Lineup
+                  </motion.button>
+                )}
                 <div className="text-center">
                   <Shield className="w-12 h-12 text-emerald-500/50 mx-auto mb-4" />
                   <h2 className="text-2xl font-bold text-emerald-400 mb-4 tracking-wider uppercase">
-                    Your Base
+                    {hasBase ? "Your Lineup" : "Create Your Lineup"}
                   </h2>
-
-                  {!hasBase ? (
-                    <>
-                      <p className="text-emerald-200/40 mb-6 text-sm">
-                        Create your base to begin defending
-                      </p>
-                      <motion.button
-                        onClick={handleCreateBase}
-                        whileHover={{ scale: 1.05 }}
-                        whileTap={{ scale: 0.95 }}
-                        className="px-8 py-3 text-base font-bold tracking-wider uppercase border-2 border-emerald-500/50 hover:border-emerald-500 transition-all cursor-pointer"
-                        style={{
-                          background:
-                            "linear-gradient(to bottom, rgba(16, 185, 129, 0.1), rgba(0, 0, 0, 0.4))",
-                          textShadow: "0 0 10px rgba(16, 185, 129, 0.5)",
+                  <div className="grid grid-cols-5 gap-4 p-4">
+                    {baseBeasts.map((beast, index) => (
+                      <div
+                        key={index}
+                        className={`min-h-[150px] border-2 border-dashed rounded-lg flex items-center justify-center transition-colors ${
+                          isDraggingOver === index
+                            ? "border-emerald-500 bg-emerald-950/30"
+                            : "border-emerald-500/30"
+                        }`}
+                        onDragOver={(e: React.DragEvent) => {
+                          e.preventDefault();
+                          setIsDraggingOver(index);
+                        }}
+                        onDragLeave={() => {
+                          setIsDraggingOver(-1);
+                        }}
+                        onDrop={(e: React.DragEvent) => {
+                          e.preventDefault();
+                          setIsDraggingOver(-1);
+                          const beastId = parseInt(e.dataTransfer.getData("beastId"));
+                          const beastToAdd = beasts.find((b) => b.id === beastId);
+                          // Check if beast is already in lineup
+                          const isAlreadyInBase = baseBeasts.some((b) => b?.id === beastId);
+                          if (beastToAdd && !isAlreadyInBase) {
+                            const newBaseBeasts = [...baseBeasts];
+                            newBaseBeasts[index] = beastToAdd;
+                            setBaseBeasts(newBaseBeasts);
+                          }
                         }}
                       >
-                        <span className="text-emerald-500">CREATE BASE</span>
-                      </motion.button>
-                    </>
-                  ) : (
-                    <div className="text-emerald-400/80 text-sm tracking-wider uppercase">
-                      Base established
-                    </div>
+                        {beast ? (
+                          <motion.div
+                            initial={{ opacity: 0, scale: 0.9 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            className="cursor-pointer"
+                          >
+                            {beast.image && (
+                              <img
+                                src={beast.image}
+                                alt={`${beast.name} - Level: ${beast.level}, Health: ${beast.health}, Power: ${beast.power}, Tier: ${beast.tier}, Type: ${beast.type}, Prefix: ${beast.prefix}, Suffix: ${beast.suffix}, Shiny: ${beast.shiny}, Animated: ${beast.animated}`}
+                                className="w-32 h-auto"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setInspectedBeast(beast);
+                                }}
+                              />
+                            )}
+                          </motion.div>
+                        ) : (
+                          <div className="text-emerald-200/20 text-xs text-center">
+                            Slot {index + 1}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                  {!hasBase && (
+                    <motion.button
+                      disabled={!baseBeasts.every((b) => b !== null)}
+                      whileHover={
+                        baseBeasts.every((b) => b !== null)
+                          ? { scale: 1.05 }
+                          : {}
+                      }
+                      whileTap={
+                        baseBeasts.every((b) => b !== null) ? { scale: 0.95 } : {}
+                      }
+                      className="mt-6 px-8 py-3 text-base font-bold tracking-wider uppercase border-2 transition-all cursor-pointer disabled:opacity-50"
+                      style={{
+                        borderColor: baseBeasts.every((b) => b !== null)
+                          ? "rgba(16, 185, 129, 0.5)"
+                          : "rgba(16, 185, 129, 0.3)",
+                        background: baseBeasts.every((b) => b !== null)
+                          ? "linear-gradient(to bottom, rgba(16, 185, 129, 0.1), rgba(0, 0, 0, 0.4))"
+                          : "linear-gradient(to bottom, rgba(16, 185, 129, 0.05), rgba(0, 0, 0, 0.3))",
+                        textShadow: baseBeasts.every((b) => b !== null)
+                          ? "0 0 10px rgba(16, 185, 129, 0.5)"
+                          : "none",
+                      }}
+                    >
+                      <span
+                        className={
+                          baseBeasts.every((b) => b !== null)
+                            ? "text-emerald-500"
+                            : "text-emerald-400/50"
+                        }
+                      >
+                        {baseBeasts.every((b) => b !== null)
+                          ? "Register Lineup"
+                          : "Lineup Incomplete"}
+                      </span>
+                    </motion.button>
                   )}
                 </div>
               </div>
@@ -191,64 +373,96 @@ export function HomePage() {
               <h2 className="text-center text-xl font-bold text-emerald-400 mb-6 tracking-wider uppercase">
                 Your Beasts
               </h2>
-              {isLoadingBeasts ? (
-                <div className="border border-emerald-500/30 bg-emerald-950/20 p-8 text-center">
-                  <p className="text-emerald-200/60 text-sm tracking-wide uppercase">
-                    Loading beasts...
-                  </p>
-                </div>
-              ) : error ? (
-                <div className="border border-red-500/30 bg-red-950/20 p-8 text-center">
-                  <p className="text-red-200/60 text-sm tracking-wide uppercase">
-                    Error loading beasts
-                  </p>
-                </div>
-              ) : beasts.length > 0 ? (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {beasts.map((beast) => (
-                    <motion.div
-                      key={beast.id}
-                      initial={{ opacity: 0, scale: 0.9 }}
-                      animate={{ opacity: 1, scale: 1 }}
-                      className="border border-emerald-500/20 bg-emerald-950/10 p-6"
-                    >
-                      <div className="text-center">
-                        <h3 className="text-lg font-bold text-emerald-400 mb-2">
-                          {beast.name}
-                        </h3>
-                        <div className="text-xs text-emerald-200/60 space-y-1">
-                          <div>
-                            <span className="text-emerald-200/40">Level:</span>{" "}
-                            {beast.level}
-                          </div>
-                          <div>
-                            <span className="text-emerald-200/40">Health:</span>{" "}
-                            {beast.health}
-                          </div>
-                          <div>
-                            <span className="text-emerald-200/40">Power:</span>{" "}
-                            {beast.power}
-                          </div>
-                          <div>
-                            <span className="text-emerald-200/40">Tier:</span>{" "}
-                            {beast.tier}
-                          </div>
-                          <div>
-                            <span className="text-emerald-200/40">Type:</span>{" "}
-                            {beast.type}
-                          </div>
-                        </div>
-                      </div>
-                    </motion.div>
-                  ))}
-                </div>
-              ) : (
-                <div className="border border-emerald-500/30 bg-emerald-950/20 p-8 text-center">
-                  <p className="text-emerald-200/60 text-sm tracking-wide uppercase">
-                    No beasts found
-                  </p>
-                </div>
-              )}
+              <div className="border border-emerald-500/30 bg-emerald-950/20 p-8">
+                {isLoadingBeasts ? (
+                  <div className="text-center">
+                    <p className="text-emerald-200/60 text-sm tracking-wide uppercase">
+                      Loading beasts...
+                    </p>
+                  </div>
+                ) : error ? (
+                  <div className="text-center">
+                    <p className="text-red-200/60 text-sm tracking-wide uppercase">
+                      Error loading beasts
+                    </p>
+                  </div>
+                ) : beasts.length > 0 ? (
+                  <>
+                    <div className="mb-6 flex flex-wrap justify-center gap-4">
+                      {[
+                        { key: "name" as keyof Beast, label: "Name" },
+                        { key: "level" as keyof Beast, label: "Level" },
+                        { key: "health" as keyof Beast, label: "Health" },
+                        { key: "power" as keyof Beast, label: "Power" },
+                        { key: "tier" as keyof Beast, label: "Tier" },
+                        { key: "type" as keyof Beast, label: "Type" },
+                      ].map(({ key, label }) => (
+                        <button
+                          key={key}
+                          onClick={() => {
+                            if (sortBy === key) {
+                              setSortDirection(sortDirection === "asc" ? "desc" : "asc");
+                            } else {
+                              setSortBy(key);
+                              setSortDirection("asc");
+                            }
+                          }}
+                          className={`px-4 py-2 text-sm font-bold tracking-wider uppercase transition-all cursor-pointer flex items-center gap-2 ${
+                            sortBy === key
+                              ? "text-emerald-400 border-emerald-500/50"
+                              : "text-emerald-200/60 border-emerald-500/20 hover:text-emerald-300"
+                          } border rounded`}
+                          style={{
+                            background:
+                              sortBy === key
+                                ? "linear-gradient(to bottom, rgba(16, 185, 129, 0.1), rgba(0, 0, 0, 0.3))"
+                                : "linear-gradient(to bottom, rgba(16, 185, 129, 0.05), rgba(0, 0, 0, 0.2))",
+                          }}
+                        >
+                          <span>{label}</span>
+                          {sortBy === key && (
+                            <span className="text-emerald-400">
+                              {sortDirection === "asc" ? "↑" : "↓"}
+                            </span>
+                          )}
+                        </button>
+                      ))}
+                    </div>
+                    <div className="grid grid-cols-[repeat(auto-fill,minmax(128px,1fr))] gap-4 justify-items-start">
+                      {sortedBeasts.map((beast) => (
+                        <motion.div
+                          key={`beast-${beast.id}-${beast.token_id}`}
+                          initial={{ opacity: 0, scale: 0.9 }}
+                          animate={{ opacity: 1, scale: 1 }}
+                          className="cursor-move"
+                        >
+                          {beast.image && (
+                            <img
+                              src={beast.image}
+                              alt={`${beast.name} - Level: ${beast.level}, Health: ${beast.health}, Power: ${beast.power}, Tier: ${beast.tier}, Type: ${beast.type}, Prefix: ${beast.prefix}, Suffix: ${beast.suffix}, Shiny: ${beast.shiny}, Animated: ${beast.animated}`}
+                              className="w-32 h-auto cursor-pointer"
+                              draggable
+                              onDragStart={(e: React.DragEvent) => {
+                                e.dataTransfer.setData("beastId", beast.id.toString());
+                              }}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setInspectedBeast(beast);
+                              }}
+                            />
+                          )}
+                        </motion.div>
+                      ))}
+                    </div>
+                  </>
+                ) : (
+                  <div className="text-center">
+                    <p className="text-emerald-200/60 text-sm tracking-wide uppercase">
+                      No beasts found
+                    </p>
+                  </div>
+                )}
+              </div>
             </motion.div>
 
             {/* World's Beast Lineups Section */}
@@ -287,14 +501,14 @@ export function HomePage() {
                     </div>
                   </div>
 
-                  {/* Base Status */}
+                  {/* Lineup Status */}
                   <div className="border border-emerald-500/20 bg-emerald-950/10 p-6 text-center">
                     <Shield className="w-8 h-8 text-emerald-500/50 mx-auto mb-3" />
                     <div className="text-lg font-bold text-emerald-400 mb-1">
-                      {stats.base}
+                      {hasBase ? "Lineup Created" : "No Lineup"}
                     </div>
                     <div className="text-xs text-emerald-200/40 tracking-wider uppercase">
-                      Base
+                      Lineup
                     </div>
                   </div>
                 </div>
@@ -303,6 +517,29 @@ export function HomePage() {
           </>
         )}
       </div>
+
+      {/* Beast Inspection Modal */}
+      {inspectedBeast && (
+        <div
+          className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4"
+          onClick={() => setInspectedBeast(null)}
+        >
+          <motion.div
+            initial={{ opacity: 0, scale: 0.8 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="w-1/2 md:w-1/3 max-h-[50vh] w-full"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {inspectedBeast.image && (
+              <img
+                src={inspectedBeast.image}
+                alt={`${inspectedBeast.name} - Level: ${inspectedBeast.level}, Health: ${inspectedBeast.health}, Power: ${inspectedBeast.power}, Tier: ${inspectedBeast.tier}, Type: ${inspectedBeast.type}, Prefix: ${inspectedBeast.prefix}, Suffix: ${inspectedBeast.suffix}, Shiny: ${inspectedBeast.shiny}, Animated: ${inspectedBeast.animated}`}
+                className="w-full h-full object-contain"
+              />
+            )}
+          </motion.div>
+        </div>
+      )}
     </div>
   );
 }

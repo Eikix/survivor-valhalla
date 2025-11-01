@@ -15,6 +15,7 @@ export type Beast = {
   shiny: number;
   animated: number;
   token_id: number;
+  image: string;
 };
 
 /**
@@ -68,8 +69,10 @@ const getBeastCollection = async (
       a."Health",
       a."Power",
       a."Shiny",
-      a."Animated"
-    FROM attrs a;
+      a."Animated",
+      json_extract(t.metadata, '$.image') as image
+    FROM attrs a
+    LEFT JOIN tokens t ON a.token_id = t.id;
   `;
 
   const url = `${toriiUrl}/sql?query=${encodeURIComponent(q)}`;
@@ -107,19 +110,27 @@ const getBeastCollection = async (
     let beasts: Beast[] = data
       .filter((data: any) => data["Beast"])
       .map((data: any) => {
+        // Helper function to safely convert to number
+        const toNumber = (val: any): number => {
+          if (val == null || val === "") return 0;
+          const num = typeof val === "string" ? parseInt(val, 10) : Number(val);
+          return isNaN(num) ? 0 : num;
+        };
+
         let beast: Beast = {
-          id: Number(data["Beast ID"]),
-          token_id: Number(data["Token ID"]),
-          name: data["Beast"].replace(" ", ""),
-          level: Number(data["Level"]),
-          health: Number(data["Health"]),
-          prefix: data["Prefix"],
-          suffix: data["Suffix"],
-          power: Number(data["Power"]),
-          tier: Number(data["Tier"]),
-          type: data["Type"],
-          shiny: Number(data["Shiny"]),
-          animated: Number(data["Animated"]),
+          id: toNumber(data["Beast ID"]),
+          token_id: toNumber(data["Token ID"]),
+          name: data["Beast"]?.replace(" ", "") || "",
+          level: toNumber(data["Level"]),
+          health: toNumber(data["Health"]),
+          prefix: data["Prefix"] || "",
+          suffix: data["Suffix"] || "",
+          power: toNumber(data["Power"]),
+          tier: toNumber(data["Tier"]),
+          type: data["Type"] || "",
+          shiny: toNumber(data["Shiny"]),
+          animated: toNumber(data["Animated"]),
+          image: data["image"] || "",
         };
 
         return beast;
