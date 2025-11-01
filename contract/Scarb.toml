@@ -16,6 +16,7 @@ move = "sozo execute survivor_valhalla-actions move -c 1 --wait"
 dojo = "1.7.1"
 starknet = "2.12.2"
 beasts_nft = { git = "https://github.com/Provable-Games/beasts.git" }
+openzeppelin_token = "1.0.0"
 
 [[target.starknet-contract]]
 build-external-contracts = [
@@ -28,7 +29,6 @@ allow-prebuilt-plugins = ["dojo_cairo_macros"]
 
 [dev-dependencies]
 cairo_test = "2.12.2"
-dojo_cairo_test = "1.7.1"
 
 [profile.mainnet]
 
