@@ -2,7 +2,7 @@
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { LandingPage } from "./pages/LandingPage";
-import { HomePage } from "./pages/HomePage";
+import { LineupPage } from "./pages/LineupPage";
 import { StarknetProvider } from "./components/starknet-provider";
 import { DojoSdkProvider } from "@dojoengine/sdk/react";
 import { init } from "@dojoengine/sdk";
@@ -45,7 +45,7 @@ function App() {
           <BrowserRouter>
             <Routes>
               <Route path="/" element={<LandingPage />} />
-              <Route path="/home" element={<HomePage />} />
+              <Route path="/home" element={<LineupPage />} />
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
           </BrowserRouter>

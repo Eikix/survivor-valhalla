@@ -1,4 +1,4 @@
-// src/pages/HomePage.tsx
+// src/pages/LineupPage.tsx
 import { motion } from "framer-motion";
 import { Shield, Trophy, Skull } from "lucide-react";
 import { useState, useEffect, useMemo } from "react";
@@ -12,7 +12,7 @@ import type { Beast } from "../hooks/useBeasts";
 import { ModelsMapping } from "../bindings/typescript/models.gen";
 import { addAddressPadding } from "starknet";
 
-export function HomePage() {
+export function LineupPage() {
   const [inspectedBeast, setInspectedBeast] = useState<Beast | null>(null);
   const [baseBeasts, setBaseBeasts] = useState<(Beast | null)[]>(Array(5).fill(null));
   const [isDraggingOver, setIsDraggingOver] = useState<number>(-1);
