@@ -5,8 +5,8 @@ on:
     branches:
       - main
     paths:
-      - 'contract/**'
-      - '.github/workflows/deploy-mainnet.yml'
+      - "contract/**"
+      - ".github/workflows/deploy-mainnet.yml"
   workflow_dispatch:
 
 jobs:
@@ -14,89 +14,89 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-    - name: Set up QEMU
-      uses: docker/setup-qemu-action@v3
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
 
-    - name: Set up Docker Buildx
-      uses: docker/setup-buildx-action@v3
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
 
-    - name: Check and set environment
-      id: env
-      run: |
-        if [ -z "${{ secrets.STARKNET_RPC_URL_MAINNET }}" ]; then
-          echo "rpc_url=https://api.cartridge.gg/x/starknet/mainnet" >> $GITHUB_OUTPUT
-        else
-          echo "rpc_url=${{ secrets.STARKNET_RPC_URL_MAINNET }}" >> $GITHUB_OUTPUT
-        fi
+      - name: Check and set environment
+        id: env
+        run: |
+          if [ -z "${{ secrets.STARKNET_RPC_URL_MAINNET }}" ]; then
+            echo "rpc_url=https://api.cartridge.gg/x/starknet/mainnet" >> $GITHUB_OUTPUT
+          else
+            echo "rpc_url=${{ secrets.STARKNET_RPC_URL_MAINNET }}" >> $GITHUB_OUTPUT
+          fi
 
-        if [ -z "${{ vars.DOJO_ACCOUNT_ADDRESS }}" ]; then
-          echo "Error: DOJO_ACCOUNT_ADDRESS is not set"
-          exit 1
-        fi
-        if [ -z "${{ secrets.DOJO_PRIVATE_KEY }}" ]; then
-          echo "Error: DOJO_PRIVATE_KEY is not set"
-          exit 1
-        fi
+          if [ -z "${{ vars.DOJO_ACCOUNT_ADDRESS }}" ]; then
+            echo "Error: DOJO_ACCOUNT_ADDRESS is not set"
+            exit 1
+          fi
+          if [ -z "${{ secrets.DOJO_PRIVATE_KEY }}" ]; then
+            echo "Error: DOJO_PRIVATE_KEY is not set"
+            exit 1
+          fi
 
-        echo "All required configuration is set"
+          echo "All required configuration is set"
 
-    - name: Build + Deploy + Slot + Walnut (single container)
-      working-directory: ./contract
-      env:
-        STARKNET_RPC_URL: ${{ steps.env.outputs.rpc_url }}
-        DOJO_ACCOUNT_ADDRESS: ${{ vars.DOJO_ACCOUNT_ADDRESS }}
-        DOJO_PRIVATE_KEY: ${{ secrets.DOJO_PRIVATE_KEY }}
-        SLOT_AUTH: ${{ secrets.SLOT_AUTH_TOKEN }}
-      run: |
-        docker run --rm \
-          --platform linux/arm64 \
-          -v "${{ github.workspace }}/contract:/app" \
-          -w /app \
-          -e STARKNET_RPC_URL="$STARKNET_RPC_URL" \
-          -e DOJO_ACCOUNT_ADDRESS="$DOJO_ACCOUNT_ADDRESS" \
-          -e DOJO_PRIVATE_KEY="$DOJO_PRIVATE_KEY" \
-          -e SLOT_AUTH="$SLOT_AUTH" \
-          ghcr.io/dojoengine/dojo:v1.7.1 \
-          bash -lc "
-            set -e
+      - name: Build + Deploy + Slot + Walnut (single container)
+        working-directory: ./contract
+        env:
+          STARKNET_RPC_URL: ${{ steps.env.outputs.rpc_url }}
+          DOJO_ACCOUNT_ADDRESS: ${{ vars.DOJO_ACCOUNT_ADDRESS }}
+          DOJO_PRIVATE_KEY: ${{ secrets.DOJO_PRIVATE_KEY }}
+          SLOT_AUTH: ${{ secrets.SLOT_AUTH_TOKEN }}
+        run: |
+          docker run --rm \
+            --platform linux/arm64 \
+            -v "${{ github.workspace }}/contract:/app" \
+            -w /app \
+            -e STARKNET_RPC_URL="$STARKNET_RPC_URL" \
+            -e DOJO_ACCOUNT_ADDRESS="$DOJO_ACCOUNT_ADDRESS" \
+            -e DOJO_PRIVATE_KEY="$DOJO_PRIVATE_KEY" \
+            -e SLOT_AUTH="$SLOT_AUTH" \
+            ghcr.io/dojoengine/dojo:v1.7.1 \
+            bash -lc "
+              set -e
 
-            echo '[1/7] sozo build'
-            sozo -P mainnet build
+              echo '[1/7] sozo build'
+              sozo -P mainnet build
 
-            echo '[2/7] sozo migrate'
-            sozo -P mainnet migrate
+              echo '[2/7] sozo migrate'
+              sozo -P mainnet migrate
 
-            echo '[3/7] extract world address'
-            WORLD_ADDRESS=\$(grep world_address /app/dojo_mainnet.toml | awk -F\\\" '{print \$2}')
-            echo \"World address: \$WORLD_ADDRESS\"
+              echo '[3/7] extract world address'
+              WORLD_ADDRESS=\$(grep world_address /app/dojo_mainnet.toml | awk -F\\\" '{print \$2}')
+              echo \"World address: \$WORLD_ADDRESS\"
 
-            echo '[4/7] install slot (in container)'
-            apt-get update -y >/dev/null 2>&1
-            apt-get install -y curl jq ca-certificates git >/dev/null 2>&1
-            curl -L https://slot.cartridge.sh | bash
-            export PATH=\"/root/.slot/bin:\$PATH\"
-            /root/.slot/bin/slotup || true
+              echo '[4/7] install slot (in container)'
+              apt-get update -y >/dev/null 2>&1
+              apt-get install -y curl jq ca-certificates git >/dev/null 2>&1
+              curl -L https://slot.cartridge.sh | bash
+              export PATH=\"/root/.slot/bin:\$PATH\"
+              /root/.slot/bin/slotup || true
 
-            echo '[5/7] deploy torii via slot'
-            slot deployments delete survivor-valhalla torii || true
-            slot deployments create survivor-valhalla torii \
-              --version v1.7.1 \
-              --world \"\$WORLD_ADDRESS\" \
-              --rpc \"\$STARKNET_RPC_URL\"
+              echo '[5/7] deploy torii via slot'
+              slot deployments update survivor-valhalla torii \
+                --version v1.7.1 \
+                --world \"\$WORLD_ADDRESS\" \
+                --rpc \"\$STARKNET_RPC_URL\"
+                --config /app/torii.toml
 
-            slot deployments describe survivor-valhalla torii > /app/deployment-info.txt
+              slot deployments describe survivor-valhalla torii > /app/deployment-info.txt
 
-            echo '[6/7] walnut verify (best-effort)'
-            sozo walnut verify || echo 'Walnut verification started - check link'
+              echo '[6/7] walnut verify (best-effort)'
+              sozo walnut verify || echo 'Walnut verification started - check link'
 
-            echo '[7/7] done'
-          "
+              echo '[7/7] done'
+            "
 
-    - name: Upload deployment info
-      uses: actions/upload-artifact@v4
-      with:
-        name: deployment-info
-        path: ./contract/deployment-info.txt
+      - name: Upload deployment info
+        uses: actions/upload-artifact@v4
+        with:
+          name: deployment-info
+          path: ./contract/deployment-info.txt
