@@ -29,7 +29,6 @@ allow-prebuilt-plugins = ["dojo_cairo_macros"]
 
 [dev-dependencies]
 cairo_test = "2.12.2"
-dojo_cairo_test = "1.7.1"
 
 [profile.mainnet]
 

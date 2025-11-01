@@ -1,1 +1,1 @@
-// This file is now empty as we're using beasts_nft interfaces directly
+pub mod adventurer;

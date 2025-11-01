@@ -1,13 +1,16 @@
 #[starknet::interface]
 pub trait IBattleActions<T> {
     fn battle(ref self: T, defender: starknet::ContractAddress);
+    fn set_attack_lineup(ref self: T, adventurer1_id: u64, adventurer2_id: u64, adventurer3_id: u64, adventurer4_id: u64, adventurer5_id: u64);
 }
 
 #[dojo::contract]
 pub mod battle_actions {
     use dojo::event::EventStorage;
     use dojo::model::ModelStorage;
-    use survivor_valhalla::models::{BeastLineup, PlayerEnergy, Battle};
+    use survivor_valhalla::models::{BeastLineup, PlayerEnergy, Battle, AttackLineup, CachedAdventurer};
+    use survivor_valhalla::interfaces::adventurer::{IAdventurerSystemsDispatcher, IAdventurerSystemsDispatcherTrait, IERC721Dispatcher, IERC721DispatcherTrait};
+    use survivor_valhalla::constants::BEASTMODE_CONTRACT;
     use starknet::{ContractAddress, get_caller_address, get_block_timestamp};
     use super::IBattleActions;
 
@@ -43,11 +46,11 @@ pub mod battle_actions {
             
             assert(attacker != defender, 'Cannot battle yourself');
             
-            // Check attacker has a lineup
-            let attacker_lineup: BeastLineup = world.read_model(attacker);
-            assert(attacker_lineup.beast1_id != 0, 'No lineup registered');
+            // Check attacker has an attack lineup (adventurers)
+            let attack_lineup: AttackLineup = world.read_model(attacker);
+            assert(attack_lineup.adventurer1_id != 0, 'No attack lineup registered');
             
-            // Check defender has a lineup
+            // Check defender has a defense lineup (beasts)
             let defender_lineup: BeastLineup = world.read_model(defender);
             assert(defender_lineup.beast1_id != 0, 'Defender has no lineup');
             
@@ -88,6 +91,81 @@ pub mod battle_actions {
                 winner,
                 timestamp: current_time,
             });
+        }
+
+        fn set_attack_lineup(
+            ref self: ContractState, 
+            adventurer1_id: u64, 
+            adventurer2_id: u64, 
+            adventurer3_id: u64, 
+            adventurer4_id: u64, 
+            adventurer5_id: u64
+        ) {
+            let mut world = self.world_default();
+            let player = get_caller_address();
+            
+            // Get Death Mountain contract dispatcher
+            let beastmode_address: ContractAddress = BEASTMODE_CONTRACT.try_into().unwrap();
+            let adventurer_dispatcher = IAdventurerSystemsDispatcher { contract_address: beastmode_address };
+            let erc721_dispatcher = IERC721Dispatcher { contract_address: beastmode_address };
+            
+            // Validate and cache each adventurer
+            let adventurer_ids = array![adventurer1_id, adventurer2_id, adventurer3_id, adventurer4_id, adventurer5_id];
+            let mut i: usize = 0;
+            
+            loop {
+                if i >= 5 {
+                    break;
+                }
+                
+                let adventurer_id = *adventurer_ids.at(i);
+                
+                if adventurer_id != 0 {
+                    // Verify ownership
+                    let owner = erc721_dispatcher.owner_of(adventurer_id.into());
+                    assert(owner == player, 'Not owner of adventurer');
+                    
+                    // Verify adventurer is from beastmode dungeon
+                    let dungeon = adventurer_dispatcher.get_adventurer_dungeon(adventurer_id);
+                    assert(dungeon == beastmode_address, 'Wrong dungeon');
+                    
+                    // Get adventurer data
+                    let adventurer = adventurer_dispatcher.get_adventurer(adventurer_id);
+                    assert(adventurer.health > 0, 'Adventurer is dead');
+                    
+                    // Calculate level from XP (roughly following Death Mountain logic)
+                    let level = if adventurer.xp == 0 { 1 } else { ((adventurer.xp / 100) + 1).try_into().unwrap() };
+                    
+                    // Cache adventurer stats
+                    let cached = CachedAdventurer {
+                        player,
+                        adventurer_id,
+                        health: adventurer.health,
+                        level,
+                        strength: adventurer.stats.strength,
+                        dexterity: adventurer.stats.dexterity,
+                        vitality: adventurer.stats.vitality,
+                        intelligence: adventurer.stats.intelligence,
+                        wisdom: adventurer.stats.wisdom,
+                        charisma: adventurer.stats.charisma,
+                        luck: adventurer.stats.luck,
+                    };
+                    world.write_model(@cached);
+                }
+                
+                i += 1;
+            };
+            
+            // Save attack lineup
+            let lineup = AttackLineup {
+                player,
+                adventurer1_id,
+                adventurer2_id,
+                adventurer3_id,
+                adventurer4_id,
+                adventurer5_id,
+            };
+            world.write_model(@lineup);
         }
     }
 

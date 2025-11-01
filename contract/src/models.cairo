@@ -46,3 +46,33 @@ pub struct Battle {
     pub winner: ContractAddress,
     pub timestamp: u64,
 }
+
+#[derive(Copy, Drop, Serde, Debug)]
+#[dojo::model]
+pub struct AttackLineup {
+    #[key]
+    pub player: ContractAddress,
+    pub adventurer1_id: u64,
+    pub adventurer2_id: u64,
+    pub adventurer3_id: u64,
+    pub adventurer4_id: u64,
+    pub adventurer5_id: u64,
+}
+
+#[derive(Copy, Drop, Serde, Debug)]
+#[dojo::model]
+pub struct CachedAdventurer {
+    #[key]
+    pub player: ContractAddress,
+    #[key]
+    pub adventurer_id: u64,
+    pub health: u16,
+    pub level: u8,
+    pub strength: u8,
+    pub dexterity: u8,
+    pub vitality: u8,
+    pub intelligence: u8,
+    pub wisdom: u8,
+    pub charisma: u8,
+    pub luck: u8,
+}

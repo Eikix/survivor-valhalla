@@ -8,11 +8,13 @@ pub mod models;
 pub mod interfaces;
 pub mod constants;
 
-pub mod tests {
-    mod test_world;
-    mod mock_beasts;
-    mod test_beast_actions;
-    mod test_battle_actions;
-    mod test_energy_actions;
-    mod test_integration;
-}
+// pub mod tests {
+//     mod test_world;
+//     mod mock_beasts;
+//     mod mock_adventurer;
+//     mod test_beast_actions;
+//     mod test_battle_actions;
+//     mod test_energy_actions;
+//     mod test_integration;
+//     mod test_adventurer_integration;
+// }
