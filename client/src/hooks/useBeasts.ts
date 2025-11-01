@@ -174,26 +174,54 @@ const getBeastLineupImages = async (
 ): Promise<Record<string, string>> => {
   if (tokenIds.length === 0) return {};
 
+  // Helper to convert BigNumberish to number
+  const toNumber = (id: string | number | bigint): number => {
+    if (typeof id === "number") return id;
+    if (typeof id === "bigint") return Number(id);
+    if (typeof id === "string") {
+      // Handle hex strings
+      if (id.startsWith("0x")) {
+        return parseInt(id, 16);
+      }
+      return parseInt(id, 10);
+    }
+    return 0;
+  };
+
   // Convert all token IDs to numbers and filter out zeros
-  const validTokenIds = tokenIds.map((id) => Number(id)).filter((id) => id > 0);
+  const validTokenIds = tokenIds.map(toNumber).filter((id) => id > 0);
 
   if (validTokenIds.length === 0) return {};
 
-  // Convert token IDs to hex format for the SQL query
-  const tokenIdList = validTokenIds
-    .map((id) => `'0x${id.toString(16)}'`)
-    .join(",");
+  // Use token_attributes table (this worked for 6/10 tokens before)
+  // Match by trait_value where trait_name = 'Token ID'
+  const contractAddressHex = addAddressPadding(BEASTS_CONTRACT.toLowerCase());
+
+  const tokenIdConditions = validTokenIds
+    .map((id) => {
+      console.log(`[getBeastLineupImages] Token ${id} -> searching for trait_value = '${id}'`);
+      return `ta.trait_value = '${id}'`;
+    })
+    .join(" OR ");
+
   const q = `
-    SELECT
-      t.id as token_id,
+    SELECT DISTINCT
+      ta.token_id,
       json_extract(t.metadata, '$.image') as image
-    FROM tokens t
-    WHERE t.id IN (${tokenIdList})
+    FROM token_attributes ta
+    LEFT JOIN tokens t ON ta.token_id = t.id
+    WHERE ta.trait_name = 'Token ID'
+      AND (${tokenIdConditions})
+      AND t.contract_address = '${contractAddressHex}'
   `;
 
   const url = `${toriiUrl}/sql?query=${encodeURIComponent(q)}`;
 
   try {
+    console.log("[getBeastLineupImages] Fetching images for token IDs:", validTokenIds);
+    console.log("[getBeastLineupImages] Query:", q);
+    console.log("[getBeastLineupImages] Total tokens requested:", validTokenIds.length);
+
     const sql = await fetch(url, {
       method: "GET",
       headers: {
@@ -213,18 +241,50 @@ const getBeastLineupImages = async (
     }
 
     const data = await sql.json();
+    console.log("[getBeastLineupImages] Raw response:", data);
+    console.log(`[getBeastLineupImages] Received ${data.length} results out of ${validTokenIds.length} requested tokens`);
 
     // Convert array to map of token_id -> image
-    // Parse hex token_id from database and convert to decimal string for consistency
+    // The token_id in response is a composite key: contract_address + token_id
+    // We need to extract just the token_id part (last 64 chars) and convert to decimal
     const imageMap: Record<string, string> = {};
-    data.forEach((row: any) => {
-      if (row.token_id && row.image) {
-        // Parse hex token_id (e.g., "0x1234" -> 4660)
-        const tokenIdDecimal = parseInt(row.token_id, 16);
-        imageMap[String(tokenIdDecimal)] = row.image;
+
+    // Build a reverse lookup: for each validTokenId, find its corresponding row
+    validTokenIds.forEach((decimalId) => {
+      const row = data.find((r: any) => {
+        if (!r.token_id) return false;
+
+        // The token_id is formatted as: contract_address (66 chars with 0x) + token_id (64 chars)
+        // Total length should be 130 chars (0x + 64 + 64)
+        // Extract the last 64 characters (the actual token ID)
+        const fullHex = r.token_id;
+        console.log(`[getBeastLineupImages] Parsing token_id from DB: ${fullHex}`);
+
+        // Remove '0x' prefix, skip contract address (64 chars), get token ID (last 64 chars)
+        const hexWithoutPrefix = fullHex.slice(2); // Remove '0x'
+        const tokenIdHex = hexWithoutPrefix.slice(-64); // Get last 64 chars (the token ID)
+        const rowTokenId = parseInt(tokenIdHex, 16);
+
+        console.log(`[getBeastLineupImages] Extracted token ID: 0x${tokenIdHex} -> ${rowTokenId}, comparing to ${decimalId}`);
+        return rowTokenId === decimalId;
+      });
+
+      if (row && row.image) {
+        console.log(`[getBeastLineupImages] ✓ Mapping token ${decimalId} -> image found`);
+        imageMap[String(decimalId)] = row.image;
+      } else {
+        console.log(`[getBeastLineupImages] ✗ No image found for token ${decimalId}`);
       }
     });
 
+    const foundCount = Object.keys(imageMap).length;
+    const missingTokens = validTokenIds.filter(id => !imageMap[String(id)]);
+
+    console.log("[getBeastLineupImages] Final image map:", imageMap);
+    console.log(`[getBeastLineupImages] Summary: ${foundCount}/${validTokenIds.length} images found`);
+    if (missingTokens.length > 0) {
+      console.warn(`[getBeastLineupImages] Missing tokens (not in database):`, missingTokens);
+    }
     return imageMap;
   } catch (error) {
     console.error("[getBeastLineupImages] Error fetching images:", error);

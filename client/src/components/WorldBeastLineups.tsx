@@ -11,6 +11,9 @@ export function WorldBeastLineups(props: {
   const lineupsArray = props.lineups.filter((lineup) => lineup !== undefined);
   const { beastImages } = props;
 
+  console.log("[WorldBeastLineups] Lineups:", lineupsArray);
+  console.log("[WorldBeastLineups] Beast images map:", beastImages);
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
@@ -47,9 +50,14 @@ export function WorldBeastLineups(props: {
                       const beastId =
                         lineup[`beast${pos}_id` as keyof typeof lineup];
                       const hasBeast = beastId && Number(beastId) > 0;
+                      // Convert to number first, then to string for consistent lookup
+                      const lookupKey = hasBeast ? String(Number(beastId)) : "";
                       const imageUrl = hasBeast
-                        ? beastImages[String(beastId)]
+                        ? beastImages[lookupKey]
                         : null;
+                      if (hasBeast && !imageUrl) {
+                        console.log(`[WorldBeastLineups] Missing image for beast. Raw ID: ${beastId}, Type: ${typeof beastId}, Lookup key: ${lookupKey}, Available keys:`, Object.keys(beastImages));
+                      }
                       return (
                         <div
                           key={pos}
@@ -64,10 +72,14 @@ export function WorldBeastLineups(props: {
                               src={imageUrl}
                               alt={`Beast ${beastId}`}
                               className="w-full h-full object-cover"
+                              title={`Token ID: ${beastId}`}
                             />
                           ) : hasBeast ? (
-                            <span className="text-emerald-400 text-[8px]">
-                              {String(beastId).slice(0, 3)}
+                            <span
+                              className="text-emerald-400 text-[8px]"
+                              title={`Token ID: ${beastId} (image not available)`}
+                            >
+                              #{String(beastId).slice(-4)}
                             </span>
                           ) : (
                             <span className="text-emerald-200/30">—</span>
