@@ -15,8 +15,8 @@ move = "sozo execute survivor_valhalla-actions move -c 1 --wait"
 [dependencies]
 dojo = "1.7.1"
 starknet = "2.12.2"
-beasts_nft = { git = "https://github.com/Provcable-Games/beasts.git" }
-death_mountain = { git = "https://github.com/Provable-Games/death-mountain.git" }
+beasts_nft = { git = "https://github.com/Provable-Games/beasts.git" }
+openzeppelin_token = "1.0.0"
 
 [[target.starknet-contract]]
 build-external-contracts = [

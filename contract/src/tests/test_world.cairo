@@ -1,51 +1,88 @@
+use dojo::world::{WorldStorage, WorldStorageTrait, world};
+use dojo_cairo_test::{
+    ContractDefTrait, NamespaceDef, TestResource, WorldStorageTestTrait,
+    spawn_test_world
+};
+use survivor_valhalla::models::{
+    m_BeastLineup, m_Beast, m_PlayerEnergy, m_Battle
+};
+use survivor_valhalla::systems::beast_actions::{
+    IBeastActionsDispatcher, beast_actions
+};
+use survivor_valhalla::systems::battle_actions::{
+    IBattleActionsDispatcher, battle_actions
+};
+use survivor_valhalla::systems::energy_actions::{
+    IEnergyActionsDispatcher, energy_actions
+};
+
+pub fn setup_world() -> WorldStorage {
+    let ndef = NamespaceDef {
+        namespace: "survivor_valhalla",
+        resources: [
+            // Models
+            TestResource::Model(m_BeastLineup::TEST_CLASS_HASH),
+            TestResource::Model(m_Beast::TEST_CLASS_HASH),
+            TestResource::Model(m_PlayerEnergy::TEST_CLASS_HASH),
+            TestResource::Model(m_Battle::TEST_CLASS_HASH),
+            // Events
+            TestResource::Event(beast_actions::e_BeastLineupRegistered::TEST_CLASS_HASH),
+            TestResource::Event(beast_actions::e_BeastSwapped::TEST_CLASS_HASH),
+            TestResource::Event(battle_actions::e_BattleCompleted::TEST_CLASS_HASH),
+            TestResource::Event(battle_actions::e_EnergyConsumed::TEST_CLASS_HASH),
+            // Contracts
+            TestResource::Contract(beast_actions::TEST_CLASS_HASH),
+            TestResource::Contract(battle_actions::TEST_CLASS_HASH),
+            TestResource::Contract(energy_actions::TEST_CLASS_HASH),
+        ].span(),
+    };
+
+    let mut world = spawn_test_world(world::TEST_CLASS_HASH, [ndef].span());
+    
+    let contracts = [
+        ContractDefTrait::new(@"survivor_valhalla", @"beast_actions")
+            .with_writer_of([dojo::utils::bytearray_hash(@"survivor_valhalla")].span()),
+        ContractDefTrait::new(@"survivor_valhalla", @"battle_actions")
+            .with_writer_of([dojo::utils::bytearray_hash(@"survivor_valhalla")].span()),
+        ContractDefTrait::new(@"survivor_valhalla", @"energy_actions")
+            .with_writer_of([dojo::utils::bytearray_hash(@"survivor_valhalla")].span()),
+    ].span();
+    
+    world.sync_perms_and_inits(contracts);
+    
+    world
+}
+
+pub fn deploy_beast_actions(world: WorldStorage) -> IBeastActionsDispatcher {
+    let (contract_address, _) = world.dns(@"beast_actions").unwrap();
+    IBeastActionsDispatcher { contract_address }
+}
+
+pub fn deploy_battle_actions(world: WorldStorage) -> IBattleActionsDispatcher {
+    let (contract_address, _) = world.dns(@"battle_actions").unwrap();
+    IBattleActionsDispatcher { contract_address }
+}
+
+pub fn deploy_energy_actions(world: WorldStorage) -> IEnergyActionsDispatcher {
+    let (contract_address, _) = world.dns(@"energy_actions").unwrap();
+    IEnergyActionsDispatcher { contract_address }
+}
+
+// Original tests preserved below for backward compatibility
 #[cfg(test)]
 mod tests {
+    use super::*;
     use dojo::model::ModelStorage;
-    use dojo::world::{WorldStorageTrait, world};
-    use dojo_cairo_test::{
-        ContractDef, ContractDefTrait, NamespaceDef, TestResource, WorldStorageTestTrait,
-        spawn_test_world
-    };
+    use survivor_valhalla::models::BeastLineup;
+    use survivor_valhalla::systems::beast_actions::IBeastActionsDispatcherTrait;
     use starknet::testing::set_contract_address;
-    use survivor_valhalla::models::{BeastLineup, m_BeastLineup};
-    use survivor_valhalla::systems::beast_actions::{
-        IBeastActionsDispatcher, IBeastActionsDispatcherTrait, beast_actions
-    };
     use starknet::ContractAddress;
-
-    fn namespace_def() -> NamespaceDef {
-        let ndef = NamespaceDef {
-            namespace: "survivor_valhalla",
-            resources: [
-                TestResource::Model(m_BeastLineup::TEST_CLASS_HASH),
-                TestResource::Event(beast_actions::e_BeastLineupRegistered::TEST_CLASS_HASH),
-                TestResource::Event(beast_actions::e_BeastSwapped::TEST_CLASS_HASH),
-                TestResource::Contract(beast_actions::TEST_CLASS_HASH),
-            ]
-                .span(),
-        };
-
-        ndef
-    }
-
-    fn contract_defs() -> Span<ContractDef> {
-        [
-            ContractDefTrait::new(@"survivor_valhalla", @"beast_actions")
-                .with_writer_of([dojo::utils::bytearray_hash(@"survivor_valhalla")].span())
-        ]
-            .span()
-    }
 
     #[test]
     fn test_register_beast_lineup() {
         let caller: ContractAddress = 0x1337.try_into().unwrap();
-
-        let ndef = namespace_def();
-        let mut world = spawn_test_world(world::TEST_CLASS_HASH, [ndef].span());
-        world.sync_perms_and_inits(contract_defs());
-
-        let (contract_address, _) = world.dns(@"beast_actions").unwrap();
-        let beast_actions_system = IBeastActionsDispatcher { contract_address };
+        let world = setup_world();
+        let beast_actions_system = deploy_beast_actions(world);
 
         // Set the contract address (which becomes the caller)
         set_contract_address(caller);
@@ -67,13 +104,8 @@ mod tests {
     #[test]
     fn test_swap_beast() {
         let caller: ContractAddress = 0x1337.try_into().unwrap();
-
-        let ndef = namespace_def();
-        let mut world = spawn_test_world(world::TEST_CLASS_HASH, [ndef].span());
-        world.sync_perms_and_inits(contract_defs());
-
-        let (contract_address, _) = world.dns(@"beast_actions").unwrap();
-        let beast_actions_system = IBeastActionsDispatcher { contract_address };
+        let world = setup_world();
+        let beast_actions_system = deploy_beast_actions(world);
 
         // Set the contract address (which becomes the caller)
         set_contract_address(caller);
@@ -98,13 +130,8 @@ mod tests {
     #[test]
     fn test_multiple_swaps() {
         let caller: ContractAddress = 0x1337.try_into().unwrap();
-
-        let ndef = namespace_def();
-        let mut world = spawn_test_world(world::TEST_CLASS_HASH, [ndef].span());
-        world.sync_perms_and_inits(contract_defs());
-
-        let (contract_address, _) = world.dns(@"beast_actions").unwrap();
-        let beast_actions_system = IBeastActionsDispatcher { contract_address };
+        let world = setup_world();
+        let beast_actions_system = deploy_beast_actions(world);
 
         // Set the contract address (which becomes the caller)
         set_contract_address(caller);
@@ -132,13 +159,8 @@ mod tests {
     #[should_panic]
     fn test_swap_invalid_position() {
         let caller: ContractAddress = 0x1337.try_into().unwrap();
-
-        let ndef = namespace_def();
-        let mut world = spawn_test_world(world::TEST_CLASS_HASH, [ndef].span());
-        world.sync_perms_and_inits(contract_defs());
-
-        let (contract_address, _) = world.dns(@"beast_actions").unwrap();
-        let beast_actions_system = IBeastActionsDispatcher { contract_address };
+        let world = setup_world();
+        let beast_actions_system = deploy_beast_actions(world);
 
         // Set the contract address (which becomes the caller)
         set_contract_address(caller);
@@ -153,13 +175,8 @@ mod tests {
     #[test]
     fn test_overwrite_lineup() {
         let caller: ContractAddress = 0x1337.try_into().unwrap();
-
-        let ndef = namespace_def();
-        let mut world = spawn_test_world(world::TEST_CLASS_HASH, [ndef].span());
-        world.sync_perms_and_inits(contract_defs());
-
-        let (contract_address, _) = world.dns(@"beast_actions").unwrap();
-        let beast_actions_system = IBeastActionsDispatcher { contract_address };
+        let world = setup_world();
+        let beast_actions_system = deploy_beast_actions(world);
 
         // Set the contract address (which becomes the caller)
         set_contract_address(caller);
@@ -184,13 +201,8 @@ mod tests {
     #[test]
     fn test_register_empty_lineup() {
         let caller: ContractAddress = 0x1337.try_into().unwrap();
-
-        let ndef = namespace_def();
-        let mut world = spawn_test_world(world::TEST_CLASS_HASH, [ndef].span());
-        world.sync_perms_and_inits(contract_defs());
-
-        let (contract_address, _) = world.dns(@"beast_actions").unwrap();
-        let beast_actions_system = IBeastActionsDispatcher { contract_address };
+        let world = setup_world();
+        let beast_actions_system = deploy_beast_actions(world);
 
         // Set the contract address (which becomes the caller)
         set_contract_address(caller);
@@ -212,13 +224,8 @@ mod tests {
     #[test]
     fn test_register_partial_lineup() {
         let caller: ContractAddress = 0x1337.try_into().unwrap();
-
-        let ndef = namespace_def();
-        let mut world = spawn_test_world(world::TEST_CLASS_HASH, [ndef].span());
-        world.sync_perms_and_inits(contract_defs());
-
-        let (contract_address, _) = world.dns(@"beast_actions").unwrap();
-        let beast_actions_system = IBeastActionsDispatcher { contract_address };
+        let world = setup_world();
+        let beast_actions_system = deploy_beast_actions(world);
 
         // Set the contract address (which becomes the caller)
         set_contract_address(caller);
@@ -241,13 +248,8 @@ mod tests {
     #[should_panic(expected: ('Cannot swap to empty', 'ENTRYPOINT_FAILED'))]
     fn test_swap_to_empty_fails() {
         let caller: ContractAddress = 0x1337.try_into().unwrap();
-
-        let ndef = namespace_def();
-        let mut world = spawn_test_world(world::TEST_CLASS_HASH, [ndef].span());
-        world.sync_perms_and_inits(contract_defs());
-
-        let (contract_address, _) = world.dns(@"beast_actions").unwrap();
-        let beast_actions_system = IBeastActionsDispatcher { contract_address };
+        let world = setup_world();
+        let beast_actions_system = deploy_beast_actions(world);
 
         // Set the contract address (which becomes the caller)
         set_contract_address(caller);

@@ -101,4 +101,5 @@ dependencies = [
  "beasts_nft",
  "dojo",
  "dojo_cairo_test",
+ "openzeppelin_token",
 ]

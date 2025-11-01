@@ -8,9 +8,11 @@ pub trait IBeastActions<T> {
 pub mod beast_actions {
     use dojo::event::EventStorage;
     use dojo::model::ModelStorage;
-    use survivor_valhalla::models::BeastLineup;
-    use survivor_valhalla::interfaces::{IBeastsDispatcher, IBeastsDispatcherTrait};
-    use starknet::{ContractAddress, get_caller_address};
+    use survivor_valhalla::models::{BeastLineup, Beast, PlayerEnergy};
+    use beasts_nft::interfaces::{IBeastsDispatcher, IBeastsDispatcherTrait};
+    use openzeppelin_token::erc721::interface::{IERC721Dispatcher, IERC721DispatcherTrait};
+    use beasts_nft::pack::PackableBeast;
+    use starknet::{ContractAddress, get_caller_address, get_block_timestamp};
     use super::IBeastActions;
     
     #[cfg(not(test))]
@@ -46,27 +48,107 @@ pub mod beast_actions {
             let mut world = self.world_default();
             let player = get_caller_address();
             
-            // Verify ownership of non-zero beasts only (skip in test mode)
+            // Verify ownership and fetch beast details
             if BEASTS_CONTRACT != 0x0 {
                 let beasts_contract: ContractAddress = BEASTS_CONTRACT.try_into().unwrap();
                 let beasts_dispatcher = IBeastsDispatcher { contract_address: beasts_contract };
+                let erc721_dispatcher = IERC721Dispatcher { contract_address: beasts_contract };
                 
-                // Only check ownership for non-zero beast IDs
+                // Store beast 1
                 if beast1_id != 0 {
-                    assert(beasts_dispatcher.owner_of(beast1_id) == player, 'Not owner of beast 1');
+                    assert(erc721_dispatcher.owner_of(beast1_id) == player, 'Not owner of beast 1');
+                    let beast_data: PackableBeast = beasts_dispatcher.get_beast(beast1_id);
+                    let beast = Beast {
+                        player,
+                        position: 0,
+                        token_id: beast1_id,
+                        beast_id: beast_data.id,
+                        level: beast_data.level,
+                        health: beast_data.health,
+                        beast_type: 0,
+                        tier: 0,
+                    };
+                    world.write_model(@beast);
                 }
+                
+                // Store beast 2
                 if beast2_id != 0 {
-                    assert(beasts_dispatcher.owner_of(beast2_id) == player, 'Not owner of beast 2');
+                    assert(erc721_dispatcher.owner_of(beast2_id) == player, 'Not owner of beast 2');
+                    let beast_data: PackableBeast = beasts_dispatcher.get_beast(beast2_id);
+                    let beast = Beast {
+                        player,
+                        position: 1,
+                        token_id: beast2_id,
+                        beast_id: beast_data.id,
+                        level: beast_data.level,
+                        health: beast_data.health,
+                        beast_type: 0,
+                        tier: 0,
+                    };
+                    world.write_model(@beast);
                 }
+                
+                // Store beast 3
                 if beast3_id != 0 {
-                    assert(beasts_dispatcher.owner_of(beast3_id) == player, 'Not owner of beast 3');
+                    assert(erc721_dispatcher.owner_of(beast3_id) == player, 'Not owner of beast 3');
+                    let beast_data: PackableBeast = beasts_dispatcher.get_beast(beast3_id);
+                    let beast = Beast {
+                        player,
+                        position: 2,
+                        token_id: beast3_id,
+                        beast_id: beast_data.id,
+                        level: beast_data.level,
+                        health: beast_data.health,
+                        beast_type: 0,
+                        tier: 0,
+                    };
+                    world.write_model(@beast);
                 }
+                
+                // Store beast 4
                 if beast4_id != 0 {
-                    assert(beasts_dispatcher.owner_of(beast4_id) == player, 'Not owner of beast 4');
+                    assert(erc721_dispatcher.owner_of(beast4_id) == player, 'Not owner of beast 4');
+                    let beast_data: PackableBeast = beasts_dispatcher.get_beast(beast4_id);
+                    let beast = Beast {
+                        player,
+                        position: 3,
+                        token_id: beast4_id,
+                        beast_id: beast_data.id,
+                        level: beast_data.level,
+                        health: beast_data.health,
+                        beast_type: 0,
+                        tier: 0,
+                    };
+                    world.write_model(@beast);
                 }
+                
+                // Store beast 5
                 if beast5_id != 0 {
-                    assert(beasts_dispatcher.owner_of(beast5_id) == player, 'Not owner of beast 5');
+                    assert(erc721_dispatcher.owner_of(beast5_id) == player, 'Not owner of beast 5');
+                    let beast_data: PackableBeast = beasts_dispatcher.get_beast(beast5_id);
+                    let beast = Beast {
+                        player,
+                        position: 4,
+                        token_id: beast5_id,
+                        beast_id: beast_data.id,
+                        level: beast_data.level,
+                        health: beast_data.health,
+                        beast_type: 0,
+                        tier: 0,
+                    };
+                    world.write_model(@beast);
                 }
+            }
+            
+            // Initialize player energy if first time
+            let mut energy: PlayerEnergy = world.read_model(player);
+            if energy.energy == 0 && energy.last_refill_time == 0 {
+                energy = PlayerEnergy {
+                    player,
+                    energy: 5,
+                    last_refill_time: get_block_timestamp(),
+                };
+                world.write_model(@energy);
             }
             
             let lineup = BeastLineup {
@@ -95,12 +177,28 @@ pub mod beast_actions {
             
             // Cannot swap to empty (0)
             assert(new_beast_id != 0, 'Cannot swap to empty');
+            assert(position <= 4, 'Invalid position');
             
-            // Verify ownership of the new beast (skip in test mode)
+            // Verify ownership and update beast details
             if BEASTS_CONTRACT != 0x0 {
                 let beasts_contract: ContractAddress = BEASTS_CONTRACT.try_into().unwrap();
                 let beasts_dispatcher = IBeastsDispatcher { contract_address: beasts_contract };
-                assert(beasts_dispatcher.owner_of(new_beast_id) == player, 'Not owner of beast');
+                let erc721_dispatcher = IERC721Dispatcher { contract_address: beasts_contract };
+                assert(erc721_dispatcher.owner_of(new_beast_id) == player, 'Not owner of beast');
+                
+                // Fetch and store new beast details
+                let beast_data: PackableBeast = beasts_dispatcher.get_beast(new_beast_id);
+                let beast = Beast {
+                    player,
+                    position,
+                    token_id: new_beast_id,
+                    beast_id: beast_data.id,
+                    level: beast_data.level,
+                    health: beast_data.health,
+                    beast_type: 0, // TODO: Determine from beast_id
+                    tier: 0, // TODO: Determine from beast_id
+                };
+                world.write_model(@beast);
             }
             
             let mut lineup: BeastLineup = world.read_model(player);
@@ -115,8 +213,6 @@ pub mod beast_actions {
                 lineup.beast4_id = new_beast_id;
             } else if position == 4 {
                 lineup.beast5_id = new_beast_id;
-            } else {
-                panic!("Invalid position: must be between 0 and 4");
             }
             
             world.write_model(@lineup);

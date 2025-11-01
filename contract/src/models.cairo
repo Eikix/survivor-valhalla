@@ -11,3 +11,38 @@ pub struct BeastLineup {
     pub beast4_id: u256,
     pub beast5_id: u256,
 }
+
+#[derive(Copy, Drop, Serde, Debug)]
+#[dojo::model]
+pub struct Beast {
+    #[key]
+    pub player: ContractAddress,
+    #[key]
+    pub position: u8,
+    pub token_id: u256,
+    pub beast_id: u8,
+    pub level: u16,
+    pub health: u16,
+    pub beast_type: u8,
+    pub tier: u8,
+}
+
+#[derive(Copy, Drop, Serde, Debug)]
+#[dojo::model]
+pub struct PlayerEnergy {
+    #[key]
+    pub player: ContractAddress,
+    pub energy: u8,
+    pub last_refill_time: u64,
+}
+
+#[derive(Copy, Drop, Serde, Debug)]
+#[dojo::model]
+pub struct Battle {
+    #[key]
+    pub battle_id: u32,
+    pub attacker: ContractAddress,
+    pub defender: ContractAddress,
+    pub winner: ContractAddress,
+    pub timestamp: u64,
+}
