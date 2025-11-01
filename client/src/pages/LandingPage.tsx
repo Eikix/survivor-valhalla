@@ -49,7 +49,7 @@ export function LandingPage() {
           initial={{ opacity: 0, scale: 0.9 }}
           animate={{ opacity: 1, scale: 1 }}
           transition={{ duration: 1.2, ease: "easeOut" }}
-          className="mb-16"
+          className="mb-8"
         >
           {/* Top decorative line */}
           <motion.div
@@ -66,7 +66,8 @@ export function LandingPage() {
             transition={{ duration: 0.8, delay: 0.5 }}
             className="text-6xl md:text-8xl font-bold tracking-wider mb-6"
             style={{
-              textShadow: "0 0 40px rgba(16, 185, 129, 0.5), 0 0 80px rgba(16, 185, 129, 0.2)",
+              textShadow:
+                "0 0 40px rgba(16, 185, 129, 0.5), 0 0 80px rgba(16, 185, 129, 0.2)",
               fontFamily: "serif",
             }}
           >
@@ -107,15 +108,14 @@ export function LandingPage() {
               textShadow: "0 0 20px rgba(16, 185, 129, 0.8)",
             }}
             whileTap={{ scale: 0.95 }}
-            className="group relative px-12 py-4 text-xl font-bold tracking-wider uppercase border-2 border-emerald-500/50 hover:border-emerald-500 transition-all duration-300"
+            className="group relative px-12 py-4 text-xl font-bold tracking-wider uppercase border-2 border-emerald-500/50 hover:border-emerald-500 transition-all duration-300 cursor-pointer"
             style={{
-              background: "linear-gradient(to bottom, rgba(16, 185, 129, 0.1), rgba(0, 0, 0, 0.4))",
+              background:
+                "linear-gradient(to bottom, rgba(16, 185, 129, 0.1), rgba(0, 0, 0, 0.4))",
               textShadow: "0 0 10px rgba(16, 185, 129, 0.5)",
             }}
           >
-            <span className="relative z-10 text-emerald-500">
-              ENTER ARENA
-            </span>
+            <span className="relative z-10 text-emerald-500">ENTER ARENA</span>
 
             {/* Hover glow effect */}
             <motion.div
@@ -124,27 +124,6 @@ export function LandingPage() {
               whileHover={{ opacity: 1 }}
             />
           </motion.button>
-
-          {/* Pulsing indicator */}
-          <motion.div
-            animate={{ opacity: [0.4, 0.8, 0.4] }}
-            transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
-            className="mt-6 text-emerald-500/60 text-xs tracking-widest uppercase"
-          >
-            Press to continue
-          </motion.div>
-        </motion.div>
-
-        {/* Bottom atmospheric text */}
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ duration: 1, delay: 1.5 }}
-          className="absolute bottom-8 left-1/2 -translate-x-1/2 text-center"
-        >
-          <p className="text-emerald-900/60 text-xs tracking-wider">
-            Starknet • Dojo • Loot Survivor
-          </p>
         </motion.div>
       </div>
     </div>
