@@ -1,0 +1,12 @@
+{
+  "extends": "../../../tsconfig.app.json",
+  "compilerOptions": {
+    "verbatimModuleSyntax": false,
+    "strict": false,
+    "noUnusedLocals": false,
+    "noUnusedParameters": false,
+    "erasableSyntaxOnly": false,
+    "noFallthroughCasesInSwitch": false,
+    "noUncheckedSideEffectImports": false
+  }
+}
