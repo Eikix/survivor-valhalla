@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { DojoProvider, DojoCall } from "@dojoengine/core";
 import {
   Account,

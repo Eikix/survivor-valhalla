@@ -1,16 +1,21 @@
 // src/components/WorldBeastLineups.tsx
 import { motion } from "framer-motion";
 import { useEntityQuery, useModels } from "@dojoengine/sdk/react";
-import { ToriiQueryBuilder } from "@dojoengine/sdk";
+import { KeysClause, ToriiQueryBuilder } from "@dojoengine/sdk";
 import { ModelsMapping } from "../bindings/typescript/models.gen";
 
 export function WorldBeastLineups() {
   // Subscribe to all entities - data automatically goes into the Zustand store
-  useEntityQuery(new ToriiQueryBuilder().includeHashedKeys());
+  useEntityQuery(
+    new ToriiQueryBuilder()
+      .includeHashedKeys()
+      .withClause(
+        KeysClause([ModelsMapping.BeastLineupRegistered], []).build(),
+      ),
+  );
 
   // Get all BeastLineup models from the store (filtered by model type)
   const beastLineups = useModels(ModelsMapping.BeastLineupRegistered);
-
 
   // Convert to array format for easier rendering
   const lineupsArray = Object.entries(beastLineups)
