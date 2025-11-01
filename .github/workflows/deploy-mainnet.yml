@@ -63,30 +63,30 @@ jobs:
             bash -lc "
               set -e
 
-              echo '[1/7] sozo build'
+              echo '[1/6] sozo build'
               sozo -P mainnet build
 
-              echo '[2/7] sozo migrate'
+              echo '[2/6] sozo migrate'
               sozo -P mainnet migrate
 
-              echo '[3/7] install slot (in container)'
+              echo '[3/6] install slot (in container)'
               apt-get update -y >/dev/null 2>&1
               apt-get install -y curl jq ca-certificates git >/dev/null 2>&1
               curl -L https://slot.cartridge.sh | bash
               export PATH=\"/root/.slot/bin:\$PATH\"
               /root/.slot/bin/slotup || true
 
-              echo '[4/7] deploy torii via slot'
+              echo '[4/6] deploy torii via slot'
               slot deployments update survivor-valhalla torii \
                 --version v1.7.1 \
                 --config /app/torii.toml
 
               slot deployments describe survivor-valhalla torii > /app/deployment-info.txt
 
-              echo '[6/7] walnut verify (best-effort)'
+              echo '[5/6] walnut verify (best-effort)'
               sozo walnut verify || echo 'Walnut verification started - check link'
 
-              echo '[7/7] done'
+              echo '[6/6] done'
             "
 
       - name: Upload deployment info
