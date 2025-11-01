@@ -117,28 +117,57 @@ jobs:
               echo '[2/6] sozo migrate'
               sozo -P mainnet migrate
 
-              echo '[3/6] install slot (in container)'
+              echo '[3/6] Archive manifest'
+              TIMESTAMP=$(date -u +%Y-%m-%d_%H%M%S)
+              cp manifest_mainnet.json manifest_mainnet_${TIMESTAMP}.json
+              
+              echo '[4/6] install slot (in container)'
               apt-get update -y >/dev/null 2>&1
               apt-get install -y curl jq ca-certificates git >/dev/null 2>&1
               curl -L https://slot.cartridge.sh | bash
               export PATH=\"/root/.slot/bin:\$PATH\"
               /root/.slot/bin/slotup || true
 
-              echo '[4/6] deploy torii via slot'
+              echo '[5/6] deploy torii via slot'
               slot deployments update survivor-valhalla torii \
                 --version v1.7.1 \
                 --config /app/torii.toml
 
               slot deployments describe survivor-valhalla torii > /app/deployment-info.txt
 
-              echo '[5/6] walnut verify (best-effort)'
+              echo '[6/6] walnut verify (best-effort)'
               sozo walnut verify || echo 'Walnut verification started - check link'
 
-              echo '[6/6] done'
+              echo '[7/6] done'
             "
 
-      - name: Upload deployment info
+      - name: Archive and commit manifest
+        run: |
+          TIMESTAMP=$(date -u +%Y-%m-%d_%H%M%S)
+          
+          # Copy the manifest to the archive directory
+          mkdir -p manifests/mainnet
+          cp ./contract/manifest_mainnet.json ./manifests/mainnet/manifest_mainnet_${TIMESTAMP}.json
+          cp ./contract/manifest_mainnet.json ./contract/manifest_mainnet.json
+          
+          # Configure git
+          git config user.name "GitHub Actions"
+          git config user.email "actions@github.com"
+          
+          # Add and commit the manifest files
+          git add manifests/mainnet/manifest_mainnet_${TIMESTAMP}.json
+          git add contract/manifest_mainnet.json
+          
+          # Commit with deployment info
+          git commit -m "Archive manifest for mainnet deployment v${{ needs.check-version.outputs.version }} [${TIMESTAMP}]" || echo "No changes to commit"
+          
+          # Push the changes
+          git push || echo "Failed to push manifest (may need PAT)"
+          
+      - name: Upload deployment artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: deployment-info
-          path: ./contract/deployment-info.txt
+          name: deployment-artifacts
+          path: |
+            ./contract/deployment-info.txt
+            ./contract/manifest_mainnet.json
