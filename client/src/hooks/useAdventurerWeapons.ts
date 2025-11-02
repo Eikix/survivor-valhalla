@@ -79,14 +79,14 @@ export const getWeaponTypeIcon = (weaponType: number): string => {
 
 /**
  * Get armor type icon/emoji from weapon type enum value (for beasts)
- * 1 = Blade_or_Hide -> Hide armor - 🦴
+ * 1 = Blade_or_Hide -> Hide armor - 🧥
  * 2 = Bludgeon_or_Metal -> Metal armor - 🛡️
  * 3 = Magic_or_Cloth -> Cloth armor - 👘
  */
 export const getArmorTypeIcon = (weaponType: number): string => {
   const armorIcons: Record<number, string> = {
     0: "?",
-    1: "🦴", // Hide armor
+    1: "🧥", // Hide armor
     2: "🛡️", // Metal armor
     3: "👘", // Cloth armor
   };
