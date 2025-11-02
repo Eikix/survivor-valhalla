@@ -1,8 +1,8 @@
 {
   "world": {
     "class_hash": "0x691da17eb9ef169b385eaaf3a303972d187479e30be146d3337423eaec6272d",
-    "address": "0x1c549354a5324cf3a978f89eb60566b251740d85dada78a6f85246fe5684f96",
-    "seed": "dojo_survivor_valhalla_mainnet",
+    "address": "0x506afd1468177a7d2de7a0d05f7675eea6cfdc081b41cb604f812ebb3cc4dc4",
+    "seed": "dojo_survivor_valhalla",
     "name": "survivor_valhalla",
     "entrypoints": [
       "uuid",
@@ -1490,8 +1490,8 @@
   },
   "contracts": [
     {
-      "address": "0x62017dad4ca883ecef6180eefcb1929272fc3c31d11a7bc9d7df31602d30897",
-      "class_hash": "0x53589778180fc31d3b644f046a75ef6007bbd59452954f17e6cf2b881eb515d",
+      "address": "0x3c517ffdb643ef716594e866b7db8d9aeaf4c2f1f49f4cbd697de0615fc0499",
+      "class_hash": "0x3b842581cc8d5703f2ee82fa94b4e283ed256a924f5320a6a54d1671bf86709",
       "abi": [
         {
           "type": "impl",
@@ -1719,7 +1719,7 @@
       ]
     },
     {
-      "address": "0x2f04f10a45afce1c2b7f5681d81c736680059c4dcd39bc23192a4ff9223afae",
+      "address": "0x2c467374481cd76dc3b05dcb079f23c2c8d0735186cc16c263d34fca2e24fb8",
       "class_hash": "0x3253172b895729876c601ff0a1a871717e750a04c4c27040f51c830105a648e",
       "abi": [
         {
@@ -1966,7 +1966,7 @@
       ]
     },
     {
-      "address": "0x7f2b4731065637d14c4cc1d035f82236f12fd718c15213430e1af63f32e79be",
+      "address": "0x5083e35ca0d6b50d4c721aa1dba5314c64f7bce75c8b689089dbd23628c07b3",
       "class_hash": "0x458cda4fb1d2db0904e088bb72f6ef93795a78ade119c8dd4c85a7838d91740",
       "abi": [
         {
@@ -2247,7 +2247,7 @@
     },
     {
       "members": [],
-      "class_hash": "0x5935cc5073c954511b45e151c869ea0465974bdfe1f2e6fad66d7e8543d50b4",
+      "class_hash": "0x15e2aedac417cc57f0152ac5246ce5e7fbc6df06fc62c37b427f3a09632cb38",
       "tag": "survivor_valhalla-DamageDealt",
       "selector": "0x10a2265ea8cabad799e0e88323ba9a22fef429b4dd2b1e3c6d5ca5cfd225bae"
     },
@@ -2265,7 +2265,7 @@
     },
     {
       "members": [],
-      "class_hash": "0x1be662a07d6c38914ba097eb50ecdd02f11cc653347c5db15d122e3150744b2",
+      "class_hash": "0x30fa082dc0838eba3b299cf374b4a8d619c8c7d133f59f65e422050e52b2ca7",
       "tag": "survivor_valhalla-UnitDefeated",
       "selector": "0x28b133b0e1125287fa86467013486102a54c019b46f3844f6917ad92c9cf0a1"
     }
