@@ -200,7 +200,7 @@ pub mod battle_actions {
                     world.write_model(@cached);
                     
                     // Extract weapon info using Death Mountain loot dispatcher
-                    let weapon_loot = loot_dispatcher.get_item(adventurer.equipment.weapon);
+                    let weapon_loot = loot_dispatcher.get_item(adventurer.equipment.weapon.id);
                     let weapon_power = calculate_weapon_power(adventurer.equipment.weapon, weapon_loot.tier);
                     
                     let weapon = AdventurerWeapon {
