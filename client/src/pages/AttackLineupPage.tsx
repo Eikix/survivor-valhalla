@@ -1044,7 +1044,10 @@ export function AttackLineupPage() {
                   </div>
                   <div className="mt-6 text-center">
                     <motion.button
-                      onClick={clearBattleState}
+                      onClick={() => {
+                        clearBattleState();
+                        setSelectedEnemy(null);
+                      }}
                       whileHover={{ scale: 1.05 }}
                       whileTap={{ scale: 0.95 }}
                       className="px-6 py-2 text-sm font-bold tracking-wider uppercase border border-emerald-500/50 hover:border-emerald-500 transition-all cursor-pointer text-emerald-400"
