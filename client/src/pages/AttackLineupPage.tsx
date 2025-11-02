@@ -22,25 +22,28 @@ import { useTransactionToast } from "../hooks/useTransactionToast";
 type BeastLineupWithId = BeastLineup & { entityId: string };
 
 export function AttackLineupPage() {
-  const [inspectedAdventurer, setInspectedAdventurer] = useState<Adventurer | null>(null);
-  const [inspectedEnemyBeast, setInspectedEnemyBeast] = useState<string | null>(null);
+  const [inspectedAdventurer, setInspectedAdventurer] =
+    useState<Adventurer | null>(null);
+  const [inspectedEnemyBeast, setInspectedEnemyBeast] = useState<string | null>(
+    null,
+  );
   const [attackLineup, setAttackLineup] = useState<(Adventurer | null)[]>(
     Array(5).fill(null),
   );
-  const [selectedEnemy, setSelectedEnemy] = useState<BeastLineupWithId | null>(null);
+  const [selectedEnemy, setSelectedEnemy] = useState<BeastLineupWithId | null>(
+    null,
+  );
   const [isDraggingOver, setIsDraggingOver] = useState<number>(-1);
   const [sortBy, setSortBy] = useState<keyof Adventurer | "">("");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
 
   // Use battle events hook
   const {
-    battleInProgress,
     battleLog,
     battleResult,
-    currentBattleId,
-    battleSummary,
-    startBattle,
     clearBattleState,
+    prepareForBattle,
+    isWaitingForBattle,
   } = useBattleEvents();
 
   const { connect, connectors } = useConnect();
@@ -58,9 +61,9 @@ export function AttackLineupPage() {
 
   const createLineup = async () => {
     if (!client || !account) return;
-    
+
     const tx = showTransaction(undefined, "Creating adventurer lineup...");
-    
+
     try {
       // Convert to numbers to ensure u64 compatibility
       await client.battle_actions.setAttackLineup(
@@ -82,7 +85,7 @@ export function AttackLineupPage() {
     if (!client || !account) return;
 
     const tx = showTransaction(undefined, `Updating adventurer lineup...`);
-    
+
     try {
       // Convert to numbers to ensure u64 compatibility
       await client.battle_actions.setAttackLineup(
@@ -102,23 +105,21 @@ export function AttackLineupPage() {
 
   const executeBattle = async () => {
     if (!client || !account || !selectedEnemy || !hasLineup) return;
-    
+
+    // Prepare for battle: capture the current battle_id before we start
+    prepareForBattle();
+
     const tx = showTransaction(undefined, "Initiating battle...");
-    
+
     try {
-      // Start battle tracking with hook
-      startBattle();
-      
-      await client.battle_actions.battle(
-        account,
-        selectedEnemy.player
-      );
-      tx.success("Battle initiated!");
-      
+      // Execute battle transaction (synchronous on-chain)
+      // The useBattleEvents hook will automatically detect the new BattleCompleted event
+      // and load the battle log when it's indexed by Torii
+      await client.battle_actions.battle(account, selectedEnemy.player);
+      tx.success("Battle complete! Loading results...");
     } catch (error) {
-      console.error("Failed to start battle:", error);
-      tx.error("Failed to start battle");
-      clearBattleState();
+      console.error("Failed to execute battle:", error);
+      tx.error("Failed to execute battle");
     }
   };
 
@@ -217,8 +218,6 @@ export function AttackLineupPage() {
       });
   }, [allBeastLineups, address]);
 
- 
-
   // Extract all unique token IDs from beast lineups for fetching images
   const allBeastLineupTokenIds = useMemo(() => {
     const tokenIds: (string | number | bigint)[] = [];
@@ -238,12 +237,13 @@ export function AttackLineupPage() {
     return tokenIds;
   }, [worldBeastLineups]);
 
-
   // Fetch images for all beast lineup beasts
-  const { data: beastLineupImages = {} } = useBeastLineupImages(allBeastLineupTokenIds, {
-    enabled: allBeastLineupTokenIds.length > 0,
-  });
-
+  const { data: beastLineupImages = {} } = useBeastLineupImages(
+    allBeastLineupTokenIds,
+    {
+      enabled: allBeastLineupTokenIds.length > 0,
+    },
+  );
 
   const hasLineup = !!userLineup;
   const lastProcessedLineupRef = useRef<string>("");
@@ -268,7 +268,9 @@ export function AttackLineupPage() {
       ];
 
       // Create a stable key for this lineup + adventurers combination
-      const lineupKey = lineupAdventurerIds.map((id) => String(id || 0)).join(",");
+      const lineupKey = lineupAdventurerIds
+        .map((id) => String(id || 0))
+        .join(",");
       const combinedKey = `${lineupKey}:${adventurersIdsString}`;
 
       // Skip if we've already processed this exact lineup with the same adventurers
@@ -278,7 +280,10 @@ export function AttackLineupPage() {
 
       const loadedAdventurers = lineupAdventurerIds.map((adventurerId) => {
         if (adventurerId && Number(adventurerId) > 0) {
-          return adventurers.find((a) => a.adventurer_id === Number(adventurerId)) || null;
+          return (
+            adventurers.find((a) => a.adventurer_id === Number(adventurerId)) ||
+            null
+          );
         }
         return null;
       });
@@ -297,8 +302,8 @@ export function AttackLineupPage() {
   // Check if current lineup differs from on-chain lineup
   const hasLineupChanges = useMemo(() => {
     if (!hasLineup || !userLineup) return false;
-    
-    const currentIds = attackLineup.map(a => a?.adventurer_id || 0);
+
+    const currentIds = attackLineup.map((a) => a?.adventurer_id || 0);
     const onChainIds = [
       Number(userLineup.adventurer1_id || 0),
       Number(userLineup.adventurer2_id || 0),
@@ -306,7 +311,7 @@ export function AttackLineupPage() {
       Number(userLineup.adventurer4_id || 0),
       Number(userLineup.adventurer5_id || 0),
     ];
-    
+
     return currentIds.some((id, index) => id !== onChainIds[index]);
   }, [hasLineup, userLineup, attackLineup]);
 
@@ -314,7 +319,9 @@ export function AttackLineupPage() {
   const sortedAdventurers = useMemo(() => {
     // Remove duplicates first (by id)
     const uniqueAdventurers = Array.from(
-      new Map(adventurers.map((adventurer) => [adventurer.id, adventurer])).values(),
+      new Map(
+        adventurers.map((adventurer) => [adventurer.id, adventurer]),
+      ).values(),
     );
 
     if (!sortBy) {
@@ -487,14 +494,20 @@ export function AttackLineupPage() {
                 animate={{ opacity: 1, scale: 1 }}
                 className="mb-16 text-center"
               >
-                <div className={`border p-8 ${
-                  battleResult.includes("Victory") 
-                    ? "border-emerald-500/50 bg-emerald-950/20"
-                    : "border-emerald-500/50 bg-emerald-950/20"
-                }`}>
-                  <h2 className={`text-4xl font-bold mb-4 tracking-wider uppercase ${
-                    battleResult.includes("Victory") ? "text-emerald-400" : "text-emerald-400"
-                  }`}>
+                <div
+                  className={`border p-8 ${
+                    battleResult.includes("Victory")
+                      ? "border-emerald-500/50 bg-emerald-950/20"
+                      : "border-emerald-500/50 bg-emerald-950/20"
+                  }`}
+                >
+                  <h2
+                    className={`text-4xl font-bold mb-4 tracking-wider uppercase ${
+                      battleResult.includes("Victory")
+                        ? "text-emerald-400"
+                        : "text-emerald-400"
+                    }`}
+                  >
                     {battleResult}
                   </h2>
                   <motion.button
@@ -508,107 +521,6 @@ export function AttackLineupPage() {
                   >
                     Continue
                   </motion.button>
-                </div>
-              </motion.div>
-            )}
-
-            {/* Battle Summary Section - Show when battle is completed */}
-            {battleResult && battleSummary && (
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.3 }}
-                className="mb-16"
-              >
-                <div className="border border-blue-500/30 bg-blue-950/20 p-8">
-                  <h2 className="text-center text-xl font-bold text-blue-400 mb-6 tracking-wider uppercase">
-                    🔍 Battle Analysis
-                  </h2>
-                  <div className="space-y-4">
-                    <div className="text-center mb-4">
-                      <div className="text-blue-300 text-sm">Battle ID: {battleSummary.battleId}</div>
-                      <div className="text-blue-300 text-sm">Winner: {battleSummary.winner.slice(0, 8)}...{battleSummary.winner.slice(-6)}</div>
-                    </div>
-                    
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div className="bg-blue-950/30 border border-blue-500/20 p-4 rounded">
-                        <h3 className="text-blue-400 font-bold mb-2">Damage Events ({battleSummary.damageEvents.length})</h3>
-                        <div className="max-h-32 overflow-y-auto text-xs text-blue-200">
-                          {battleSummary.damageEvents.length > 0 ? (
-                            battleSummary.damageEvents.map((eventObj: any, index: number) => {
-                              const entityId = Object.keys(eventObj)[0];
-                              const event = eventObj[entityId];
-                              return (
-                                <div key={index} className="mb-1">
-                                  Unit {event.attacker_id} → {event.target_id}: {event.damage} dmg
-                                </div>
-                              );
-                            })
-                          ) : (
-                            <div className="text-blue-200/50">No damage events</div>
-                          )}
-                        </div>
-                      </div>
-                      
-                      <div className="bg-blue-950/30 border border-blue-500/20 p-4 rounded">
-                        <h3 className="text-blue-400 font-bold mb-2">Defeat Events ({battleSummary.defeatEvents.length})</h3>
-                        <div className="max-h-32 overflow-y-auto text-xs text-blue-200">
-                          {battleSummary.defeatEvents.length > 0 ? (
-                            battleSummary.defeatEvents.map((eventObj: any, index: number) => {
-                              const entityId = Object.keys(eventObj)[0];
-                              const event = eventObj[entityId];
-                              const unitType = event.is_adventurer ? "Adventurer" : "Beast";
-                              return (
-                                <div key={index} className="mb-1">
-                                  {unitType} {event.unit_id} defeated at pos {event.position}
-                                </div>
-                              );
-                            })
-                          ) : (
-                            <div className="text-blue-200/50">No defeats</div>
-                          )}
-                        </div>
-                      </div>
-                      
-                      <div className="bg-blue-950/30 border border-blue-500/20 p-4 rounded">
-                        <h3 className="text-blue-400 font-bold mb-2">Round Events ({battleSummary.roundEvents.length})</h3>
-                        <div className="max-h-32 overflow-y-auto text-xs text-blue-200">
-                          {battleSummary.roundEvents.length > 0 ? (
-                            battleSummary.roundEvents.map((eventObj: any, index: number) => {
-                              const entityId = Object.keys(eventObj)[0];
-                              const event = eventObj[entityId];
-                              return (
-                                <div key={index} className="mb-1">
-                                  Round {event.round}: {event.attacker_survivors} vs {event.defender_survivors}
-                                </div>
-                              );
-                            })
-                          ) : (
-                            <div className="text-blue-200/50">No round events</div>
-                          )}
-                        </div>
-                      </div>
-                      
-                      <div className="bg-blue-950/30 border border-blue-500/20 p-4 rounded">
-                        <h3 className="text-blue-400 font-bold mb-2">Battle Completion ({battleSummary.battleEvents.length})</h3>
-                        <div className="max-h-32 overflow-y-auto text-xs text-blue-200">
-                          {battleSummary.battleEvents.length > 0 ? (
-                            battleSummary.battleEvents.map((eventObj: any, index: number) => {
-                              const entityId = Object.keys(eventObj)[0];
-                              const event = eventObj[entityId];
-                              return (
-                                <div key={index} className="mb-1">
-                                  Winner: {event.winner.slice(0, 8)}...{event.winner.slice(-6)}
-                                </div>
-                              );
-                            })
-                          ) : (
-                            <div className="text-blue-200/50">No completion events</div>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
                 </div>
               </motion.div>
             )}
@@ -641,29 +553,48 @@ export function AttackLineupPage() {
                   transition={{ delay: 0.3 }}
                   className="mb-8"
                 >
-                  <div className="border-2 border-amber-900/50 bg-emerald-950/20 p-8 relative overflow-hidden" style={{
-                    boxShadow: "0 0 20px rgba(120, 53, 15, 0.2), inset 0 0 20px rgba(120, 53, 15, 0.05)"
-                  }}>
+                  <div
+                    className="border-2 border-amber-900/50 bg-emerald-950/20 p-8 relative overflow-hidden"
+                    style={{
+                      boxShadow:
+                        "0 0 20px rgba(120, 53, 15, 0.2), inset 0 0 20px rgba(120, 53, 15, 0.05)",
+                    }}
+                  >
                     {/* Accent pattern overlay */}
-                    <div className="absolute inset-0 opacity-10 pointer-events-none" style={{
-                      backgroundImage: "repeating-linear-gradient(45deg, transparent, transparent 10px, rgba(120, 53, 15, 0.1) 10px, rgba(120, 53, 15, 0.1) 20px)"
-                    }} />
+                    <div
+                      className="absolute inset-0 opacity-10 pointer-events-none"
+                      style={{
+                        backgroundImage:
+                          "repeating-linear-gradient(45deg, transparent, transparent 10px, rgba(120, 53, 15, 0.1) 10px, rgba(120, 53, 15, 0.1) 20px)",
+                      }}
+                    />
                     <div className="text-center relative z-10">
                       <Swords className="w-12 h-12 text-amber-900/70 mx-auto mb-4 rotate-180" />
-                      <h2 className="text-2xl font-bold text-amber-800 mb-2 tracking-wider uppercase" style={{
-                        textShadow: "0 0 10px rgba(120, 53, 15, 0.5)"
-                      }}>
+                      <h2
+                        className="text-2xl font-bold text-amber-800 mb-2 tracking-wider uppercase"
+                        style={{
+                          textShadow: "0 0 10px rgba(120, 53, 15, 0.5)",
+                        }}
+                      >
                         Enemy Force
                       </h2>
                       <div className="text-amber-700/70 font-mono text-xs mb-4">
-                        {selectedEnemy.player?.slice(0, 6)}...{selectedEnemy.player?.slice(-4)}
+                        {selectedEnemy.player?.slice(0, 6)}...
+                        {selectedEnemy.player?.slice(-4)}
                       </div>
                       <div className="grid grid-cols-5 gap-4 p-4">
                         {[1, 2, 3, 4, 5].map((pos) => {
-                          const beastId = selectedEnemy[`beast${pos}_id` as keyof typeof selectedEnemy];
+                          const beastId =
+                            selectedEnemy[
+                              `beast${pos}_id` as keyof typeof selectedEnemy
+                            ];
                           const hasBeast = beastId && Number(beastId) > 0;
-                          const lookupKey = hasBeast ? String(Number(beastId)) : "";
-                          const imageUrl = hasBeast ? beastLineupImages[lookupKey] : null;
+                          const lookupKey = hasBeast
+                            ? String(Number(beastId))
+                            : "";
+                          const imageUrl = hasBeast
+                            ? beastLineupImages[lookupKey]
+                            : null;
                           return (
                             <div
                               key={pos}
@@ -676,7 +607,9 @@ export function AttackLineupPage() {
                                   src={imageUrl}
                                   alt={`Beast ${beastId}`}
                                   className="w-full h-full object-contain cursor-pointer"
-                                  onClick={() => setInspectedEnemyBeast(imageUrl)}
+                                  onClick={() =>
+                                    setInspectedEnemyBeast(imageUrl)
+                                  }
                                 />
                               ) : null}
                             </div>
@@ -694,7 +627,9 @@ export function AttackLineupPage() {
                   transition={{ delay: 0.4 }}
                   className="text-center mb-8"
                 >
-                  <div className="text-4xl font-bold text-emerald-500 mb-4">VS</div>
+                  <div className="text-4xl font-bold text-emerald-500 mb-4">
+                    VS
+                  </div>
                   {hasLineup && attackLineup.every((a) => a !== null) ? (
                     <motion.button
                       onClick={executeBattle}
@@ -702,7 +637,8 @@ export function AttackLineupPage() {
                       whileTap={{ scale: 0.95 }}
                       className="px-8 py-3 text-lg font-bold tracking-wider uppercase border-2 border-emerald-500/50 hover:border-emerald-500 transition-all cursor-pointer"
                       style={{
-                        background: "linear-gradient(to bottom, rgba(16, 185, 129, 0.1), rgba(0, 0, 0, 0.4))",
+                        background:
+                          "linear-gradient(to bottom, rgba(16, 185, 129, 0.1), rgba(0, 0, 0, 0.4))",
                         textShadow: "0 0 10px rgba(16, 185, 129, 0.5)",
                       }}
                     >
@@ -714,6 +650,48 @@ export function AttackLineupPage() {
                     </div>
                   )}
                 </motion.div>
+
+                {/* Battle Waiting / Loading Section */}
+                {isWaitingForBattle && battleLog.length === 0 && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.2 }}
+                    className="mb-8"
+                  >
+                    <div className="border border-emerald-500/30 bg-emerald-950/20 p-12">
+                      <div className="text-center">
+                        <motion.div
+                          animate={{
+                            rotate: 360,
+                          }}
+                          transition={{
+                            duration: 2,
+                            repeat: Infinity,
+                            ease: "linear",
+                          }}
+                          className="w-16 h-16 mx-auto mb-6 border-4 border-emerald-500/30 border-t-emerald-500 rounded-full"
+                        />
+                        <h2 className="text-2xl font-bold text-emerald-400 mb-4 tracking-wider uppercase">
+                          Battle in Progress
+                        </h2>
+                        <motion.p
+                          animate={{
+                            opacity: [0.5, 1, 0.5],
+                          }}
+                          transition={{
+                            duration: 2,
+                            repeat: Infinity,
+                            ease: "easeInOut",
+                          }}
+                          className="text-emerald-200/60 text-sm tracking-wide"
+                        >
+                          Waiting for battle results from the chain...
+                        </motion.p>
+                      </div>
+                    </div>
+                  </motion.div>
+                )}
 
                 {/* Your Attack Force Section */}
                 <motion.div
@@ -813,7 +791,9 @@ export function AttackLineupPage() {
                                     }}
                                   />
                                 )}
-                                <div className="text-emerald-300 text-xs">Lvl {adventurer.level}</div>
+                                <div className="text-emerald-300 text-xs">
+                                  Lvl {adventurer.level}
+                                </div>
                               </motion.div>
                             ) : (
                               <div className="text-emerald-200/20 text-xs text-center">
@@ -875,12 +855,10 @@ export function AttackLineupPage() {
                             textShadow: "0 0 10px rgba(16, 185, 129, 0.5)",
                           }}
                         >
-                          <span className="text-emerald-500">
-                            Update
-                          </span>
+                          <span className="text-emerald-500">Update</span>
                         </motion.button>
                       ) : null}
-                      
+
                       <div className="mt-4 text-center">
                         <motion.button
                           onClick={() => setSelectedEnemy(null)}
@@ -895,54 +873,13 @@ export function AttackLineupPage() {
                   </div>
                 </motion.div>
 
-                {/* Battle Log Section - Show during combat */}
-                {(battleInProgress || battleLog.length > 0) && (
-                  <motion.div
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.4 }}
-                    className="mb-16"
-                  >
-                    <div className="border border-yellow-500/30 bg-yellow-950/20 p-8">
-                      <h2 className="text-center text-xl font-bold text-yellow-400 mb-6 tracking-wider uppercase flex items-center justify-center gap-2">
-                        ⚔️ Battle Log
-                        {battleInProgress && (
-                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-yellow-400"></div>
-                        )}
-                      </h2>
-                      <div className="max-h-80 overflow-y-auto border border-yellow-500/20 bg-black/30 p-4 rounded">
-                        {battleLog.length > 0 ? (
-                          <div className="space-y-2">
-                            {battleLog.map((logEntry, index) => (
-                              <motion.div
-                                key={index}
-                                initial={{ opacity: 0, x: -10 }}
-                                animate={{ opacity: 1, x: 0 }}
-                                transition={{ delay: index * 0.1 }}
-                                className="text-sm font-mono text-yellow-200/90 border-l-2 border-yellow-500/30 pl-4"
-                              >
-                                {logEntry}
-                              </motion.div>
-                            ))}
-                          </div>
-                        ) : battleInProgress ? (
-                          <div className="text-center text-yellow-400/60 text-sm uppercase tracking-wide">
-                            Waiting for battle events...
-                          </div>
-                        ) : null}
-                      </div>
-                    </div>
-                  </motion.div>
-                )}
-
-                {/* Dead Adventurers Collection Section - Hide during battle */}
-                {!battleInProgress && (
-                  <motion.div
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.4 }}
-                    className="mb-16"
-                  >
+                {/* Dead Adventurers Collection Section */}
+                <motion.div
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.4 }}
+                  className="mb-16"
+                >
                   <h2 className="text-center text-xl font-bold text-emerald-400 mb-6 tracking-wider uppercase">
                     Fallen Heroes
                   </h2>
@@ -963,11 +900,26 @@ export function AttackLineupPage() {
                       <>
                         <div className="mb-6 flex flex-wrap justify-center gap-4">
                           {[
-                            { key: "level" as keyof Adventurer, label: "Level" },
-                            { key: "strength" as keyof Adventurer, label: "Strength" },
-                            { key: "dexterity" as keyof Adventurer, label: "Dexterity" },
-                            { key: "vitality" as keyof Adventurer, label: "Vitality" },
-                            { key: "intelligence" as keyof Adventurer, label: "Intelligence" },
+                            {
+                              key: "level" as keyof Adventurer,
+                              label: "Level",
+                            },
+                            {
+                              key: "strength" as keyof Adventurer,
+                              label: "Strength",
+                            },
+                            {
+                              key: "dexterity" as keyof Adventurer,
+                              label: "Dexterity",
+                            },
+                            {
+                              key: "vitality" as keyof Adventurer,
+                              label: "Vitality",
+                            },
+                            {
+                              key: "intelligence" as keyof Adventurer,
+                              label: "Intelligence",
+                            },
                           ].map(({ key, label }) => (
                             <button
                               key={key}
@@ -1028,7 +980,9 @@ export function AttackLineupPage() {
                                   }}
                                 />
                               )}
-                              <div className="text-emerald-300 text-xs">Lvl {adventurer.level}</div>
+                              <div className="text-emerald-300 text-xs">
+                                Lvl {adventurer.level}
+                              </div>
                             </motion.div>
                           ))}
                         </div>
@@ -1041,9 +995,69 @@ export function AttackLineupPage() {
                       </div>
                     )}
                   </div>
-                  </motion.div>
-                )}
+                </motion.div>
               </>
+            )}
+
+            {/* Battle Log Section - Show after combat */}
+            {battleLog.length > 0 && (
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.4 }}
+                className="mb-16"
+              >
+                <div className="border border-emerald-500/30 bg-emerald-950/20 p-8">
+                  <h2 className="text-center text-xl font-bold text-emerald-400 mb-6 tracking-wider uppercase">
+                    Battle Chronicle
+                  </h2>
+                  <div className="border border-emerald-500/20 bg-black/40 p-6">
+                    <div className="space-y-1">
+                      {battleLog.map((logEntry, index) => {
+                        // Check if this is a separator/header line
+                        const isSeparator =
+                          logEntry.includes("---") || logEntry.includes("═══");
+                        const isHeader = logEntry.includes("Battle Chronicle");
+
+                        return (
+                          <motion.div
+                            key={index}
+                            initial={{ opacity: 0, x: -10 }}
+                            animate={{ opacity: 1, x: 0 }}
+                            transition={{ delay: index * 0.02 }}
+                            className={`
+                              font-mono text-sm
+                              ${isSeparator ? "text-emerald-500/40 text-center my-1" : ""}
+                              ${isHeader ? "text-emerald-400 font-bold text-center my-2" : ""}
+                              ${!isSeparator && !isHeader ? "text-emerald-200/70 pl-2" : ""}
+                            `}
+                            style={{
+                              whiteSpace: "pre-line",
+                              lineHeight: isSeparator ? "1.2" : "1.6",
+                            }}
+                          >
+                            {logEntry}
+                          </motion.div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                  <div className="mt-6 text-center">
+                    <motion.button
+                      onClick={clearBattleState}
+                      whileHover={{ scale: 1.05 }}
+                      whileTap={{ scale: 0.95 }}
+                      className="px-6 py-2 text-sm font-bold tracking-wider uppercase border border-emerald-500/50 hover:border-emerald-500 transition-all cursor-pointer text-emerald-400"
+                      style={{
+                        background:
+                          "linear-gradient(to bottom, rgba(16, 185, 129, 0.1), rgba(0, 0, 0, 0.4))",
+                      }}
+                    >
+                      Clear Chronicle
+                    </motion.button>
+                  </div>
+                </div>
+              </motion.div>
             )}
           </>
         )}
@@ -1070,57 +1084,97 @@ export function AttackLineupPage() {
                   className="w-full max-w-lg h-auto mx-auto mb-4"
                 />
               )}
-              
+
               {/* Name */}
               <h3 className="text-xl font-bold text-emerald-400 mb-3">
                 {inspectedAdventurer.name}
               </h3>
-              
+
               {/* Compact Stats Grid */}
               <div className="grid grid-cols-5 gap-2 max-w-lg mx-auto text-xs">
                 <div className="bg-emerald-950/50 border border-emerald-500/20 rounded p-2">
-                  <div className="text-emerald-200/60 uppercase tracking-wider text-[10px]">LVL</div>
-                  <div className="text-emerald-300 font-bold">{inspectedAdventurer.level}</div>
+                  <div className="text-emerald-200/60 uppercase tracking-wider text-[10px]">
+                    LVL
+                  </div>
+                  <div className="text-emerald-300 font-bold">
+                    {inspectedAdventurer.level}
+                  </div>
                 </div>
                 <div className="bg-emerald-950/50 border border-emerald-500/20 rounded p-2">
-                  <div className="text-emerald-200/60 uppercase tracking-wider text-[10px]">HP</div>
-                  <div className="text-emerald-300 font-bold">{inspectedAdventurer.health}</div>
+                  <div className="text-emerald-200/60 uppercase tracking-wider text-[10px]">
+                    HP
+                  </div>
+                  <div className="text-emerald-300 font-bold">
+                    {inspectedAdventurer.health}
+                  </div>
                 </div>
                 <div className="bg-emerald-950/50 border border-emerald-500/20 rounded p-2">
-                  <div className="text-emerald-200/60 uppercase tracking-wider text-[10px]">STR</div>
-                  <div className="text-emerald-300 font-bold">{inspectedAdventurer.strength}</div>
+                  <div className="text-emerald-200/60 uppercase tracking-wider text-[10px]">
+                    STR
+                  </div>
+                  <div className="text-emerald-300 font-bold">
+                    {inspectedAdventurer.strength}
+                  </div>
                 </div>
                 <div className="bg-emerald-950/50 border border-emerald-500/20 rounded p-2">
-                  <div className="text-emerald-200/60 uppercase tracking-wider text-[10px]">DEX</div>
-                  <div className="text-emerald-300 font-bold">{inspectedAdventurer.dexterity}</div>
+                  <div className="text-emerald-200/60 uppercase tracking-wider text-[10px]">
+                    DEX
+                  </div>
+                  <div className="text-emerald-300 font-bold">
+                    {inspectedAdventurer.dexterity}
+                  </div>
                 </div>
                 <div className="bg-emerald-950/50 border border-emerald-500/20 rounded p-2">
-                  <div className="text-emerald-200/60 uppercase tracking-wider text-[10px]">VIT</div>
-                  <div className="text-emerald-300 font-bold">{inspectedAdventurer.vitality}</div>
+                  <div className="text-emerald-200/60 uppercase tracking-wider text-[10px]">
+                    VIT
+                  </div>
+                  <div className="text-emerald-300 font-bold">
+                    {inspectedAdventurer.vitality}
+                  </div>
                 </div>
                 <div className="bg-emerald-950/50 border border-emerald-500/20 rounded p-2">
-                  <div className="text-emerald-200/60 uppercase tracking-wider text-[10px]">INT</div>
-                  <div className="text-emerald-300 font-bold">{inspectedAdventurer.intelligence}</div>
+                  <div className="text-emerald-200/60 uppercase tracking-wider text-[10px]">
+                    INT
+                  </div>
+                  <div className="text-emerald-300 font-bold">
+                    {inspectedAdventurer.intelligence}
+                  </div>
                 </div>
                 <div className="bg-emerald-950/50 border border-emerald-500/20 rounded p-2">
-                  <div className="text-emerald-200/60 uppercase tracking-wider text-[10px]">WIS</div>
-                  <div className="text-emerald-300 font-bold">{inspectedAdventurer.wisdom}</div>
+                  <div className="text-emerald-200/60 uppercase tracking-wider text-[10px]">
+                    WIS
+                  </div>
+                  <div className="text-emerald-300 font-bold">
+                    {inspectedAdventurer.wisdom}
+                  </div>
                 </div>
                 <div className="bg-emerald-950/50 border border-emerald-500/20 rounded p-2">
-                  <div className="text-emerald-200/60 uppercase tracking-wider text-[10px]">CHA</div>
-                  <div className="text-emerald-300 font-bold">{inspectedAdventurer.charisma}</div>
+                  <div className="text-emerald-200/60 uppercase tracking-wider text-[10px]">
+                    CHA
+                  </div>
+                  <div className="text-emerald-300 font-bold">
+                    {inspectedAdventurer.charisma}
+                  </div>
                 </div>
                 <div className="bg-emerald-950/50 border border-emerald-500/20 rounded p-2">
-                  <div className="text-emerald-200/60 uppercase tracking-wider text-[10px]">LUCK</div>
-                  <div className="text-emerald-300 font-bold">{inspectedAdventurer.luck}</div>
+                  <div className="text-emerald-200/60 uppercase tracking-wider text-[10px]">
+                    LUCK
+                  </div>
+                  <div className="text-emerald-300 font-bold">
+                    {inspectedAdventurer.luck}
+                  </div>
                 </div>
                 <div className="bg-emerald-950/50 border border-emerald-500/20 rounded p-2">
-                  <div className="text-emerald-200/60 uppercase tracking-wider text-[10px]">XP</div>
-                  <div className="text-emerald-300 font-bold">{inspectedAdventurer.xp}</div>
+                  <div className="text-emerald-200/60 uppercase tracking-wider text-[10px]">
+                    XP
+                  </div>
+                  <div className="text-emerald-300 font-bold">
+                    {inspectedAdventurer.xp}
+                  </div>
                 </div>
               </div>
             </div>
-            
+
             <div className="mt-4 text-center">
               <button
                 onClick={() => setInspectedAdventurer(null)}
