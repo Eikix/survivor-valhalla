@@ -1,318 +1,398 @@
-import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
-import { useAccount } from '@starknet-react/core';
-import { useEventQuery, useModels } from '@dojoengine/sdk/react';
-import { ToriiQueryBuilder } from '@dojoengine/sdk';
-import { ModelsMapping } from '../bindings/typescript/models.gen';
+import { useState, useCallback, useEffect } from "react";
+import { useAccount } from "@starknet-react/core";
+import { useEventQuery, useModels } from "@dojoengine/sdk/react";
+import { ToriiQueryBuilder } from "@dojoengine/sdk";
+import { ModelsMapping } from "../bindings/typescript/models.gen";
 
 interface BattleEvent {
-  type: 'damage' | 'defeat' | 'round' | 'battle';
+  type: "damage" | "defeat" | "round" | "battle";
   battle_id: number;
   data: any;
-  order: number; // For proper event ordering
+  round: number;
+  sequence: number; // For ordering within a round
 }
 
 export function useBattleEvents() {
-  const [battleInProgress, setBattleInProgress] = useState<boolean>(false);
   const [battleLog, setBattleLog] = useState<string[]>([]);
   const [battleResult, setBattleResult] = useState<string | null>(null);
-  const [currentBattleId, setCurrentBattleId] = useState<number | null>(null);
-  const [battleSummary, setBattleSummary] = useState<{
-    battleId: number;
-    winner: string;
-    damageEvents: any[];
-    defeatEvents: any[];
-    roundEvents: any[];
-    battleEvents: any[];
-  } | null>(null);
-  
-  const timeoutRef = useRef< ReturnType<typeof setTimeout> | null>(null);
-  const startTimeRef = useRef<number | null>(null);
-  const processedEventsRef = useRef<Set<string>>(new Set());
+  const [lastBattleIdBeforeFight, setLastBattleIdBeforeFight] = useState<
+    number | null
+  >(null);
+  const [isWaitingForBattle, setIsWaitingForBattle] = useState(false);
 
   const { address } = useAccount();
 
-  // Query all battle-related entities using the proper Dojo pattern
+  // Query all battle-related events
   useEventQuery(
     new ToriiQueryBuilder()
       .includeHashedKeys()
       .withEntityModels([
         ModelsMapping.DamageDealt,
-        ModelsMapping.UnitDefeated, 
+        ModelsMapping.UnitDefeated,
         ModelsMapping.RoundCompleted,
-        ModelsMapping.BattleCompleted
+        ModelsMapping.BattleCompleted,
+        ModelsMapping.CombatUnit,
       ]),
   );
 
-  // Get all battle event models
   const damageEvents = useModels(ModelsMapping.DamageDealt);
-  const defeatEvents = useModels(ModelsMapping.UnitDefeated);
+  const unitDefeatedEvents = useModels(ModelsMapping.UnitDefeated);
   const roundEvents = useModels(ModelsMapping.RoundCompleted);
   const battleEvents = useModels(ModelsMapping.BattleCompleted);
+  const combatUnits = useModels(ModelsMapping.CombatUnit);
 
   const clearBattleState = useCallback(() => {
-    setBattleResult(null);
     setBattleLog([]);
-    setBattleInProgress(false);
-    setCurrentBattleId(null);
-    setBattleSummary(null);
-    startTimeRef.current = null;
-    processedEventsRef.current.clear();
-    
-    // Clear timeout
-    if (timeoutRef.current) {
-      clearTimeout(timeoutRef.current);
-      timeoutRef.current = null;
-    }
+    setBattleResult(null);
+    setLastBattleIdBeforeFight(null);
+    setIsWaitingForBattle(false);
   }, []);
 
-  // Convert raw model data to standardized BattleEvent format for current battle only
-  const currentBattleEvents = useMemo((): BattleEvent[] => {
-    if (!battleInProgress || !currentBattleId) return [];
-
-    const allEvents: BattleEvent[] = [];
-
-    // Process damage events for current battle
-    if (Array.isArray(damageEvents)) {
-      damageEvents.forEach((eventObj: any) => {
-        const entityId = Object.keys(eventObj)[0];
-        const event = eventObj[entityId];
-        if (event && Number(event.battle_id) === currentBattleId) {
-          allEvents.push({
-            type: 'damage',
-            battle_id: Number(event.battle_id),
-            data: event,
-            order: 1 // Damage events happen first in each exchange
-          });
-        }
-      });
+  // Function to capture current battle_id before fight
+  const prepareForBattle = useCallback(() => {
+    if (!address || !Array.isArray(battleEvents)) {
+      setLastBattleIdBeforeFight(0);
+      setIsWaitingForBattle(true);
+      return;
     }
 
-    // Process defeat events for current battle  
-    if (Array.isArray(defeatEvents)) {
-      defeatEvents.forEach((eventObj: any) => {
-        const entityId = Object.keys(eventObj)[0];
-        const event = eventObj[entityId];
-        if (event && Number(event.battle_id) === currentBattleId) {
-          allEvents.push({
-            type: 'defeat',
-            battle_id: Number(event.battle_id),
-            data: event,
-            order: 2 // Defeats happen after damage
-          });
+    const paddedAddress = address.toLowerCase();
+    let maxBattleId = 0;
+
+    battleEvents.forEach((eventObj: any) => {
+      const entityId = Object.keys(eventObj)[0];
+      const event = eventObj[entityId];
+
+      if (event && event.attacker?.toLowerCase() === paddedAddress) {
+        const battleId = Number(event.battle_id);
+        if (battleId > maxBattleId) {
+          maxBattleId = battleId;
         }
-      });
-    }
+      }
+    });
 
-    // Process round events for current battle
-    if (Array.isArray(roundEvents)) {
-      roundEvents.forEach((eventObj: any) => {
-        const entityId = Object.keys(eventObj)[0];
-        const event = eventObj[entityId];
-        if (event && Number(event.battle_id) === currentBattleId) {
-          allEvents.push({
-            type: 'round',
-            battle_id: Number(event.battle_id),
-            data: event,
-            order: 3 // Round completion happens after all combat
-          });
+    setLastBattleIdBeforeFight(maxBattleId);
+    setIsWaitingForBattle(true);
+    console.log(
+      `[useBattleEvents] Prepared for battle. Last battle_id: ${maxBattleId}`,
+    );
+  }, [address, battleEvents]);
+
+  // Listen for new BattleCompleted events where we're the attacker
+  useEffect(() => {
+    // Only show logs if we've prepared for battle (clicked the button)
+    if (
+      !address ||
+      !Array.isArray(battleEvents) ||
+      lastBattleIdBeforeFight === null
+    )
+      return;
+
+    const paddedAddress = address.toLowerCase();
+
+    // Find the most recent battle where we're the attacker with battle_id > lastBattleIdBeforeFight
+    let mostRecentBattle: number | null = null;
+
+    battleEvents.forEach((eventObj: any) => {
+      const entityId = Object.keys(eventObj)[0];
+      const event = eventObj[entityId];
+
+      if (event && event.attacker?.toLowerCase() === paddedAddress) {
+        const battleId = Number(event.battle_id);
+
+        // Only consider battles with ID strictly greater than lastBattleIdBeforeFight
+        if (
+          battleId > lastBattleIdBeforeFight &&
+          (mostRecentBattle === null || battleId > mostRecentBattle)
+        ) {
+          mostRecentBattle = battleId;
         }
-      });
-    }
+      }
+    });
 
-    // Process battle completion events for current battle
-    if (Array.isArray(battleEvents)) {
-      battleEvents.forEach((eventObj: any) => {
-        const entityId = Object.keys(eventObj)[0];
-        const event = eventObj[entityId];
-        if (event && Number(event.battle_id) === currentBattleId) {
-          allEvents.push({
-            type: 'battle',
-            battle_id: Number(event.battle_id),
-            data: event,
-            order: 4 // Battle completion is final
-          });
-        }
-      });
-    }
+    // If we found a new battle, build the log
+    if (mostRecentBattle !== null) {
+      console.log(
+        `[useBattleEvents] New battle detected: #${mostRecentBattle} (after ${lastBattleIdBeforeFight})`,
+      );
 
-    // Sort events by type order for proper battle flow
-    allEvents.sort((a, b) => a.order - b.order);
+      // Build battle log inline
+      const battleId = mostRecentBattle;
+      const allEvents: BattleEvent[] = [];
 
-    return allEvents;
-  }, [damageEvents, defeatEvents, roundEvents, battleEvents, battleInProgress, currentBattleId]);
-
-  const processEvents = useCallback((events: BattleEvent[]) => {
-    if (!battleInProgress) return;
-
-    const newLogEntries: string[] = [];
-
-    events.forEach((event) => {
-      // Create a unique key for this event to avoid duplicates
-      const eventKey = `${event.type}-${event.battle_id}-${JSON.stringify(event.data)}`;
-      if (processedEventsRef.current.has(eventKey)) return;
-      
-      processedEventsRef.current.add(eventKey);
-
-      switch (event.type) {
-        case 'damage':
-          const multiplierText = Number(event.data.type_multiplier) === 150 ? " (Super effective!)" : 
-                               Number(event.data.type_multiplier) === 75 ? " (Not very effective)" : "";
-          newLogEntries.push(
-            `Unit ${event.data.attacker_id} attacks Unit ${event.data.target_id} for ${event.data.damage} damage${multiplierText}`
-          );
-          break;
-          
-        case 'defeat':
-          const unitType = event.data.is_adventurer ? "Adventurer" : "Beast";
-          newLogEntries.push(
-            `💀 ${unitType} ${event.data.unit_id} at position ${event.data.position} has been defeated!`
-          );
-          break;
-          
-        case 'round':
-          newLogEntries.push(
-            `🏁 Round ${event.data.round} completed! Survivors: ${event.data.attacker_survivors} vs ${event.data.defender_survivors}`
-          );
-          break;
-          
-        case 'battle':
-          const isVictory = event.data.winner?.toLowerCase() === address?.toLowerCase();
-          setBattleResult(isVictory ? "Victory!" : "Defeat!");
-          setBattleInProgress(false);
-          newLogEntries.push(
-            `⚔️ Battle ${event.battle_id} completed! Winner: ${event.data.winner.slice(0, 6)}...${event.data.winner.slice(-4)}`
-          );
-          
-          // Log all events for this battle when it completes
-          console.log('=== BATTLE COMPLETED ===');
-          console.log(`Battle ID: ${event.battle_id}`);
-          console.log(`Winner: ${event.data.winner}`);
-          console.log('All events for this battle:');
-          
-          // Filter and log all events for this specific battle
-          const battleDamageEvents = Array.isArray(damageEvents) ? 
-            damageEvents.filter((eventObj: any) => {
-              const entityId = Object.keys(eventObj)[0];
-              const eventData = eventObj[entityId];
-              return eventData && Number(eventData.battle_id) === event.battle_id;
-            }) : [];
-            
-          const battleDefeatEvents = Array.isArray(defeatEvents) ? 
-            defeatEvents.filter((eventObj: any) => {
-              const entityId = Object.keys(eventObj)[0];
-              const eventData = eventObj[entityId];
-              return eventData && Number(eventData.battle_id) === event.battle_id;
-            }) : [];
-            
-          const battleRoundEvents = Array.isArray(roundEvents) ? 
-            roundEvents.filter((eventObj: any) => {
-              const entityId = Object.keys(eventObj)[0];
-              const eventData = eventObj[entityId];
-              return eventData && Number(eventData.battle_id) === event.battle_id;
-            }) : [];
-            
-          const battleCompletionEvents = Array.isArray(battleEvents) ? 
-            battleEvents.filter((eventObj: any) => {
-              const entityId = Object.keys(eventObj)[0];
-              const eventData = eventObj[entityId];
-              return eventData && Number(eventData.battle_id) === event.battle_id;
-            }) : [];
-          
-          console.log('Damage Events:', battleDamageEvents);
-          console.log('Defeat Events:', battleDefeatEvents);
-          console.log('Round Events:', battleRoundEvents);
-          console.log('Battle Completion Events:', battleCompletionEvents);
-          console.log('========================');
-          
-          // Store battle summary for UI display
-          setBattleSummary({
-            battleId: event.battle_id,
-            winner: event.data.winner,
-            damageEvents: battleDamageEvents,
-            defeatEvents: battleDefeatEvents,
-            roundEvents: battleRoundEvents,
-            battleEvents: battleCompletionEvents
-          });
-          
-          // Clear timeout when battle completes
-          if (timeoutRef.current) {
-            clearTimeout(timeoutRef.current);
-            timeoutRef.current = null;
+      // Collect damage events
+      if (Array.isArray(damageEvents)) {
+        damageEvents.forEach((eventObj: any) => {
+          const entityId = Object.keys(eventObj)[0];
+          const event = eventObj[entityId];
+          if (event && Number(event.battle_id) === battleId) {
+            allEvents.push({
+              type: "damage",
+              battle_id: battleId,
+              data: event,
+              round: Number(event.round),
+              sequence: 0, // Will be set later
+            });
           }
-          break;
+        });
       }
-    });
 
-    if (newLogEntries.length > 0) {
-      setBattleLog(prev => [...prev, ...newLogEntries]);
-    }
-  }, [battleInProgress, address]);
+      // Collect defeat events
+      if (Array.isArray(unitDefeatedEvents)) {
+        unitDefeatedEvents.forEach((eventObj: any) => {
+          const entityId = Object.keys(eventObj)[0];
+          const event = eventObj[entityId];
+          if (event && Number(event.battle_id) === battleId) {
+            allEvents.push({
+              type: "defeat",
+              battle_id: battleId,
+              data: event,
+              round: Number(event.round),
+              sequence: 0, // Will be set later
+            });
+          }
+        });
+      }
 
-  // Process new events when model data changes
-  useEffect(() => {
-    console.log('Battle events effect called:', {
-      damageEvents,
-      defeatEvents, 
-      roundEvents,
-      battleEvents,
-      currentBattleEvents,
-      battleInProgress,
-      currentBattleId
-    });
-    
-    if (currentBattleEvents.length > 0) {
-      processEvents(currentBattleEvents);
-    }
-  }, [currentBattleEvents, processEvents, damageEvents, defeatEvents, roundEvents, battleEvents, battleInProgress, currentBattleId]);
+      // Collect round events
+      if (Array.isArray(roundEvents)) {
+        roundEvents.forEach((eventObj: any) => {
+          const entityId = Object.keys(eventObj)[0];
+          const event = eventObj[entityId];
+          if (event && Number(event.battle_id) === battleId) {
+            allEvents.push({
+              type: "round",
+              battle_id: battleId,
+              data: event,
+              round: Number(event.round),
+              sequence: 999, // Round summaries come last
+            });
+          }
+        });
+      }
 
-  // Auto-detect battle ID from any new events
-  useEffect(() => {
-    if (!battleInProgress || currentBattleId) return;
+      // Collect battle completion event
+      if (Array.isArray(battleEvents)) {
+        battleEvents.forEach((eventObj: any) => {
+          const entityId = Object.keys(eventObj)[0];
+          const event = eventObj[entityId];
+          if (event && Number(event.battle_id) === battleId) {
+            allEvents.push({
+              type: "battle",
+              battle_id: battleId,
+              data: event,
+              round: 9999,
+              sequence: 9999,
+            });
+          }
+        });
+      }
 
-    // Check all event types for a battle ID to auto-detect current battle
-    const allEventArrays = [damageEvents, defeatEvents, roundEvents, battleEvents];
-    
-    for (const eventArray of allEventArrays) {
-      if (Array.isArray(eventArray) && eventArray.length > 0) {
-        const recentEvent = eventArray[eventArray.length - 1]; // Get most recent event
-        const entityId = Object.keys(recentEvent)[0];
-        const event = recentEvent[entityId];
-        
-        if (event && event.battle_id) {
-          const battleId = Number(event.battle_id);
-          setCurrentBattleId(battleId);
-          return;
+      // Group damage and defeat events - show defeat right after the damage that caused it
+      const damageEventsMap = new Map<string, BattleEvent>();
+      const defeatEventsMap = new Map<string, BattleEvent>();
+
+      allEvents.forEach((event) => {
+        if (event.type === "damage") {
+          const key = `${event.round}-${event.data.target_id}`;
+          damageEventsMap.set(key, event);
+        } else if (event.type === "defeat") {
+          const key = `${event.round}-${event.data.unit_id}`;
+          defeatEventsMap.set(key, event);
         }
-      }
-    }
-  }, [damageEvents, defeatEvents, roundEvents, battleEvents, battleInProgress, currentBattleId]);
+      });
 
-  const startBattle = useCallback(() => {
-    setBattleResult(null);
-    setBattleInProgress(true);
-    setBattleLog([]);
-    setCurrentBattleId(null); // Will be auto-detected from first event
-    
-    startTimeRef.current = Date.now();
-    processedEventsRef.current.clear();
-    
-    // Set up timeout to stop battle after 30 seconds if no completion
-    timeoutRef.current = setTimeout(() => {
-      setBattleInProgress(false);
-      startTimeRef.current = null;
-    }, 30000);
-    
-  }, []);
+      // Assign sequence numbers to interleave damage and defeat
+      let sequenceCounter = 0;
+      damageEventsMap.forEach((damageEvent, key) => {
+        damageEvent.sequence = sequenceCounter++;
+        const defeatEvent = defeatEventsMap.get(key);
+        if (defeatEvent) {
+          defeatEvent.sequence = sequenceCounter++;
+        }
+      });
+
+      // Handle defeats that don't have corresponding damage in our map
+      defeatEventsMap.forEach((defeatEvent) => {
+        if (defeatEvent.sequence === 0) {
+          defeatEvent.sequence = sequenceCounter++;
+        }
+      });
+
+      // Sort events by round, then sequence
+      allEvents.sort((a, b) => {
+        if (a.round !== b.round) return a.round - b.round;
+        return a.sequence - b.sequence;
+      });
+
+      console.log(
+        `[useBattleEvents] Found ${allEvents.length} events for battle #${battleId}`,
+      );
+
+      // Build battle log
+      const logEntries: string[] = [];
+
+      let result: string | null = null;
+
+      // Build a map of unit_id to type for better descriptions
+      const unitTypes = new Map<number, boolean>(); // true = adventurer, false = beast
+
+      // First, try to get all unit info from CombatUnit data for this battle
+      if (Array.isArray(combatUnits)) {
+        combatUnits.forEach((unitObj: any) => {
+          const entityId = Object.keys(unitObj)[0];
+          const unit = unitObj[entityId];
+          if (unit && Number(unit.battle_id) === battleId) {
+            unitTypes.set(Number(unit.unit_id), unit.is_adventurer);
+            console.log(
+              `[useBattleEvents] CombatUnit: ${unit.unit_id} is ${unit.is_adventurer ? "Adventurer" : "Beast"}`,
+            );
+          }
+        });
+      }
+
+      // Also populate from defeat events as additional source
+      allEvents.forEach((event) => {
+        if (event.type === "defeat") {
+          unitTypes.set(Number(event.data.unit_id), event.data.is_adventurer);
+        }
+      });
+
+      // Fallback: look at defeat events to understand the pattern and infer other units
+      const adventurerIds = new Set<number>();
+      const beastIds = new Set<number>();
+
+      allEvents.forEach((event) => {
+        if (event.type === "defeat") {
+          if (event.data.is_adventurer) {
+            adventurerIds.add(Number(event.data.unit_id));
+          } else {
+            beastIds.add(Number(event.data.unit_id));
+          }
+        }
+      });
+
+      // Now infer types for all units mentioned in damage events
+      allEvents.forEach((event) => {
+        if (event.type === "damage") {
+          const targetId = Number(event.data.target_id);
+          const attackerId = Number(event.data.attacker_id);
+
+          // If target is a known beast, attacker is likely an adventurer
+          if (beastIds.has(targetId) && !unitTypes.has(attackerId)) {
+            unitTypes.set(attackerId, true); // adventurer
+          }
+          // If target is a known adventurer, attacker is likely a beast
+          if (adventurerIds.has(targetId) && !unitTypes.has(attackerId)) {
+            unitTypes.set(attackerId, false); // beast
+          }
+          // If attacker is a known beast, target is likely an adventurer
+          if (beastIds.has(attackerId) && !unitTypes.has(targetId)) {
+            unitTypes.set(targetId, true); // adventurer
+          }
+          // If attacker is a known adventurer, target is likely a beast
+          if (adventurerIds.has(attackerId) && !unitTypes.has(targetId)) {
+            unitTypes.set(targetId, false); // beast
+          }
+        }
+      });
+
+      console.log(
+        `[useBattleEvents] Unit types map size: ${unitTypes.size}`,
+        Array.from(unitTypes.entries()),
+      );
+
+      allEvents.forEach((event) => {
+        switch (event.type) {
+          case "damage":
+            const multiplier = Number(event.data.type_multiplier);
+            const damage = Number(event.data.damage);
+            const attackerId = Number(event.data.attacker_id);
+            const targetId = Number(event.data.target_id);
+
+            // Determine if attacker/target is adventurer or beast
+            const attackerType = unitTypes.get(attackerId);
+            const targetType = unitTypes.get(targetId);
+
+            let effectText = "";
+            if (multiplier === 150) {
+              effectText = " It's super effective!";
+            } else if (multiplier === 75) {
+              effectText = " It's not very effective...";
+            }
+
+            // Create more descriptive message
+            let attackerDesc = `Unit #${attackerId}`;
+            let targetDesc = `Unit #${targetId}`;
+
+            if (attackerType !== undefined) {
+              attackerDesc = attackerType
+                ? `Adventurer #${attackerId}`
+                : `Beast #${attackerId}`;
+            }
+
+            if (targetType !== undefined) {
+              targetDesc = targetType
+                ? `Adventurer #${targetId}`
+                : `Beast #${targetId}`;
+            }
+
+            logEntries.push(
+              `> ${attackerDesc} dealt ${damage} HP damage to ${targetDesc}.${effectText}`,
+            );
+            break;
+
+          case "defeat":
+            const unitType = event.data.is_adventurer ? "Adventurer" : "Beast";
+            const position = Number(event.data.position) + 1;
+            logEntries.push(
+              `  💀 ${unitType} #${event.data.unit_id} (Position ${position}) fainted!`,
+            );
+            break;
+
+          case "round":
+            logEntries.push(
+              `\n--- Round ${event.data.round} End ---\nAdventurers: ${event.data.attacker_survivors} remaining | Beasts: ${event.data.defender_survivors} remaining\n`,
+            );
+            break;
+
+          case "battle":
+            const isVictory =
+              event.data.winner?.toLowerCase() === address?.toLowerCase();
+            result = isVictory ? "Victory!" : "Defeat!";
+            const resultText = isVictory
+              ? "You won the battle!"
+              : "You were defeated!";
+            logEntries.push(
+              `\n═══════════════════════════════\n${resultText}\nBattle #${battleId} complete!\n═══════════════════════════════`,
+            );
+            break;
+        }
+      });
+
+      setBattleLog(logEntries);
+      setBattleResult(result);
+      setIsWaitingForBattle(false);
+
+      console.log(
+        `[useBattleEvents] Battle log created with ${logEntries.length} entries. Result: ${result}`,
+      );
+    }
+  }, [
+    battleEvents,
+    damageEvents,
+    unitDefeatedEvents,
+    roundEvents,
+    combatUnits,
+    address,
+    lastBattleIdBeforeFight,
+  ]);
 
   return {
-    // State
-    battleInProgress,
     battleLog,
     battleResult,
-    currentBattleId,
-    battleSummary,
-    // Actions
-    startBattle,
     clearBattleState,
+    prepareForBattle,
+    isWaitingForBattle,
   };
 }

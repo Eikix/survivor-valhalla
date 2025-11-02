@@ -1,6 +1,6 @@
 // src/pages/LineupPage.tsx
 import { motion } from "framer-motion";
-import { Shield, Trophy, Skull } from "lucide-react";
+import { Shield } from "lucide-react";
 import { useState, useEffect, useMemo, useRef } from "react";
 import { useConnect, useAccount } from "@starknet-react/core";
 import { useDojoSDK, useEntityQuery, useModels } from "@dojoengine/sdk/react";
@@ -41,9 +41,9 @@ export function LineupPage() {
 
   const createLineup = async () => {
     if (!client || !account) return;
-    
+
     const tx = showTransaction(undefined, "Creating beast lineup...");
-    
+
     try {
       await client.beast_actions.register(
         account,
@@ -65,8 +65,11 @@ export function LineupPage() {
     const newBeast = baseBeasts[swappedPosition];
     if (!newBeast) return;
 
-    const tx = showTransaction(undefined, `Swapping beast at position ${swappedPosition + 1}...`);
-    
+    const tx = showTransaction(
+      undefined,
+      `Swapping beast at position ${swappedPosition + 1}...`,
+    );
+
     try {
       await client.beast_actions.swap(
         account,
@@ -175,7 +178,10 @@ export function LineupPage() {
         }
       });
     });
-    console.log("[LineupPage] Extracted token IDs for world lineups:", tokenIds);
+    console.log(
+      "[LineupPage] Extracted token IDs for world lineups:",
+      tokenIds,
+    );
     return tokenIds;
   }, [worldLineups]);
 
@@ -317,12 +323,6 @@ export function LineupPage() {
       </div>
     );
   }
-
-  // Mock stats (only shown when wallet is connected)
-  const stats = {
-    wins: 0,
-    losses: 0,
-  };
 
   useEffect(() => {
     if (!inspectedBeast) return;
@@ -696,53 +696,6 @@ export function LineupPage() {
               lineups={worldLineups}
               beastImages={lineupImages}
             />
-
-            {/* Stats Section */}
-            {hasBase && (
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.3 }}
-              >
-                <h2 className="text-center text-xl font-bold text-emerald-400 mb-6 tracking-wider uppercase">
-                  Combat Records
-                </h2>
-                <div className="grid grid-cols-3 gap-4">
-                  {/* Wins */}
-                  <div className="border border-emerald-500/20 bg-emerald-950/10 p-6 text-center">
-                    <Trophy className="w-8 h-8 text-emerald-500/50 mx-auto mb-3" />
-                    <div className="text-3xl font-bold text-emerald-400 mb-1">
-                      {stats.wins}
-                    </div>
-                    <div className="text-xs text-emerald-200/40 tracking-wider uppercase">
-                      Wins
-                    </div>
-                  </div>
-
-                  {/* Losses */}
-                  <div className="border border-emerald-500/20 bg-emerald-950/10 p-6 text-center">
-                    <Skull className="w-8 h-8 text-emerald-500/50 mx-auto mb-3" />
-                    <div className="text-3xl font-bold text-emerald-400 mb-1">
-                      {stats.losses}
-                    </div>
-                    <div className="text-xs text-emerald-200/40 tracking-wider uppercase">
-                      Losses
-                    </div>
-                  </div>
-
-                  {/* Lineup Status */}
-                  <div className="border border-emerald-500/20 bg-emerald-950/10 p-6 text-center">
-                    <Shield className="w-8 h-8 text-emerald-500/50 mx-auto mb-3" />
-                    <div className="text-lg font-bold text-emerald-400 mb-1">
-                      {hasBase ? "Lineup Created" : "No Lineup"}
-                    </div>
-                    <div className="text-xs text-emerald-200/40 tracking-wider uppercase">
-                      Lineup
-                    </div>
-                  </div>
-                </div>
-              </motion.div>
-            )}
           </>
         )}
       </div>

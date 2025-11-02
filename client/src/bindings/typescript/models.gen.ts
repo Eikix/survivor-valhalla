@@ -1,5 +1,4 @@
 // @ts-nocheck
-
 import type { SchemaType as ISchemaType } from "@dojoengine/sdk";
 
 import { BigNumberish } from 'starknet';
@@ -114,6 +113,7 @@ export interface BattleCompleted {
 // Type definition for `survivor_valhalla::systems::battle_actions::battle_actions::DamageDealt` struct
 export interface DamageDealt {
 	battle_id: BigNumberish;
+	round: BigNumberish;
 	attacker_id: BigNumberish;
 	target_id: BigNumberish;
 	damage: BigNumberish;
@@ -273,6 +273,7 @@ export const schema: SchemaType = {
 		},
 		DamageDealt: {
 			battle_id: 0,
+			round: 0,
 			attacker_id: 0,
 			target_id: 0,
 			damage: 0,
