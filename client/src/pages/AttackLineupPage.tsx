@@ -843,7 +843,6 @@ export function AttackLineupPage() {
                         <div className="mb-6 flex flex-wrap justify-center gap-4">
                           {[
                             { key: "level" as keyof Adventurer, label: "Level" },
-                            { key: "health" as keyof Adventurer, label: "Health" },
                             { key: "strength" as keyof Adventurer, label: "Strength" },
                             { key: "dexterity" as keyof Adventurer, label: "Dexterity" },
                             { key: "vitality" as keyof Adventurer, label: "Vitality" },
@@ -909,7 +908,6 @@ export function AttackLineupPage() {
                                 />
                               )}
                               <div className="text-red-300 text-xs">Lvl {adventurer.level}</div>
-                              <div className="text-red-200/50 text-xs">HP {adventurer.health}</div>
                             </motion.div>
                           ))}
                         </div>
