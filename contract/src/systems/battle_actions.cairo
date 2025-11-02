@@ -413,6 +413,37 @@ pub mod battle_actions {
         (adventurer_units, beast_units, initiative_order)
     }
 
+    // Find unit in array by position and check if alive
+    fn find_target_unit(units: @Array<CombatUnit>, position: u8, alive_array: @Array<bool>) -> Option<usize> {
+        let mut i = 0;
+        loop {
+            if i >= units.len() {
+                break Option::None;
+            }
+            let unit = units.at(i);
+            if *unit.position == position && *alive_array.at(i) {
+                break Option::Some(i);
+            }
+            i += 1;
+        }
+    }
+
+    // Count living units
+    fn count_survivors(alive_array: @Array<bool>) -> u8 {
+        let mut count = 0;
+        let mut i = 0;
+        loop {
+            if i >= alive_array.len() {
+                break;
+            }
+            if *alive_array.at(i) {
+                count += 1;
+            }
+            i += 1;
+        };
+        count
+    }
+
     // Execute the main combat loop
     fn execute_combat(
         ref world: dojo::world::WorldStorage,
@@ -423,77 +454,202 @@ pub mod battle_actions {
         attacker: ContractAddress,
         defender: ContractAddress
     ) -> ContractAddress {
-        let mut adventurers_alive = array![true, true, true, true, true];
-        let mut beasts_alive = array![true, true, true, true, true];
-
-        // Simple combat: each unit attacks once in order
+        // Track current HP for each unit (initialize from units)
+        let mut adventurer_hp = array![];
+        let mut beast_hp = array![];
+        let mut adventurers_alive = array![];
+        let mut beasts_alive = array![];
+        
+        // Initialize HP tracking from combat units
         let mut i = 0;
+        loop {
+            if i >= adventurer_units.len() {
+                break;
+            }
+            let unit = adventurer_units.at(i);
+            adventurer_hp.append(*unit.current_hp);
+            adventurers_alive.append(true);
+            i += 1;
+        };
+        
+        i = 0;
+        loop {
+            if i >= beast_units.len() {
+                break;
+            }
+            let unit = beast_units.at(i);
+            beast_hp.append(*unit.current_hp);
+            beasts_alive.append(true);
+            i += 1;
+        };
+        
+        let round = 1_u8;
+        
+        // Execute combat turns - each living unit attacks once
+        i = 0;
         loop {
             if i >= adventurer_units.len() + beast_units.len() {
                 break;
             }
             
-            // For simplified version, just alternate: adventurer, beast, adventurer, beast...
-            let is_adventurer_turn = i % 2 == 0;
+            // Determine if it's adventurer or beast turn (alternate)
+            let is_adventurer_turn = i < adventurer_units.len();
             
             if is_adventurer_turn {
                 // Adventurer attacks beast
-                let adv_index = i / 2;
-                if adv_index < adventurer_units.len() {
-                    let adventurer = adventurer_units.at(adv_index);
-                    if *adventurer.is_alive {
-                        // Find target
-                        let target_pos = get_target_position(*adventurer.position, @beasts_alive);
-                        match target_pos {
-                            Option::Some(_pos) => {
-                                // Find beast at position and deal damage
-                                // This is simplified - in full version we'd look up actual beast
-                                // For now, just mark as successful attack
-                                world.emit_event(@DamageDealt {
-                                    battle_id,
-                                    attacker_id: *adventurer.unit_id,
-                                    target_id: 1, // Simplified
-                                    damage: *adventurer.damage,
-                                    type_multiplier: 100,
-                                });
-                            },
-                            Option::None => {} // No targets left
-                        }
+                let unit = adventurer_units.at(i);
+                if *adventurers_alive.at(i) {
+                    // Find target using position-based targeting
+                    let target_pos = get_target_position(*unit.position, @beasts_alive);
+                    match target_pos {
+                        Option::Some(pos) => {
+                            // Find the beast at target position
+                            let target_idx_opt = find_target_unit(@beast_units, pos, @beasts_alive);
+                            match target_idx_opt {
+                                Option::Some(target_idx) => {
+                                    let target = beast_units.at(target_idx);
+                                    
+                                    // Calculate damage with type effectiveness
+                                    let multiplier = get_damage_multiplier(*unit.weapon_type, *target.beast_type);
+                                    let final_damage = calculate_final_damage(*unit.damage, *unit.weapon_type, *target.beast_type, true);
+                                    
+                                    // Apply damage to target
+                                    let current_hp = *beast_hp.at(target_idx);
+                                    let new_hp = if final_damage >= current_hp { 0 } else { current_hp - final_damage };
+                                    
+                                    // Emit damage event
+                                    world.emit_event(@DamageDealt {
+                                        battle_id,
+                                        attacker_id: *unit.unit_id,
+                                        target_id: *target.unit_id,
+                                        damage: final_damage,
+                                        type_multiplier: multiplier,
+                                    });
+                                    
+                                    // Check if target is defeated
+                                    if new_hp == 0 {
+                                        // Mark as dead (rebuild alive array - this is simplified)
+                                        let mut new_beasts_alive = array![];
+                                        let mut j = 0;
+                                        loop {
+                                            if j >= beasts_alive.len() {
+                                                break;
+                                            }
+                                            if j == target_idx {
+                                                new_beasts_alive.append(false);
+                                            } else {
+                                                new_beasts_alive.append(*beasts_alive.at(j));
+                                            }
+                                            j += 1;
+                                        };
+                                        beasts_alive = new_beasts_alive;
+                                        
+                                        world.emit_event(@UnitDefeated {
+                                            battle_id,
+                                            round,
+                                            unit_id: *target.unit_id,
+                                            is_adventurer: false,
+                                            position: *target.position,
+                                        });
+                                    }
+                                },
+                                Option::None => {} // Target not found
+                            }
+                        },
+                        Option::None => {} // No valid targets
                     }
                 }
             } else {
                 // Beast attacks adventurer
-                let beast_index = (i - 1) / 2;
-                if beast_index < beast_units.len() {
-                    let beast = beast_units.at(beast_index);
-                    if *beast.is_alive {
-                        // Find target and deal damage
-                        let target_pos = get_target_position(*beast.position, @adventurers_alive);
-                        match target_pos {
-                            Option::Some(_pos) => {
-                                world.emit_event(@DamageDealt {
-                                    battle_id,
-                                    attacker_id: *beast.unit_id,
-                                    target_id: 1, // Simplified
-                                    damage: *beast.damage,
-                                    type_multiplier: 100,
-                                });
-                            },
-                            Option::None => {} // No targets left
-                        }
+                let beast_idx = i - adventurer_units.len();
+                let unit = beast_units.at(beast_idx);
+                if *beasts_alive.at(beast_idx) {
+                    // Find target using position-based targeting
+                    let target_pos = get_target_position(*unit.position, @adventurers_alive);
+                    match target_pos {
+                        Option::Some(pos) => {
+                            // Find the adventurer at target position
+                            let target_idx_opt = find_target_unit(@adventurer_units, pos, @adventurers_alive);
+                            match target_idx_opt {
+                                Option::Some(target_idx) => {
+                                    let target = adventurer_units.at(target_idx);
+                                    
+                                    // Beast damage has no type effectiveness
+                                    let final_damage = *unit.damage;
+                                    
+                                    // Apply damage to target
+                                    let current_hp = *adventurer_hp.at(target_idx);
+                                    let new_hp = if final_damage >= current_hp { 0 } else { current_hp - final_damage };
+                                    
+                                    // Emit damage event
+                                    world.emit_event(@DamageDealt {
+                                        battle_id,
+                                        attacker_id: *unit.unit_id,
+                                        target_id: *target.unit_id,
+                                        damage: final_damage,
+                                        type_multiplier: 100, // No type effectiveness for beasts
+                                    });
+                                    
+                                    // Check if target is defeated
+                                    if new_hp == 0 {
+                                        // Mark as dead (rebuild alive array - this is simplified)
+                                        let mut new_adventurers_alive = array![];
+                                        let mut j = 0;
+                                        loop {
+                                            if j >= adventurers_alive.len() {
+                                                break;
+                                            }
+                                            if j == target_idx {
+                                                new_adventurers_alive.append(false);
+                                            } else {
+                                                new_adventurers_alive.append(*adventurers_alive.at(j));
+                                            }
+                                            j += 1;
+                                        };
+                                        adventurers_alive = new_adventurers_alive;
+                                        
+                                        world.emit_event(@UnitDefeated {
+                                            battle_id,
+                                            round,
+                                            unit_id: *target.unit_id,
+                                            is_adventurer: true,
+                                            position: *target.position,
+                                        });
+                                    }
+                                },
+                                Option::None => {} // Target not found
+                            }
+                        },
+                        Option::None => {} // No valid targets
                     }
                 }
             }
             
             i += 1;
         };
-
-        // For now, randomly determine winner based on battle_id
-        let winner_seed = battle_id % 2;
-        if winner_seed == 0 {
-            attacker
+        
+        // Count survivors and determine winner
+        let adventurer_survivors = count_survivors(@adventurers_alive);
+        let beast_survivors = count_survivors(@beasts_alive);
+        
+        // Emit round completed event
+        let winner = if adventurer_survivors > 0 && beast_survivors == 0 {
+            attacker // Adventurers win
+        } else if beast_survivors > 0 && adventurer_survivors == 0 {
+            defender // Beasts win
         } else {
-            defender
-        }
+            // If both have survivors or both are dead, default to attacker for now
+            attacker
+        };
+        
+        world.emit_event(@RoundCompleted {
+            battle_id,
+            round,
+            winner,
+            attacker_survivors: adventurer_survivors,
+            defender_survivors: beast_survivors,
+        });
+        
+        winner
     }
 }
