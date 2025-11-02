@@ -1,5 +1,14 @@
 import { motion } from "framer-motion";
-import { LogOut, ExternalLink, Copy, Check, Shield, Swords, ScrollText } from "lucide-react";
+import {
+  LogOut,
+  ExternalLink,
+  Copy,
+  Check,
+  Shield,
+  Swords,
+  ScrollText,
+  Trophy,
+} from "lucide-react";
 import { useState } from "react";
 import { useConnect, useAccount, useDisconnect } from "@starknet-react/core";
 import { useLocation, Link } from "react-router-dom";
@@ -73,6 +82,22 @@ export function Navbar() {
                   >
                     <ScrollText className="w-4 h-4 sm:w-4 sm:h-4" />
                     <span className="hidden sm:inline">Match History</span>
+                  </motion.button>
+                </Link>
+
+                <Link to="/leaderboard">
+                  <motion.button
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                    className={`flex items-center gap-1 sm:gap-2 px-1.5 sm:px-3 md:px-4 py-1.5 sm:py-2 text-xs sm:text-sm font-bold tracking-wider uppercase transition-all cursor-pointer ${
+                      location.pathname === "/leaderboard"
+                        ? "text-emerald-400 border-b-2 border-emerald-400"
+                        : "text-emerald-200/60 hover:text-emerald-300 border-b-2 border-transparent"
+                    }`}
+                    title="Leaderboard"
+                  >
+                    <Trophy className="w-4 h-4 sm:w-4 sm:h-4" />
+                    <span className="hidden sm:inline">Leaderboard</span>
                   </motion.button>
                 </Link>
               </div>
