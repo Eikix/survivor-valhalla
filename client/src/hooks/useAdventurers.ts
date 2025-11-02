@@ -141,6 +141,20 @@ const getAdventurerCollection = async (
 
     let adventurers: Adventurer[] = data
       .filter((row: any) => row.token_id)
+      .filter((row: any) => {
+        // Pre-filter to only include dead adventurers
+        try {
+          if (row.metadata) {
+            const metadata = JSON.parse(row.metadata);
+            const attributes = metadata.attributes || [];
+            const gameOverAttr = attributes.find((a: any) => a.trait === "Game Over");
+            return gameOverAttr?.value === "True";
+          }
+        } catch (e) {
+          console.error("Failed to parse metadata for filtering:", e);
+        }
+        return false;
+      })
       .map((row: any, index: number) => {
         // Parse metadata JSON which contains attributes array
         let metadata = null;
