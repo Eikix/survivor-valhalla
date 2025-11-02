@@ -1,6 +1,7 @@
 // src/components/WorldBeastLineups.tsx
 import { motion } from "framer-motion";
 import { type BeastLineup } from "../bindings/typescript/models.gen";
+import { AddressDisplay } from "./AddressDisplay";
 
 type BeastLineupWithId = BeastLineup & { entityId: string };
 
@@ -48,8 +49,8 @@ export function WorldBeastLineups(props: {
                 whileTap={isSelectionMode ? { scale: 0.98 } : {}}
               >
                 <div className="space-y-4">
-                  <div className="text-emerald-300/70 font-mono text-xs text-center">
-                    {lineup.player?.slice(0, 6)}...{lineup.player?.slice(-4)}
+                  <div className="text-emerald-300/70 text-xs text-center">
+                    <AddressDisplay address={lineup.player} />
                   </div>
                   <div className="grid grid-cols-5 gap-2">
                     {[1, 2, 3, 4, 5].map((pos) => {
