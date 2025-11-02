@@ -2,6 +2,14 @@ import type { SchemaType as ISchemaType } from "@dojoengine/sdk";
 
 import { BigNumberish } from 'starknet';
 
+// Type definition for `survivor_valhalla::models::AdventurerWeapon` struct
+export interface AdventurerWeapon {
+	player: string;
+	adventurer_id: BigNumberish;
+	weapon_type: BigNumberish;
+	weapon_power: BigNumberish;
+}
+
 // Type definition for `survivor_valhalla::models::AttackLineup` struct
 export interface AttackLineup {
 	player: string;
@@ -19,6 +27,18 @@ export interface Battle {
 	defender: string;
 	winner: string;
 	timestamp: BigNumberish;
+}
+
+// Type definition for `survivor_valhalla::models::BattleState` struct
+export interface BattleState {
+	battle_id: BigNumberish;
+	attacker: string;
+	defender: string;
+	round: BigNumberish;
+	turn: BigNumberish;
+	attacker_wins: BigNumberish;
+	defender_wins: BigNumberish;
+	is_complete: boolean;
 }
 
 // Type definition for `survivor_valhalla::models::Beast` struct
@@ -58,6 +78,21 @@ export interface CachedAdventurer {
 	luck: BigNumberish;
 }
 
+// Type definition for `survivor_valhalla::models::CombatUnit` struct
+export interface CombatUnit {
+	battle_id: BigNumberish;
+	unit_id: BigNumberish;
+	position: BigNumberish;
+	is_adventurer: boolean;
+	current_hp: BigNumberish;
+	max_hp: BigNumberish;
+	damage: BigNumberish;
+	initiative: BigNumberish;
+	weapon_type: BigNumberish;
+	beast_type: BigNumberish;
+	is_alive: boolean;
+}
+
 // Type definition for `survivor_valhalla::models::PlayerEnergy` struct
 export interface PlayerEnergy {
 	player: string;
@@ -74,11 +109,38 @@ export interface BattleCompleted {
 	timestamp: BigNumberish;
 }
 
+// Type definition for `survivor_valhalla::systems::battle_actions::battle_actions::DamageDealt` struct
+export interface DamageDealt {
+	battle_id: BigNumberish;
+	attacker_id: BigNumberish;
+	target_id: BigNumberish;
+	damage: BigNumberish;
+	type_multiplier: BigNumberish;
+}
+
 // Type definition for `survivor_valhalla::systems::battle_actions::battle_actions::EnergyConsumed` struct
 export interface EnergyConsumed {
 	player: string;
 	energy_remaining: BigNumberish;
 	timestamp: BigNumberish;
+}
+
+// Type definition for `survivor_valhalla::systems::battle_actions::battle_actions::RoundCompleted` struct
+export interface RoundCompleted {
+	battle_id: BigNumberish;
+	round: BigNumberish;
+	winner: string;
+	attacker_survivors: BigNumberish;
+	defender_survivors: BigNumberish;
+}
+
+// Type definition for `survivor_valhalla::systems::battle_actions::battle_actions::UnitDefeated` struct
+export interface UnitDefeated {
+	battle_id: BigNumberish;
+	round: BigNumberish;
+	unit_id: BigNumberish;
+	is_adventurer: boolean;
+	position: BigNumberish;
 }
 
 // Type definition for `survivor_valhalla::systems::beast_actions::beast_actions::BeastLineupRegistered` struct
@@ -100,20 +162,32 @@ export interface BeastSwapped {
 
 export interface SchemaType extends ISchemaType {
 	survivor_valhalla: {
+		AdventurerWeapon: AdventurerWeapon,
 		AttackLineup: AttackLineup,
 		Battle: Battle,
+		BattleState: BattleState,
 		Beast: Beast,
 		BeastLineup: BeastLineup,
 		CachedAdventurer: CachedAdventurer,
+		CombatUnit: CombatUnit,
 		PlayerEnergy: PlayerEnergy,
 		BattleCompleted: BattleCompleted,
+		DamageDealt: DamageDealt,
 		EnergyConsumed: EnergyConsumed,
+		RoundCompleted: RoundCompleted,
+		UnitDefeated: UnitDefeated,
 		BeastLineupRegistered: BeastLineupRegistered,
 		BeastSwapped: BeastSwapped,
 	},
 }
 export const schema: SchemaType = {
 	survivor_valhalla: {
+		AdventurerWeapon: {
+			player: "",
+			adventurer_id: 0,
+			weapon_type: 0,
+			weapon_power: 0,
+		},
 		AttackLineup: {
 			player: "",
 			adventurer1_id: 0,
@@ -128,6 +202,16 @@ export const schema: SchemaType = {
 			defender: "",
 			winner: "",
 			timestamp: 0,
+		},
+		BattleState: {
+			battle_id: 0,
+			attacker: "",
+			defender: "",
+			round: 0,
+			turn: 0,
+			attacker_wins: 0,
+			defender_wins: 0,
+			is_complete: false,
 		},
 		Beast: {
 			player: "",
@@ -160,6 +244,19 @@ export const schema: SchemaType = {
 			charisma: 0,
 			luck: 0,
 		},
+		CombatUnit: {
+			battle_id: 0,
+			unit_id: 0,
+			position: 0,
+			is_adventurer: false,
+			current_hp: 0,
+			max_hp: 0,
+			damage: 0,
+			initiative: 0,
+			weapon_type: 0,
+			beast_type: 0,
+			is_alive: false,
+		},
 		PlayerEnergy: {
 			player: "",
 			energy: 0,
@@ -172,10 +269,31 @@ export const schema: SchemaType = {
 			winner: "",
 			timestamp: 0,
 		},
+		DamageDealt: {
+			battle_id: 0,
+			attacker_id: 0,
+			target_id: 0,
+			damage: 0,
+			type_multiplier: 0,
+		},
 		EnergyConsumed: {
 			player: "",
 			energy_remaining: 0,
 			timestamp: 0,
+		},
+		RoundCompleted: {
+			battle_id: 0,
+			round: 0,
+			winner: "",
+			attacker_survivors: 0,
+			defender_survivors: 0,
+		},
+		UnitDefeated: {
+			battle_id: 0,
+			round: 0,
+			unit_id: 0,
+			is_adventurer: false,
+			position: 0,
 		},
 		BeastLineupRegistered: {
 			player: "",
@@ -193,14 +311,20 @@ export const schema: SchemaType = {
 	},
 };
 export enum ModelsMapping {
+	AdventurerWeapon = 'survivor_valhalla-AdventurerWeapon',
 	AttackLineup = 'survivor_valhalla-AttackLineup',
 	Battle = 'survivor_valhalla-Battle',
+	BattleState = 'survivor_valhalla-BattleState',
 	Beast = 'survivor_valhalla-Beast',
 	BeastLineup = 'survivor_valhalla-BeastLineup',
 	CachedAdventurer = 'survivor_valhalla-CachedAdventurer',
+	CombatUnit = 'survivor_valhalla-CombatUnit',
 	PlayerEnergy = 'survivor_valhalla-PlayerEnergy',
 	BattleCompleted = 'survivor_valhalla-BattleCompleted',
+	DamageDealt = 'survivor_valhalla-DamageDealt',
 	EnergyConsumed = 'survivor_valhalla-EnergyConsumed',
+	RoundCompleted = 'survivor_valhalla-RoundCompleted',
+	UnitDefeated = 'survivor_valhalla-UnitDefeated',
 	BeastLineupRegistered = 'survivor_valhalla-BeastLineupRegistered',
 	BeastSwapped = 'survivor_valhalla-BeastSwapped',
 }

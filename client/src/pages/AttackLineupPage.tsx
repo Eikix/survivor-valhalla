@@ -6,21 +6,27 @@ import { useConnect, useAccount } from "@starknet-react/core";
 import { useDojoSDK, useEntityQuery, useModels } from "@dojoengine/sdk/react";
 import { ToriiQueryBuilder } from "@dojoengine/sdk";
 import { Navbar } from "../components/navbar";
-import { WorldAdventurerLineups } from "../components/WorldAdventurerLineups";
+import { WorldBeastLineups } from "../components/WorldBeastLineups";
 import { useAdventurers, useAdventurerLineupImages } from "../hooks/useAdventurers";
+import { useBeasts, useBeastLineupImages } from "../hooks/useBeasts";
 import type { Adventurer } from "../hooks/useAdventurers";
 import {
   ModelsMapping,
   type AttackLineup,
+  type BeastLineup,
 } from "../bindings/typescript/models.gen";
 import { addAddressPadding } from "starknet";
 import { useTransactionToast } from "../hooks/useTransactionToast";
+
+type BeastLineupWithId = BeastLineup & { entityId: string };
 
 export function AttackLineupPage() {
   const [inspectedAdventurer, setInspectedAdventurer] = useState<Adventurer | null>(null);
   const [attackLineup, setAttackLineup] = useState<(Adventurer | null)[]>(
     Array(5).fill(null),
   );
+  const [selectedEnemy, setSelectedEnemy] = useState<BeastLineupWithId | null>(null);
+  const [battleResult, setBattleResult] = useState<string | null>(null);
   const [isDraggingOver, setIsDraggingOver] = useState<number>(-1);
   const [sortBy, setSortBy] = useState<keyof Adventurer | "">("");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
@@ -87,6 +93,26 @@ export function AttackLineupPage() {
     }
   };
 
+  const executeBattle = async () => {
+    if (!client || !account || !selectedEnemy || !hasLineup) return;
+    
+    setBattleResult(null);
+    const tx = showTransaction(undefined, "Initiating battle...");
+    console.log("selectedEnemy", selectedEnemy);
+    try {
+      await client.battle_actions.battle(
+        account,
+        selectedEnemy.player
+      );
+      tx.success("Battle initiated!");
+      // For now, show a simple result - in a real implementation you'd query the battle result
+      setBattleResult(Math.random() > 0.5 ? "Victory!" : "Defeat!");
+    } catch (error) {
+      console.error("Failed to start battle:", error);
+      tx.error("Failed to start battle");
+    }
+  };
+
   const handleRandomFill = () => {
     if (adventurers.length === 0) return;
 
@@ -110,6 +136,14 @@ export function AttackLineupPage() {
       .withEntityModels([ModelsMapping.AttackLineup]),
   );
   const allLineups = useModels(ModelsMapping.AttackLineup);
+
+  // Query beast lineups for enemy selection
+  useEntityQuery(
+    new ToriiQueryBuilder()
+      .includeHashedKeys()
+      .withEntityModels([ModelsMapping.BeastLineup]),
+  );
+  const allBeastLineups = useModels(ModelsMapping.BeastLineup);
 
   // Type for lineup objects returned by useModels
   type LineupObj = Record<string, AttackLineup>;
@@ -163,6 +197,30 @@ export function AttackLineupPage() {
       .filter((lineup): lineup is AttackLineupWithId => lineup !== null);
   }, [allLineups]);
 
+  // Beast lineups for enemy selection
+  const worldBeastLineups = useMemo((): BeastLineupWithId[] => {
+    if (!Array.isArray(allBeastLineups)) return [];
+
+    return allBeastLineups
+      .map((lineupObj: Record<string, BeastLineup>) => {
+        const entityId = Object.keys(lineupObj)[0];
+        const lineup = lineupObj[entityId];
+
+        if (!lineup) return null;
+
+        return {
+          entityId,
+          player: lineup.player,
+          beast1_id: lineup.beast1_id,
+          beast2_id: lineup.beast2_id,
+          beast3_id: lineup.beast3_id,
+          beast4_id: lineup.beast4_id,
+          beast5_id: lineup.beast5_id,
+        };
+      })
+      .filter((lineup): lineup is BeastLineupWithId => lineup !== null);
+  }, [allBeastLineups]);
+
   // Extract all unique adventurer IDs from world lineups for fetching images
   const allLineupAdventurerIds = useMemo(() => {
     const adventurerIds: (string | number | bigint)[] = [];
@@ -183,12 +241,38 @@ export function AttackLineupPage() {
     return adventurerIds;
   }, [worldLineups]);
 
+  // Extract all unique token IDs from beast lineups for fetching images
+  const allBeastLineupTokenIds = useMemo(() => {
+    const tokenIds: (string | number | bigint)[] = [];
+    worldBeastLineups.forEach((lineup) => {
+      [
+        lineup.beast1_id,
+        lineup.beast2_id,
+        lineup.beast3_id,
+        lineup.beast4_id,
+        lineup.beast5_id,
+      ].forEach((id) => {
+        if (id && Number(id) > 0) {
+          tokenIds.push(id);
+        }
+      });
+    });
+    console.log("[AttackLineupPage] Extracted token IDs for beast lineups:", tokenIds);
+    return tokenIds;
+  }, [worldBeastLineups]);
+
   // Fetch images for all lineup adventurers
   const { data: lineupImages = {} } = useAdventurerLineupImages(allLineupAdventurerIds, {
     enabled: allLineupAdventurerIds.length > 0,
   });
 
+  // Fetch images for all beast lineup beasts
+  const { data: beastLineupImages = {} } = useBeastLineupImages(allBeastLineupTokenIds, {
+    enabled: allBeastLineupTokenIds.length > 0,
+  });
+
   console.log("[AttackLineupPage] Lineup images received:", lineupImages);
+  console.log("[AttackLineupPage] Beast lineup images received:", beastLineupImages);
 
   const hasLineup = !!userLineup;
   const lastProcessedLineupRef = useRef<string>("");
@@ -374,10 +458,10 @@ export function AttackLineupPage() {
               fontFamily: "serif",
             }}
           >
-            ATTACK FORCE
+            ATTACK MODE
           </h1>
           <p className="text-red-200/40 text-sm tracking-widest uppercase">
-            Fallen heroes rise again
+            Choose your enemy and battle
           </p>
         </motion.div>
 
@@ -392,7 +476,7 @@ export function AttackLineupPage() {
             <div className="border border-red-500/30 bg-red-950/20 p-12 mb-8">
               <Swords className="w-16 h-16 text-red-500/50 mx-auto mb-6" />
               <p className="text-red-200/60 mb-8 text-sm tracking-wide uppercase">
-                Connect your wallet to assemble your force
+                Connect your wallet to enter battle mode
               </p>
               <motion.button
                 onClick={() => connect({ connector: connectors[0] })}
@@ -414,341 +498,442 @@ export function AttackLineupPage() {
           </motion.div>
         ) : (
           <>
-            {/* Create Attack Lineup Section */}
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.2 }}
-              className="mb-16"
-            >
-              <div className="border border-red-500/30 bg-red-950/20 p-8 relative">
-                {!hasLineup && (
-                  <div className="absolute top-4 right-4 flex gap-2">
-                    {adventurers.length > 0 && (
-                      <motion.button
-                        onClick={handleRandomFill}
-                        whileHover={{ scale: 1.05 }}
-                        whileTap={{ scale: 0.95 }}
-                        className="px-4 py-2 text-xs font-bold tracking-wider uppercase border border-red-500/50 hover:border-red-500 transition-all cursor-pointer text-red-400"
-                        style={{
-                          background:
-                            "linear-gradient(to bottom, rgba(239, 68, 68, 0.1), rgba(0, 0, 0, 0.4))",
-                        }}
-                      >
-                        Random Fill
-                      </motion.button>
-                    )}
-                    {attackLineup.some((a) => a !== null) && (
-                      <motion.button
-                        onClick={() => setAttackLineup(Array(5).fill(null))}
-                        whileHover={{ scale: 1.05 }}
-                        whileTap={{ scale: 0.95 }}
-                        className="px-4 py-2 text-xs font-bold tracking-wider uppercase border border-orange-500/50 hover:border-orange-500 transition-all cursor-pointer text-orange-400"
-                        style={{
-                          background:
-                            "linear-gradient(to bottom, rgba(251, 146, 60, 0.1), rgba(0, 0, 0, 0.4))",
-                        }}
-                      >
-                        Clear Lineup
-                      </motion.button>
-                    )}
-                  </div>
-                )}
-                <div className="text-center">
-                  <Swords className="w-12 h-12 text-red-500/50 mx-auto mb-4" />
-                  <h2 className="text-2xl font-bold text-red-400 mb-4 tracking-wider uppercase">
-                    {hasLineup ? "Your Attack Force" : "Assemble Your Force"}
+            {/* Battle Result Display */}
+            {battleResult && (
+              <motion.div
+                initial={{ opacity: 0, scale: 0.9 }}
+                animate={{ opacity: 1, scale: 1 }}
+                className="mb-16 text-center"
+              >
+                <div className={`border p-8 ${
+                  battleResult.includes("Victory") 
+                    ? "border-emerald-500/50 bg-emerald-950/20"
+                    : "border-red-500/50 bg-red-950/20"
+                }`}>
+                  <h2 className={`text-4xl font-bold mb-4 tracking-wider uppercase ${
+                    battleResult.includes("Victory") ? "text-emerald-400" : "text-red-400"
+                  }`}>
+                    {battleResult}
                   </h2>
-                  <div className="grid grid-cols-5 gap-4 p-4">
-                    {attackLineup.map((adventurer, index) => (
-                      <div
-                        key={index}
-                        className={`min-h-[150px] border-2 border-dashed rounded-lg flex items-center justify-center transition-colors ${
-                          isDraggingOver === index
-                            ? "border-red-500 bg-red-950/30"
-                            : "border-red-500/30"
-                        }`}
-                        onDragOver={(e: React.DragEvent) => {
-                          e.preventDefault();
-                          setIsDraggingOver(index);
-                        }}
-                        onDragLeave={() => {
-                          setIsDraggingOver(-1);
-                        }}
-                        onDrop={(e: React.DragEvent) => {
-                          e.preventDefault();
-                          setIsDraggingOver(-1);
-                          const adventurerId = parseInt(
-                            e.dataTransfer.getData("adventurerId"),
-                          );
-                          const adventurerToAdd = adventurers.find(
-                            (a) => a.id === adventurerId,
-                          );
-                          // Check if adventurer is already in lineup
-                          const isAlreadyInLineup = attackLineup.some(
-                            (a) => a?.id === adventurerId,
-                          );
-                          if (adventurerToAdd && !isAlreadyInLineup) {
-                            const newAttackLineup = [...attackLineup];
-                            const originalAdventurer = newAttackLineup[index];
-                            newAttackLineup[index] = adventurerToAdd;
-                            setAttackLineup(newAttackLineup);
-
-                            // If lineup is registered and we're swapping an adventurer, track it
-                            if (hasLineup && originalAdventurer) {
-                              setSwappedPosition(index);
-                            }
-                          }
-                        }}
-                      >
-                        {adventurer ? (
-                          <motion.div
-                            initial={{ opacity: 0, scale: 0.9 }}
-                            animate={{ opacity: 1, scale: 1 }}
-                            className="cursor-pointer text-center"
-                          >
-                            {adventurer.image && (
-                              <img
-                                src={adventurer.image}
-                                alt={`${adventurer.name} - Level: ${adventurer.level}, Health: ${adventurer.health}`}
-                                className="w-24 h-24 mx-auto mb-1"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setInspectedAdventurer(adventurer);
-                                }}
-                              />
-                            )}
-                            <div className="text-red-300 text-xs">Lvl {adventurer.level}</div>
-                          </motion.div>
-                        ) : (
-                          <div className="text-red-200/20 text-xs text-center">
-                            Slot {index + 1}
-                          </div>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                  {!hasLineup ? (
-                    <motion.button
-                      onClick={createLineup}
-                      disabled={!attackLineup.every((a) => a !== null)}
-                      whileHover={
-                        attackLineup.every((a) => a !== null)
-                          ? { scale: 1.05 }
-                          : {}
-                      }
-                      whileTap={
-                        attackLineup.every((a) => a !== null)
-                          ? { scale: 0.95 }
-                          : {}
-                      }
-                      className="mt-6 px-8 py-3 text-base font-bold tracking-wider uppercase border-2 transition-all cursor-pointer disabled:opacity-50"
-                      style={{
-                        borderColor: attackLineup.every((a) => a !== null)
-                          ? "rgba(239, 68, 68, 0.5)"
-                          : "rgba(239, 68, 68, 0.3)",
-                        background: attackLineup.every((a) => a !== null)
-                          ? "linear-gradient(to bottom, rgba(239, 68, 68, 0.1), rgba(0, 0, 0, 0.4))"
-                          : "linear-gradient(to bottom, rgba(239, 68, 68, 0.05), rgba(0, 0, 0, 0.3))",
-                        textShadow: attackLineup.every((a) => a !== null)
-                          ? "0 0 10px rgba(239, 68, 68, 0.5)"
-                          : "none",
-                      }}
-                    >
-                      <span
-                        className={
-                          attackLineup.every((a) => a !== null)
-                            ? "text-red-500"
-                            : "text-red-400/50"
-                        }
-                      >
-                        {attackLineup.every((a) => a !== null)
-                          ? "Deploy Force"
-                          : "Force Incomplete"}
-                      </span>
-                    </motion.button>
-                  ) : swappedPosition !== null ? (
-                    <motion.button
-                      onClick={swapAdventurer}
-                      whileHover={{ scale: 1.05 }}
-                      whileTap={{ scale: 0.95 }}
-                      className="mt-6 px-8 py-3 text-base font-bold tracking-wider uppercase border-2 transition-all cursor-pointer"
-                      style={{
-                        borderColor: "rgba(239, 68, 68, 0.5)",
-                        background:
-                          "linear-gradient(to bottom, rgba(239, 68, 68, 0.1), rgba(0, 0, 0, 0.4))",
-                        textShadow: "0 0 10px rgba(239, 68, 68, 0.5)",
-                      }}
-                    >
-                      <span className="text-red-500">
-                        Replace Hero (Position {swappedPosition + 1})
-                      </span>
-                    </motion.button>
-                  ) : null}
+                  <motion.button
+                    onClick={() => {
+                      setBattleResult(null);
+                      setSelectedEnemy(null);
+                    }}
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                    className="px-6 py-2 text-sm font-bold tracking-wider uppercase border border-gray-500/50 hover:border-gray-400 transition-all cursor-pointer text-gray-300"
+                  >
+                    Continue
+                  </motion.button>
                 </div>
-              </div>
-            </motion.div>
+              </motion.div>
+            )}
 
-            {/* Dead Adventurers Collection Section */}
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.4 }}
-              className="mb-16"
-            >
-              <h2 className="text-center text-xl font-bold text-red-400 mb-6 tracking-wider uppercase">
-                Fallen Heroes
-              </h2>
-              <div className="border border-red-500/30 bg-red-950/20 p-8">
-                {isLoadingAdventurers ? (
-                  <div className="text-center">
-                    <p className="text-red-200/60 text-sm tracking-wide uppercase">
-                      Summoning fallen heroes...
-                    </p>
-                  </div>
-                ) : error ? (
-                  <div className="text-center">
-                    <p className="text-orange-200/60 text-sm tracking-wide uppercase">
-                      Error summoning heroes
-                    </p>
-                  </div>
-                ) : adventurers.length > 0 ? (
-                  <>
-                    <div className="mb-6 flex flex-wrap justify-center gap-4">
-                      {[
-                        { key: "level" as keyof Adventurer, label: "Level" },
-                        { key: "health" as keyof Adventurer, label: "Health" },
-                        { key: "strength" as keyof Adventurer, label: "Strength" },
-                        { key: "dexterity" as keyof Adventurer, label: "Dexterity" },
-                        { key: "vitality" as keyof Adventurer, label: "Vitality" },
-                        { key: "intelligence" as keyof Adventurer, label: "Intelligence" },
-                      ].map(({ key, label }) => (
-                        <button
-                          key={key}
-                          onClick={() => {
-                            if (sortBy === key) {
-                              setSortDirection(
-                                sortDirection === "asc" ? "desc" : "asc",
-                              );
-                            } else {
-                              setSortBy(key);
-                              setSortDirection("asc");
-                            }
-                          }}
-                          className={`px-4 py-2 text-sm font-bold tracking-wider uppercase transition-all cursor-pointer flex items-center gap-2 ${
-                            sortBy === key
-                              ? "text-red-400 border-red-500/50"
-                              : "text-red-200/60 border-red-500/20 hover:text-red-300"
-                          } border rounded`}
-                          style={{
-                            background:
-                              sortBy === key
-                                ? "linear-gradient(to bottom, rgba(239, 68, 68, 0.1), rgba(0, 0, 0, 0.3))"
-                                : "linear-gradient(to bottom, rgba(239, 68, 68, 0.05), rgba(0, 0, 0, 0.2))",
-                          }}
-                        >
-                          <span>{label}</span>
-                          {sortBy === key && (
-                            <span className="text-red-400">
-                              {sortDirection === "asc" ? "↑" : "↓"}
-                            </span>
-                          )}
-                        </button>
-                      ))}
-                    </div>
-                    <div className="grid grid-cols-[repeat(auto-fill,minmax(128px,1fr))] gap-4 justify-items-center">
-                      {sortedAdventurers.map((adventurer) => (
-                        <motion.div
-                          key={`adventurer-${adventurer.id}-${adventurer.adventurer_id}`}
-                          initial={{ opacity: 0, scale: 0.9 }}
-                          animate={{ opacity: 1, scale: 1 }}
-                          className="cursor-move text-center"
-                        >
-                          {adventurer.image && (
-                            <img
-                              src={adventurer.image}
-                              alt={`${adventurer.name} - Level: ${adventurer.level}`}
-                              className="w-24 h-24 mx-auto mb-1 cursor-pointer"
-                              draggable
-                              onDragStart={(e: React.DragEvent) => {
-                                e.dataTransfer.setData(
-                                  "adventurerId",
-                                  adventurer.id.toString(),
-                                );
-                              }}
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setInspectedAdventurer(adventurer);
-                              }}
-                            />
-                          )}
-                          <div className="text-red-300 text-xs">Lvl {adventurer.level}</div>
-                          <div className="text-red-200/50 text-xs">HP {adventurer.health}</div>
-                        </motion.div>
-                      ))}
-                    </div>
-                  </>
-                ) : (
-                  <div className="text-center">
-                    <p className="text-red-200/60 text-sm tracking-wide uppercase">
-                      No fallen heroes found
-                    </p>
-                  </div>
-                )}
-              </div>
-            </motion.div>
-
-            {/* World's Adventurer Lineups Section */}
-            <WorldAdventurerLineups
-              lineups={worldLineups}
-              adventurerImages={lineupImages}
-            />
-
-            {/* Stats Section */}
-            {hasLineup && (
+            {/* VS Display Section */}
+            {selectedEnemy && !battleResult && (
               <motion.div
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.3 }}
+                transition={{ delay: 0.1 }}
+                className="mb-16"
               >
-                <h2 className="text-center text-xl font-bold text-red-400 mb-6 tracking-wider uppercase">
-                  Battle Records
-                </h2>
-                <div className="grid grid-cols-3 gap-4">
-                  {/* Kills */}
-                  <div className="border border-red-500/20 bg-red-950/10 p-6 text-center">
-                    <Trophy className="w-8 h-8 text-red-500/50 mx-auto mb-3" />
-                    <div className="text-3xl font-bold text-red-400 mb-1">
-                      {stats.kills}
+                <div className="border border-red-500/30 bg-red-950/20 p-8">
+                  <h2 className="text-center text-2xl font-bold text-red-400 mb-8 tracking-wider uppercase">
+                    Battle Preview
+                  </h2>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-8 items-center">
+                    {/* Your Lineup */}
+                    <div className="text-center">
+                      <h3 className="text-lg font-bold text-red-300 mb-4 uppercase">Your Force</h3>
+                      <div className="grid grid-cols-5 gap-2">
+                        {attackLineup.map((adventurer, index) => (
+                          <div key={index} className="aspect-square border border-red-500/30 bg-red-950/10 rounded flex items-center justify-center">
+                            {adventurer && adventurer.image ? (
+                              <img
+                                src={adventurer.image}
+                                alt={`Adventurer ${adventurer.adventurer_id}`}
+                                className="w-full h-full object-cover rounded"
+                              />
+                            ) : (
+                              <span className="text-red-200/30 text-xs">—</span>
+                            )}
+                          </div>
+                        ))}
+                      </div>
                     </div>
-                    <div className="text-xs text-red-200/40 tracking-wider uppercase">
-                      Kills
+                    
+                    {/* VS */}
+                    <div className="text-center">
+                      <div className="text-4xl font-bold text-red-500 mb-4">VS</div>
+                      {hasLineup && attackLineup.every((a) => a !== null) ? (
+                        <motion.button
+                          onClick={executeBattle}
+                          whileHover={{ scale: 1.05 }}
+                          whileTap={{ scale: 0.95 }}
+                          className="px-8 py-3 text-lg font-bold tracking-wider uppercase border-2 border-red-500/50 hover:border-red-500 transition-all cursor-pointer"
+                          style={{
+                            background: "linear-gradient(to bottom, rgba(239, 68, 68, 0.1), rgba(0, 0, 0, 0.4))",
+                            textShadow: "0 0 10px rgba(239, 68, 68, 0.5)",
+                          }}
+                        >
+                          <span className="text-red-500">BATTLE!</span>
+                        </motion.button>
+                      ) : (
+                        <div className="text-red-400/50 text-sm uppercase tracking-wider">
+                          Complete Your Lineup
+                        </div>
+                      )}
+                    </div>
+                    
+                    {/* Enemy Lineup */}
+                    <div className="text-center">
+                      <h3 className="text-lg font-bold text-emerald-300 mb-4 uppercase">Enemy Force</h3>
+                      <div className="grid grid-cols-5 gap-2">
+                        {[1, 2, 3, 4, 5].map((pos) => {
+                          const beastId = selectedEnemy[`beast${pos}_id` as keyof typeof selectedEnemy];
+                          const hasBeast = beastId && Number(beastId) > 0;
+                          const lookupKey = hasBeast ? String(Number(beastId)) : "";
+                          const imageUrl = hasBeast ? beastLineupImages[lookupKey] : null;
+                          return (
+                            <div key={pos} className="aspect-square border border-emerald-500/30 bg-emerald-950/10 rounded flex items-center justify-center">
+                              {hasBeast && imageUrl ? (
+                                <img
+                                  src={imageUrl}
+                                  alt={`Beast ${beastId}`}
+                                  className="w-full h-full object-cover rounded"
+                                />
+                              ) : hasBeast ? (
+                                <span className="text-emerald-400 text-xs">#{String(beastId).slice(-4)}</span>
+                              ) : (
+                                <span className="text-emerald-200/30 text-xs">—</span>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
                     </div>
                   </div>
-
-                  {/* Defeats */}
-                  <div className="border border-red-500/20 bg-red-950/10 p-6 text-center">
-                    <Skull className="w-8 h-8 text-red-500/50 mx-auto mb-3" />
-                    <div className="text-3xl font-bold text-red-400 mb-1">
-                      {stats.defeats}
-                    </div>
-                    <div className="text-xs text-red-200/40 tracking-wider uppercase">
-                      Defeats
-                    </div>
-                  </div>
-
-                  {/* Force Status */}
-                  <div className="border border-red-500/20 bg-red-950/10 p-6 text-center">
-                    <Swords className="w-8 h-8 text-red-500/50 mx-auto mb-3" />
-                    <div className="text-lg font-bold text-red-400 mb-1">
-                      {hasLineup ? "Force Deployed" : "No Force"}
-                    </div>
-                    <div className="text-xs text-red-200/40 tracking-wider uppercase">
-                      Status
-                    </div>
+                  
+                  <div className="mt-6 text-center">
+                    <motion.button
+                      onClick={() => setSelectedEnemy(null)}
+                      whileHover={{ scale: 1.05 }}
+                      whileTap={{ scale: 0.95 }}
+                      className="px-4 py-2 text-sm font-bold tracking-wider uppercase border border-gray-500/50 hover:border-gray-400 transition-all cursor-pointer text-gray-300"
+                    >
+                      Choose Different Enemy
+                    </motion.button>
                   </div>
                 </div>
               </motion.div>
+            )}
+
+            {/* Enemy Selection Section - Only show if no enemy selected */}
+            {!selectedEnemy && !battleResult && (
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.2 }}
+                className="mb-16"
+              >
+                <WorldBeastLineups
+                  lineups={worldBeastLineups}
+                  beastImages={beastLineupImages}
+                  isSelectionMode={true}
+                  onSelectLineup={setSelectedEnemy}
+                  selectedLineup={selectedEnemy}
+                />
+              </motion.div>
+            )}
+
+            {/* Formation Section - Only show when enemy is selected */}
+            {selectedEnemy && !battleResult && (
+              <>
+                {/* Create Attack Lineup Section */}
+                <motion.div
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.3 }}
+                  className="mb-16"
+                >
+                  <div className="border border-red-500/30 bg-red-950/20 p-8 relative">
+                    {!hasLineup && (
+                      <div className="absolute top-4 right-4 flex gap-2">
+                        {adventurers.length > 0 && (
+                          <motion.button
+                            onClick={handleRandomFill}
+                            whileHover={{ scale: 1.05 }}
+                            whileTap={{ scale: 0.95 }}
+                            className="px-4 py-2 text-xs font-bold tracking-wider uppercase border border-red-500/50 hover:border-red-500 transition-all cursor-pointer text-red-400"
+                            style={{
+                              background:
+                                "linear-gradient(to bottom, rgba(239, 68, 68, 0.1), rgba(0, 0, 0, 0.4))",
+                            }}
+                          >
+                            Random Fill
+                          </motion.button>
+                        )}
+                        {attackLineup.some((a) => a !== null) && (
+                          <motion.button
+                            onClick={() => setAttackLineup(Array(5).fill(null))}
+                            whileHover={{ scale: 1.05 }}
+                            whileTap={{ scale: 0.95 }}
+                            className="px-4 py-2 text-xs font-bold tracking-wider uppercase border border-orange-500/50 hover:border-orange-500 transition-all cursor-pointer text-orange-400"
+                            style={{
+                              background:
+                                "linear-gradient(to bottom, rgba(251, 146, 60, 0.1), rgba(0, 0, 0, 0.4))",
+                            }}
+                          >
+                            Clear Lineup
+                          </motion.button>
+                        )}
+                      </div>
+                    )}
+                    <div className="text-center">
+                      <Swords className="w-12 h-12 text-red-500/50 mx-auto mb-4" />
+                      <h2 className="text-2xl font-bold text-red-400 mb-4 tracking-wider uppercase">
+                        {hasLineup ? "Your Attack Force" : "Assemble Your Force"}
+                      </h2>
+                      <div className="grid grid-cols-5 gap-4 p-4">
+                        {attackLineup.map((adventurer, index) => (
+                          <div
+                            key={index}
+                            className={`min-h-[150px] border-2 border-dashed rounded-lg flex items-center justify-center transition-colors ${
+                              isDraggingOver === index
+                                ? "border-red-500 bg-red-950/30"
+                                : "border-red-500/30"
+                            }`}
+                            onDragOver={(e: React.DragEvent) => {
+                              e.preventDefault();
+                              setIsDraggingOver(index);
+                            }}
+                            onDragLeave={() => {
+                              setIsDraggingOver(-1);
+                            }}
+                            onDrop={(e: React.DragEvent) => {
+                              e.preventDefault();
+                              setIsDraggingOver(-1);
+                              const adventurerId = parseInt(
+                                e.dataTransfer.getData("adventurerId"),
+                              );
+                              const adventurerToAdd = adventurers.find(
+                                (a) => a.id === adventurerId,
+                              );
+                              // Check if adventurer is already in lineup
+                              const isAlreadyInLineup = attackLineup.some(
+                                (a) => a?.id === adventurerId,
+                              );
+                              if (adventurerToAdd && !isAlreadyInLineup) {
+                                const newAttackLineup = [...attackLineup];
+                                const originalAdventurer = newAttackLineup[index];
+                                newAttackLineup[index] = adventurerToAdd;
+                                setAttackLineup(newAttackLineup);
+
+                                // If lineup is registered and we're swapping an adventurer, track it
+                                if (hasLineup && originalAdventurer) {
+                                  setSwappedPosition(index);
+                                }
+                              }
+                            }}
+                          >
+                            {adventurer ? (
+                              <motion.div
+                                initial={{ opacity: 0, scale: 0.9 }}
+                                animate={{ opacity: 1, scale: 1 }}
+                                className="cursor-pointer text-center"
+                              >
+                                {adventurer.image && (
+                                  <img
+                                    src={adventurer.image}
+                                    alt={`${adventurer.name} - Level: ${adventurer.level}, Health: ${adventurer.health}`}
+                                    className="w-24 h-24 mx-auto mb-1"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setInspectedAdventurer(adventurer);
+                                    }}
+                                  />
+                                )}
+                                <div className="text-red-300 text-xs">Lvl {adventurer.level}</div>
+                              </motion.div>
+                            ) : (
+                              <div className="text-red-200/20 text-xs text-center">
+                                Slot {index + 1}
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                      {!hasLineup ? (
+                        <motion.button
+                          onClick={createLineup}
+                          disabled={!attackLineup.every((a) => a !== null)}
+                          whileHover={
+                            attackLineup.every((a) => a !== null)
+                              ? { scale: 1.05 }
+                              : {}
+                          }
+                          whileTap={
+                            attackLineup.every((a) => a !== null)
+                              ? { scale: 0.95 }
+                              : {}
+                          }
+                          className="mt-6 px-8 py-3 text-base font-bold tracking-wider uppercase border-2 transition-all cursor-pointer disabled:opacity-50"
+                          style={{
+                            borderColor: attackLineup.every((a) => a !== null)
+                              ? "rgba(239, 68, 68, 0.5)"
+                              : "rgba(239, 68, 68, 0.3)",
+                            background: attackLineup.every((a) => a !== null)
+                              ? "linear-gradient(to bottom, rgba(239, 68, 68, 0.1), rgba(0, 0, 0, 0.4))"
+                              : "linear-gradient(to bottom, rgba(239, 68, 68, 0.05), rgba(0, 0, 0, 0.3))",
+                            textShadow: attackLineup.every((a) => a !== null)
+                              ? "0 0 10px rgba(239, 68, 68, 0.5)"
+                              : "none",
+                          }}
+                        >
+                          <span
+                            className={
+                              attackLineup.every((a) => a !== null)
+                                ? "text-red-500"
+                                : "text-red-400/50"
+                            }
+                          >
+                            {attackLineup.every((a) => a !== null)
+                              ? "Deploy Force"
+                              : "Force Incomplete"}
+                          </span>
+                        </motion.button>
+                      ) : swappedPosition !== null ? (
+                        <motion.button
+                          onClick={swapAdventurer}
+                          whileHover={{ scale: 1.05 }}
+                          whileTap={{ scale: 0.95 }}
+                          className="mt-6 px-8 py-3 text-base font-bold tracking-wider uppercase border-2 transition-all cursor-pointer"
+                          style={{
+                            borderColor: "rgba(239, 68, 68, 0.5)",
+                            background:
+                              "linear-gradient(to bottom, rgba(239, 68, 68, 0.1), rgba(0, 0, 0, 0.4))",
+                            textShadow: "0 0 10px rgba(239, 68, 68, 0.5)",
+                          }}
+                        >
+                          <span className="text-red-500">
+                            Replace Hero (Position {swappedPosition + 1})
+                          </span>
+                        </motion.button>
+                      ) : null}
+                    </div>
+                  </div>
+                </motion.div>
+
+                {/* Dead Adventurers Collection Section */}
+                <motion.div
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.4 }}
+                  className="mb-16"
+                >
+                  <h2 className="text-center text-xl font-bold text-red-400 mb-6 tracking-wider uppercase">
+                    Fallen Heroes
+                  </h2>
+                  <div className="border border-red-500/30 bg-red-950/20 p-8">
+                    {isLoadingAdventurers ? (
+                      <div className="text-center">
+                        <p className="text-red-200/60 text-sm tracking-wide uppercase">
+                          Summoning fallen heroes...
+                        </p>
+                      </div>
+                    ) : error ? (
+                      <div className="text-center">
+                        <p className="text-orange-200/60 text-sm tracking-wide uppercase">
+                          Error summoning heroes
+                        </p>
+                      </div>
+                    ) : adventurers.length > 0 ? (
+                      <>
+                        <div className="mb-6 flex flex-wrap justify-center gap-4">
+                          {[
+                            { key: "level" as keyof Adventurer, label: "Level" },
+                            { key: "health" as keyof Adventurer, label: "Health" },
+                            { key: "strength" as keyof Adventurer, label: "Strength" },
+                            { key: "dexterity" as keyof Adventurer, label: "Dexterity" },
+                            { key: "vitality" as keyof Adventurer, label: "Vitality" },
+                            { key: "intelligence" as keyof Adventurer, label: "Intelligence" },
+                          ].map(({ key, label }) => (
+                            <button
+                              key={key}
+                              onClick={() => {
+                                if (sortBy === key) {
+                                  setSortDirection(
+                                    sortDirection === "asc" ? "desc" : "asc",
+                                  );
+                                } else {
+                                  setSortBy(key);
+                                  setSortDirection("asc");
+                                }
+                              }}
+                              className={`px-4 py-2 text-sm font-bold tracking-wider uppercase transition-all cursor-pointer flex items-center gap-2 ${
+                                sortBy === key
+                                  ? "text-red-400 border-red-500/50"
+                                  : "text-red-200/60 border-red-500/20 hover:text-red-300"
+                              } border rounded`}
+                              style={{
+                                background:
+                                  sortBy === key
+                                    ? "linear-gradient(to bottom, rgba(239, 68, 68, 0.1), rgba(0, 0, 0, 0.3))"
+                                    : "linear-gradient(to bottom, rgba(239, 68, 68, 0.05), rgba(0, 0, 0, 0.2))",
+                              }}
+                            >
+                              <span>{label}</span>
+                              {sortBy === key && (
+                                <span className="text-red-400">
+                                  {sortDirection === "asc" ? "↑" : "↓"}
+                                </span>
+                              )}
+                            </button>
+                          ))}
+                        </div>
+                        <div className="grid grid-cols-[repeat(auto-fill,minmax(128px,1fr))] gap-4 justify-items-center">
+                          {sortedAdventurers.map((adventurer) => (
+                            <motion.div
+                              key={`adventurer-${adventurer.id}-${adventurer.adventurer_id}`}
+                              initial={{ opacity: 0, scale: 0.9 }}
+                              animate={{ opacity: 1, scale: 1 }}
+                              className="cursor-move text-center"
+                            >
+                              {adventurer.image && (
+                                <img
+                                  src={adventurer.image}
+                                  alt={`${adventurer.name} - Level: ${adventurer.level}`}
+                                  className="w-24 h-24 mx-auto mb-1 cursor-pointer"
+                                  draggable
+                                  onDragStart={(e: React.DragEvent) => {
+                                    e.dataTransfer.setData(
+                                      "adventurerId",
+                                      adventurer.id.toString(),
+                                    );
+                                  }}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setInspectedAdventurer(adventurer);
+                                  }}
+                                />
+                              )}
+                              <div className="text-red-300 text-xs">Lvl {adventurer.level}</div>
+                              <div className="text-red-200/50 text-xs">HP {adventurer.health}</div>
+                            </motion.div>
+                          ))}
+                        </div>
+                      </>
+                    ) : (
+                      <div className="text-center">
+                        <p className="text-red-200/60 text-sm tracking-wide uppercase">
+                          No fallen heroes found
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                </motion.div>
+              </>
             )}
           </>
         )}

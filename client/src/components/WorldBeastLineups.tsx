@@ -7,9 +7,12 @@ type BeastLineupWithId = BeastLineup & { entityId: string };
 export function WorldBeastLineups(props: {
   lineups: BeastLineupWithId[];
   beastImages: Record<string, string>;
+  onSelectLineup?: (lineup: BeastLineupWithId) => void;
+  selectedLineup?: BeastLineupWithId | null;
+  isSelectionMode?: boolean;
 }) {
   const lineupsArray = props.lineups.filter((lineup) => lineup !== undefined);
-  const { beastImages } = props;
+  const { beastImages, onSelectLineup, selectedLineup, isSelectionMode = false } = props;
 
   console.log("[WorldBeastLineups] Lineups:", lineupsArray);
   console.log("[WorldBeastLineups] Beast images map:", beastImages);
@@ -22,22 +25,35 @@ export function WorldBeastLineups(props: {
       className="mb-16"
     >
       <h2 className="text-center text-xl font-bold text-emerald-400 mb-6 tracking-wider uppercase">
-        World's Beast Lineups
+        {isSelectionMode ? "Select Your Target" : "World's Beast Lineups"}
       </h2>
       {lineupsArray.length > 0 ? (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {lineupsArray.map((lineup) => (
-            <motion.div
-              key={lineup.entityId}
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
-              className="border border-emerald-500/20 bg-emerald-950/10 p-6"
-            >
-              <div className="space-y-4">
-                <div className="text-emerald-300/70 font-mono text-xs text-center">
-                  {lineup.player?.slice(0, 6)}...{lineup.player?.slice(-4)}
-                </div>
-                <div className="grid grid-cols-5 gap-2">
+          {lineupsArray.map((lineup) => {
+            const isSelected = selectedLineup?.entityId === lineup.entityId;
+            return (
+              <motion.div
+                key={lineup.entityId}
+                initial={{ opacity: 0, scale: 0.9 }}
+                animate={{ opacity: 1, scale: 1 }}
+                className={`border p-6 transition-all ${
+                  isSelectionMode 
+                    ? `cursor-pointer hover:scale-105 ${
+                        isSelected 
+                          ? "border-red-500/50 bg-red-950/20 shadow-lg shadow-red-500/20" 
+                          : "border-emerald-500/20 bg-emerald-950/10 hover:border-emerald-500/40"
+                      }`
+                    : "border-emerald-500/20 bg-emerald-950/10"
+                }`}
+                onClick={() => isSelectionMode && onSelectLineup?.(lineup)}
+                whileHover={isSelectionMode ? { scale: 1.02 } : {}}
+                whileTap={isSelectionMode ? { scale: 0.98 } : {}}
+              >
+                <div className="space-y-4">
+                  <div className="text-emerald-300/70 font-mono text-xs text-center">
+                    {lineup.player?.slice(0, 6)}...{lineup.player?.slice(-4)}
+                  </div>
+                  <div className="grid grid-cols-5 gap-2">
                     {[1, 2, 3, 4, 5].map((pos) => {
                       const beastId =
                         lineup[`beast${pos}_id` as keyof typeof lineup];
@@ -80,9 +96,10 @@ export function WorldBeastLineups(props: {
                       );
                     })}
                   </div>
-              </div>
-            </motion.div>
-          ))}
+                </div>
+              </motion.div>
+            );
+          })}
         </div>
       ) : (
         <div className="border border-emerald-500/30 bg-emerald-950/20 p-8 text-center">
