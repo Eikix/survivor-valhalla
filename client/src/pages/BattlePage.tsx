@@ -2,7 +2,6 @@ import { motion } from "framer-motion";
 import { useParams } from "react-router-dom";
 import { Swords } from "lucide-react";
 import { useMemo } from "react";
-import { useAccount } from "@starknet-react/core";
 import { Navbar } from "../components/navbar";
 import { useBattleDetails } from "../hooks/useBattleDetails";
 import { useAdventurers } from "../hooks/useAdventurers";
@@ -11,9 +10,8 @@ import { useBeastLineupImages } from "../hooks/useBeasts";
 export function BattlePage() {
   const { battleId } = useParams<{ battleId: string }>();
   const numericBattleId = battleId ? parseInt(battleId, 10) : 0;
-  const { address } = useAccount();
   const { battleDetails } = useBattleDetails(numericBattleId);
-  
+
   // Load adventurers for attacker images
   const { data: adventurers = [] } = useAdventurers(battleDetails?.attacker, {
     enabled: !!battleDetails?.attacker,
@@ -86,16 +84,20 @@ export function BattlePage() {
           </h1>
           <div className="flex items-center justify-center gap-4 text-red-200/60 text-sm">
             <span>
-              {battleDetails.attacker.slice(0, 8)}...{battleDetails.attacker.slice(-6)}
+              {battleDetails.attacker.slice(0, 8)}...
+              {battleDetails.attacker.slice(-6)}
             </span>
             <Swords className="w-4 h-4" />
             <span>
-              {battleDetails.defender.slice(0, 8)}...{battleDetails.defender.slice(-6)}
+              {battleDetails.defender.slice(0, 8)}...
+              {battleDetails.defender.slice(-6)}
             </span>
           </div>
           <div className="mt-2">
-            <span className={`font-bold ${battleDetails.isVictory ? 'text-green-400' : 'text-red-400'}`}>
-              {battleDetails.isVictory ? 'VICTORY' : 'DEFEAT'}
+            <span
+              className={`font-bold ${battleDetails.isVictory ? "text-green-400" : "text-red-400"}`}
+            >
+              {battleDetails.isVictory ? "VICTORY" : "DEFEAT"}
             </span>
           </div>
         </motion.div>
@@ -114,7 +116,7 @@ export function BattlePage() {
                 <Swords className="w-6 h-6 text-amber-300 rotate-180" />
               </div>
             </div>
-            
+
             {/* Attack Symbol - Bottom Right */}
             <div className="absolute bottom-4 right-4 z-20">
               <div className="bg-red-900/80 border border-red-500/50 rounded-full p-2">
@@ -126,11 +128,12 @@ export function BattlePage() {
               {/* Defense Lineup - Top Row */}
               <div className="grid grid-cols-5 gap-4">
                 {[1, 2, 3, 4, 5].map((pos) => {
-                  const beastId = battleDetails.defenderLineup?.[`beast${pos}_id`];
+                  const beastId =
+                    battleDetails.defenderLineup?.[`beast${pos}_id`];
                   const hasBeast = beastId && Number(beastId) > 0;
                   const lookupKey = hasBeast ? String(Number(beastId)) : "";
                   const imageUrl = hasBeast ? beastImages[lookupKey] : null;
-                  
+
                   return (
                     <div
                       key={pos}
@@ -146,7 +149,9 @@ export function BattlePage() {
                         />
                       ) : hasBeast ? (
                         <div className="text-center">
-                          <div className="text-amber-300 text-xs font-bold">B{beastId}</div>
+                          <div className="text-amber-300 text-xs font-bold">
+                            B{beastId}
+                          </div>
                         </div>
                       ) : (
                         <div className="text-amber-200/20 text-xs text-center">
@@ -160,18 +165,22 @@ export function BattlePage() {
 
               {/* VS Divider */}
               <div className="text-center">
-                <div className="text-3xl font-bold text-red-500">
-                  VS
-                </div>
+                <div className="text-3xl font-bold text-red-500">VS</div>
               </div>
 
               {/* Attack Lineup - Bottom Row */}
               <div className="grid grid-cols-5 gap-4">
                 {[1, 2, 3, 4, 5].map((pos) => {
-                  const adventurerId = battleDetails.attackerLineup?.[`adventurer${pos}_id`];
-                  const hasAdventurer = adventurerId && Number(adventurerId) > 0;
-                  const adventurer = hasAdventurer ? adventurers.find(a => a.adventurer_id === Number(adventurerId)) : null;
-                  
+                  const adventurerId =
+                    battleDetails.attackerLineup?.[`adventurer${pos}_id`];
+                  const hasAdventurer =
+                    adventurerId && Number(adventurerId) > 0;
+                  const adventurer = hasAdventurer
+                    ? adventurers.find(
+                        (a) => a.adventurer_id === Number(adventurerId),
+                      )
+                    : null;
+
                   return (
                     <div
                       key={pos}
@@ -187,7 +196,9 @@ export function BattlePage() {
                         />
                       ) : hasAdventurer ? (
                         <div className="text-center">
-                          <div className="text-red-300 text-xs font-bold">A{adventurerId}</div>
+                          <div className="text-red-300 text-xs font-bold">
+                            A{adventurerId}
+                          </div>
                         </div>
                       ) : (
                         <div className="text-red-200/20 text-xs text-center">
@@ -216,7 +227,8 @@ export function BattlePage() {
             <div className="border border-red-500/20 bg-black/40 p-6 max-h-96 overflow-y-auto">
               <div className="space-y-1">
                 {battleDetails.battleLog.map((logEntry, index) => {
-                  const isSeparator = logEntry.includes("---") || logEntry.includes("═══");
+                  const isSeparator =
+                    logEntry.includes("---") || logEntry.includes("═══");
                   const isHeader = logEntry.includes("Battle Chronicle");
 
                   return (
@@ -261,13 +273,13 @@ export function BattlePage() {
           <div className="border border-red-500/30 bg-red-950/20 p-6 text-center">
             <h3 className="text-red-400 font-bold mb-2">Damage Events</h3>
             <div className="text-2xl font-bold text-red-300">
-              {battleDetails.events.filter(e => e.type === 'damage').length}
+              {battleDetails.events.filter((e) => e.type === "damage").length}
             </div>
           </div>
           <div className="border border-red-500/30 bg-red-950/20 p-6 text-center">
             <h3 className="text-red-400 font-bold mb-2">Units Defeated</h3>
             <div className="text-2xl font-bold text-red-300">
-              {battleDetails.events.filter(e => e.type === 'defeat').length}
+              {battleDetails.events.filter((e) => e.type === "defeat").length}
             </div>
           </div>
         </motion.div>

@@ -199,7 +199,9 @@ const getBeastLineupImages = async (
 
   const tokenIdConditions = validTokenIds
     .map((id) => {
-      console.log(`[getBeastLineupImages] Token ${id} -> searching for trait_value = '${id}'`);
+      console.log(
+        `[getBeastLineupImages] Token ${id} -> searching for trait_value = '${id}'`,
+      );
       return `ta.trait_value = '${id}'`;
     })
     .join(" OR ");
@@ -218,9 +220,15 @@ const getBeastLineupImages = async (
   const url = `${toriiUrl}/sql?query=${encodeURIComponent(q)}`;
 
   try {
-    console.log("[getBeastLineupImages] Fetching images for token IDs:", validTokenIds);
+    console.log(
+      "[getBeastLineupImages] Fetching images for token IDs:",
+      validTokenIds,
+    );
     console.log("[getBeastLineupImages] Query:", q);
-    console.log("[getBeastLineupImages] Total tokens requested:", validTokenIds.length);
+    console.log(
+      "[getBeastLineupImages] Total tokens requested:",
+      validTokenIds.length,
+    );
 
     const sql = await fetch(url, {
       method: "GET",
@@ -242,7 +250,9 @@ const getBeastLineupImages = async (
 
     const data = await sql.json();
     console.log("[getBeastLineupImages] Raw response:", data);
-    console.log(`[getBeastLineupImages] Received ${data.length} results out of ${validTokenIds.length} requested tokens`);
+    console.log(
+      `[getBeastLineupImages] Received ${data.length} results out of ${validTokenIds.length} requested tokens`,
+    );
 
     // Convert array to map of token_id -> image
     // The token_id in response is a composite key: contract_address + token_id
@@ -258,32 +268,45 @@ const getBeastLineupImages = async (
         // Total length should be 130 chars (0x + 64 + 64)
         // Extract the last 64 characters (the actual token ID)
         const fullHex = r.token_id;
-        console.log(`[getBeastLineupImages] Parsing token_id from DB: ${fullHex}`);
+        console.log(
+          `[getBeastLineupImages] Parsing token_id from DB: ${fullHex}`,
+        );
 
         // Remove '0x' prefix, skip contract address (64 chars), get token ID (last 64 chars)
         const hexWithoutPrefix = fullHex.slice(2); // Remove '0x'
         const tokenIdHex = hexWithoutPrefix.slice(-64); // Get last 64 chars (the token ID)
         const rowTokenId = parseInt(tokenIdHex, 16);
 
-        console.log(`[getBeastLineupImages] Extracted token ID: 0x${tokenIdHex} -> ${rowTokenId}, comparing to ${decimalId}`);
+        console.log(
+          `[getBeastLineupImages] Extracted token ID: 0x${tokenIdHex} -> ${rowTokenId}, comparing to ${decimalId}`,
+        );
         return rowTokenId === decimalId;
       });
 
       if (row && row.image) {
-        console.log(`[getBeastLineupImages] ✓ Mapping token ${decimalId} -> image found`);
+        console.log(
+          `[getBeastLineupImages] ✓ Mapping token ${decimalId} -> image found`,
+        );
         imageMap[String(decimalId)] = row.image;
       } else {
-        console.log(`[getBeastLineupImages] ✗ No image found for token ${decimalId}`);
+        console.log(
+          `[getBeastLineupImages] ✗ No image found for token ${decimalId}`,
+        );
       }
     });
 
     const foundCount = Object.keys(imageMap).length;
-    const missingTokens = validTokenIds.filter(id => !imageMap[String(id)]);
+    const missingTokens = validTokenIds.filter((id) => !imageMap[String(id)]);
 
     console.log("[getBeastLineupImages] Final image map:", imageMap);
-    console.log(`[getBeastLineupImages] Summary: ${foundCount}/${validTokenIds.length} images found`);
+    console.log(
+      `[getBeastLineupImages] Summary: ${foundCount}/${validTokenIds.length} images found`,
+    );
     if (missingTokens.length > 0) {
-      console.warn(`[getBeastLineupImages] Missing tokens (not in database):`, missingTokens);
+      console.warn(
+        `[getBeastLineupImages] Missing tokens (not in database):`,
+        missingTokens,
+      );
     }
     return imageMap;
   } catch (error) {
@@ -317,7 +340,9 @@ export const useBeastLineupImages = (
 const getBeastLineupStats = async (
   tokenIds: (string | number | bigint)[],
   toriiUrl: string = TORII_URL,
-): Promise<Record<string, { power: number; health: number; type: string; level: number }>> => {
+): Promise<
+  Record<string, { power: number; health: number; type: string; level: number }>
+> => {
   if (tokenIds.length === 0) return {};
 
   // Helper to convert BigNumberish to number
@@ -336,7 +361,6 @@ const getBeastLineupStats = async (
   const validTokenIds = tokenIds.map(toNumber).filter((id) => id > 0);
   if (validTokenIds.length === 0) return {};
 
-  const contractAddressHex = addAddressPadding(BEASTS_CONTRACT.toLowerCase());
   const tokenIdConditions = validTokenIds
     .map((id) => `ta.trait_value = '${id}'`)
     .join(" OR ");
@@ -371,11 +395,16 @@ const getBeastLineupStats = async (
     });
 
     if (!sql.ok) {
-      throw new Error(`Failed to fetch beast stats: ${sql.status} ${sql.statusText}`);
+      throw new Error(
+        `Failed to fetch beast stats: ${sql.status} ${sql.statusText}`,
+      );
     }
 
     const data = await sql.json();
-    const statsMap: Record<string, { power: number; health: number; type: string; level: number }> = {};
+    const statsMap: Record<
+      string,
+      { power: number; health: number; type: string; level: number }
+    > = {};
 
     data.forEach((row: any) => {
       const tokenId = row["Token ID"];
@@ -428,9 +457,9 @@ export const useBeastLineupStats = (
  */
 export const getBeastWeaponType = (beastType: string): number => {
   const typeMap: Record<string, number> = {
-    "Brute": 2,    // Bludgeon_or_Metal
-    "Magic": 3,    // Magic_or_Cloth
-    "Hunter": 1,   // Blade_or_Hide
+    Brute: 2, // Bludgeon_or_Metal
+    Magic: 3, // Magic_or_Cloth
+    Hunter: 1, // Blade_or_Hide
   };
   return typeMap[beastType] || 0;
 };
