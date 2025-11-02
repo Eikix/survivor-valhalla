@@ -38,7 +38,8 @@ export function MatchHistoryPage() {
         ModelsMapping.UnitDefeated,
         ModelsMapping.RoundCompleted,
         ModelsMapping.CombatUnit,
-      ]),
+      ])
+      .withLimit(1000),
   );
 
   const battleCompletedEvents = useModels(ModelsMapping.BattleCompleted);
