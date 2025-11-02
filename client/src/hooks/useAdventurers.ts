@@ -33,43 +33,87 @@ const getAdventurerCollection = async (
   toriiUrl: string = TORII_URL,
   lootSurvivorContract: string = LOOT_SURVIVOR_CONTRACT,
 ): Promise<Adventurer[]> => {
-  // Query all adventurers owned by the account
-  // Join token_balances with tokens table to get owned adventurer NFTs
-  let q = `
-SELECT *
-FROM tokens
-WHERE contract_address = '0x036017e69d21d6d8c13e266eabb73ef1f1d02722d86bdcabe5f168f8e549d3cd'
-LIMIT 10;
+  // First query: Get token IDs owned by the account
+  // Use exact balance check like in beast query
+  let tokenBalancesQuery = `
+    SELECT token_id, balance
+    FROM token_balances
+    WHERE account_address = '${addAddressPadding(accountAddress.toLowerCase())}' 
+      AND contract_address = '${addAddressPadding(lootSurvivorContract.toLowerCase())}'
+      AND balance = '0x0000000000000000000000000000000000000000000000000000000000000001'
+    LIMIT 10000
   `;
-  
 
-  const url = `${toriiUrl}/sql?query=${encodeURIComponent(q)}`;
+      
+
+  // First, get the owned token IDs
+  const tokenBalancesUrl = `${toriiUrl}/sql?query=${encodeURIComponent(tokenBalancesQuery)}`;
 
   try {
-    const sql = await fetch(url, {
+    const tokenBalancesResponse = await fetch(tokenBalancesUrl, {
       method: "GET",
       headers: {
         "Content-Type": "application/json",
       },
     });
 
-    if (!sql.ok) {
-      console.error("[useAdventurers] Fetch failed:", {
-        status: sql.status,
-        statusText: sql.statusText,
-        url,
+    if (!tokenBalancesResponse.ok) {
+      console.error("[useAdventurers] Token balances fetch failed:", {
+        status: tokenBalancesResponse.status,
+        statusText: tokenBalancesResponse.statusText,
+        url: tokenBalancesUrl,
       });
       throw new Error(
-        `Failed to fetch adventurers: ${sql.status} ${sql.statusText}`,
+        `Failed to fetch token balances: ${tokenBalancesResponse.status} ${tokenBalancesResponse.statusText}`,
       );
     }
 
-    let data = await sql.json();
+    const tokenBalances = await tokenBalancesResponse.json();
+    console.log("[useAdventurers] Token balances:", tokenBalances);
 
-    console.log("[useAdventurers] Raw data:", data);
-    console.log("[useAdventurers] Data length:", data.length);
+    if (!tokenBalances || tokenBalances.length === 0) {
+      console.log("[useAdventurers] No adventurers owned by this account");
+      return [];
+    }
+
+    // Extract token IDs
+    const tokenIds = tokenBalances.map((tb: any) => `'${tb.token_id}'`).join(',');
+    
+    // Second query: Get token details for owned tokens
+    let tokensQuery = `
+      SELECT *
+      FROM tokens
+      WHERE id IN (${tokenIds})
+        AND metadata IS NOT NULL
+      LIMIT 100
+    `;
+
+    const tokensUrl = `${toriiUrl}/sql?query=${encodeURIComponent(tokensQuery)}`;
+    
+    const tokensResponse = await fetch(tokensUrl, {
+      method: "GET",
+      headers: {
+        "Content-Type": "application/json",
+      },
+    });
+
+    if (!tokensResponse.ok) {
+      console.error("[useAdventurers] Tokens fetch failed:", {
+        status: tokensResponse.status,
+        statusText: tokensResponse.statusText,
+        url: tokensUrl,
+      });
+      throw new Error(
+        `Failed to fetch tokens: ${tokensResponse.status} ${tokensResponse.statusText}`,
+      );
+    }
+
+    let data = await tokensResponse.json();
+
+    console.log("[useAdventurers] Raw tokens data:", data);
+    console.log("[useAdventurers] Tokens data length:", data.length);
     if (data.length > 0) {
-      console.log("[useAdventurers] First row:", data[0]);
+      console.log("[useAdventurers] First token:", data[0]);
     }
 
     // Helper function to safely convert to number
