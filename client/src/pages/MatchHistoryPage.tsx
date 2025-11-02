@@ -11,6 +11,8 @@ import type { BattleCompleted } from "../bindings/typescript/models.gen";
 import { addAddressPadding } from "starknet";
 import { ChevronDown, ChevronUp, Swords, ExternalLink } from "lucide-react";
 import { AddressDisplay } from "../components/AddressDisplay";
+import { usePlayerStats } from "../hooks/usePlayerStats";
+import { PlayerStatsCard } from "../components/PlayerStatsCard";
 
 type BattleWithId = BattleCompleted & { entityId: string };
 
@@ -64,6 +66,9 @@ export function MatchHistoryPage() {
     unitDefeatedEvents === undefined ||
     roundEvents === undefined ||
     combatUnits === undefined;
+
+  // Get player stats
+  const playerStats = usePlayerStats(battleCompletedEvents);
 
   // Filter battles where user is attacker or defender
   const userBattles: BattleWithId[] = Array.isArray(battleCompletedEvents)
@@ -359,6 +364,9 @@ export function MatchHistoryPage() {
             Review your past battles
           </p>
         </motion.div>
+
+        {/* Player Stats Card */}
+        <PlayerStatsCard {...playerStats} />
 
         {/* Battle List */}
         {isLoading ? (
