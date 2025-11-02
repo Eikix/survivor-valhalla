@@ -729,65 +729,73 @@ export function AttackLineupPage() {
           <motion.div
             initial={{ opacity: 0, scale: 0.8 }}
             animate={{ opacity: 1, scale: 1 }}
-            className="max-w-md w-full bg-red-950/90 border border-red-500/30 rounded-lg p-6"
+            className="max-w-2xl w-full bg-red-950/90 border border-red-500/30 rounded-lg p-6"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="flex items-start gap-6">
+            <div className="text-center">
+              {/* Very Large Image - 80% of modal */}
               {inspectedAdventurer.image && (
                 <img
                   src={inspectedAdventurer.image}
                   alt={inspectedAdventurer.name}
-                  className="w-32 h-32"
+                  className="w-full max-w-lg h-auto mx-auto mb-4"
                 />
               )}
-              <div className="flex-1">
-                <h3 className="text-xl font-bold text-red-400 mb-2">
-                  {inspectedAdventurer.name}
-                </h3>
-                <div className="space-y-1 text-sm">
-                  <div className="flex justify-between">
-                    <span className="text-red-200/60">Level:</span>
-                    <span className="text-red-300">{inspectedAdventurer.level}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-red-200/60">Health:</span>
-                    <span className="text-red-300">{inspectedAdventurer.health}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-red-200/60">Strength:</span>
-                    <span className="text-red-300">{inspectedAdventurer.strength}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-red-200/60">Dexterity:</span>
-                    <span className="text-red-300">{inspectedAdventurer.dexterity}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-red-200/60">Vitality:</span>
-                    <span className="text-red-300">{inspectedAdventurer.vitality}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-red-200/60">Intelligence:</span>
-                    <span className="text-red-300">{inspectedAdventurer.intelligence}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-red-200/60">Wisdom:</span>
-                    <span className="text-red-300">{inspectedAdventurer.wisdom}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-red-200/60">Charisma:</span>
-                    <span className="text-red-300">{inspectedAdventurer.charisma}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-red-200/60">Luck:</span>
-                    <span className="text-red-300">{inspectedAdventurer.luck}</span>
-                  </div>
+              
+              {/* Name */}
+              <h3 className="text-xl font-bold text-red-400 mb-3">
+                {inspectedAdventurer.name}
+              </h3>
+              
+              {/* Compact Stats Grid */}
+              <div className="grid grid-cols-5 gap-2 max-w-lg mx-auto text-xs">
+                <div className="bg-red-950/50 border border-red-500/20 rounded p-2">
+                  <div className="text-red-200/60 uppercase tracking-wider text-[10px]">LVL</div>
+                  <div className="text-red-300 font-bold">{inspectedAdventurer.level}</div>
+                </div>
+                <div className="bg-red-950/50 border border-red-500/20 rounded p-2">
+                  <div className="text-red-200/60 uppercase tracking-wider text-[10px]">HP</div>
+                  <div className="text-red-300 font-bold">{inspectedAdventurer.health}</div>
+                </div>
+                <div className="bg-red-950/50 border border-red-500/20 rounded p-2">
+                  <div className="text-red-200/60 uppercase tracking-wider text-[10px]">STR</div>
+                  <div className="text-red-300 font-bold">{inspectedAdventurer.strength}</div>
+                </div>
+                <div className="bg-red-950/50 border border-red-500/20 rounded p-2">
+                  <div className="text-red-200/60 uppercase tracking-wider text-[10px]">DEX</div>
+                  <div className="text-red-300 font-bold">{inspectedAdventurer.dexterity}</div>
+                </div>
+                <div className="bg-red-950/50 border border-red-500/20 rounded p-2">
+                  <div className="text-red-200/60 uppercase tracking-wider text-[10px]">VIT</div>
+                  <div className="text-red-300 font-bold">{inspectedAdventurer.vitality}</div>
+                </div>
+                <div className="bg-red-950/50 border border-red-500/20 rounded p-2">
+                  <div className="text-red-200/60 uppercase tracking-wider text-[10px]">INT</div>
+                  <div className="text-red-300 font-bold">{inspectedAdventurer.intelligence}</div>
+                </div>
+                <div className="bg-red-950/50 border border-red-500/20 rounded p-2">
+                  <div className="text-red-200/60 uppercase tracking-wider text-[10px]">WIS</div>
+                  <div className="text-red-300 font-bold">{inspectedAdventurer.wisdom}</div>
+                </div>
+                <div className="bg-red-950/50 border border-red-500/20 rounded p-2">
+                  <div className="text-red-200/60 uppercase tracking-wider text-[10px]">CHA</div>
+                  <div className="text-red-300 font-bold">{inspectedAdventurer.charisma}</div>
+                </div>
+                <div className="bg-red-950/50 border border-red-500/20 rounded p-2">
+                  <div className="text-red-200/60 uppercase tracking-wider text-[10px]">LUCK</div>
+                  <div className="text-red-300 font-bold">{inspectedAdventurer.luck}</div>
+                </div>
+                <div className="bg-red-950/50 border border-red-500/20 rounded p-2">
+                  <div className="text-red-200/60 uppercase tracking-wider text-[10px]">XP</div>
+                  <div className="text-red-300 font-bold">{inspectedAdventurer.xp}</div>
                 </div>
               </div>
             </div>
+            
             <div className="mt-4 text-center">
               <button
                 onClick={() => setInspectedAdventurer(null)}
-                className="text-red-400 text-sm uppercase tracking-wider hover:text-red-300"
+                className="text-red-400 text-xs uppercase tracking-wider hover:text-red-300 transition-colors"
               >
                 Close (ESC)
               </button>
