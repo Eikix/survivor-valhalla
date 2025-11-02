@@ -1,11 +1,13 @@
 import { motion } from "framer-motion";
-import { LogOut, ExternalLink, Copy, Check } from "lucide-react";
+import { LogOut, ExternalLink, Copy, Check, Shield, Swords } from "lucide-react";
 import { useState } from "react";
 import { useConnect, useAccount, useDisconnect } from "@starknet-react/core";
+import { useLocation, Link } from "react-router-dom";
 import type { ControllerConnector } from "@cartridge/connector";
 
 export function Navbar() {
   const [copied, setCopied] = useState(false);
+  const location = useLocation();
 
   const { connect, connector, connectors } = useConnect();
   const { address, status } = useAccount();
@@ -15,11 +17,46 @@ export function Navbar() {
     <nav className="relative z-20 border-b border-emerald-500/20 bg-black/50 backdrop-blur-sm">
       <div className="container mx-auto px-4 py-4">
         <div className="flex items-center justify-between">
-          {/* Logo/Brand */}
-          <div className="flex items-center">
+          {/* Logo/Brand and Navigation Tabs */}
+          <div className="flex items-center gap-8">
             <h2 className="text-xl font-bold text-emerald-500 tracking-wider uppercase">
               THE ARENA
             </h2>
+            
+            {/* Navigation Tabs */}
+            {status === "connected" && (
+              <div className="flex items-center gap-4">
+                <Link to="/home">
+                  <motion.button
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                    className={`flex items-center gap-2 px-4 py-2 text-sm font-bold tracking-wider uppercase transition-all cursor-pointer ${
+                      location.pathname === "/home"
+                        ? "text-emerald-400 border-b-2 border-emerald-400"
+                        : "text-emerald-200/60 hover:text-emerald-300 border-b-2 border-transparent"
+                    }`}
+                  >
+                    <Shield className="w-4 h-4" />
+                    <span>Beast Lineup</span>
+                  </motion.button>
+                </Link>
+                
+                <Link to="/attack">
+                  <motion.button
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                    className={`flex items-center gap-2 px-4 py-2 text-sm font-bold tracking-wider uppercase transition-all cursor-pointer ${
+                      location.pathname === "/attack"
+                        ? "text-emerald-400 border-b-2 border-emerald-400"
+                        : "text-emerald-200/60 hover:text-emerald-300 border-b-2 border-transparent"
+                    }`}
+                  >
+                    <Swords className="w-4 h-4" />
+                    <span>Attack Lineup</span>
+                  </motion.button>
+                </Link>
+              </div>
+            )}
           </div>
 
           {/* Wallet Section */}

@@ -1,13 +1,11 @@
 world_address = "0x01c549354a5324cf3a978f89eb60566b251740d85dada78a6f85246fe5684f96"
 rpc = "https://api.cartridge.gg/x/starknet/mainnet"
-db_dir = "./torii.db"
 
 [indexing]
 contracts = [
   "erc721:0x046da8955829adf2bda310099a0063451923f02e648cf25a1203aac6335cf0e4", # beasts
+  "erc721:0x036017E69D21D6D8c13E266EaBB73ef1f1D02722D86BDcAbe5f168f8e549d3cD", # adventurers
 ]
 [sql]
 historical = ["survivor_valhalla-BeastLineupRegistered", "survivor_valhalla-BeastSwapped"]
 
-[server]
-http_cors_origins = ["*"] # CORS allowed origins
