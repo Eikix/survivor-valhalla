@@ -38,6 +38,7 @@ export function AttackLineupPage() {
     battleLog,
     battleResult,
     currentBattleId,
+    battleSummary,
     startBattle,
     clearBattleState,
   } = useBattleEvents();
@@ -538,6 +539,106 @@ export function AttackLineupPage() {
               </motion.div>
             )}
 
+            {/* Battle Summary Section - Show when battle is completed */}
+            {battleResult && battleSummary && (
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.3 }}
+                className="mb-16"
+              >
+                <div className="border border-blue-500/30 bg-blue-950/20 p-8">
+                  <h2 className="text-center text-xl font-bold text-blue-400 mb-6 tracking-wider uppercase">
+                    🔍 Battle Analysis
+                  </h2>
+                  <div className="space-y-4">
+                    <div className="text-center mb-4">
+                      <div className="text-blue-300 text-sm">Battle ID: {battleSummary.battleId}</div>
+                      <div className="text-blue-300 text-sm">Winner: {battleSummary.winner.slice(0, 8)}...{battleSummary.winner.slice(-6)}</div>
+                    </div>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="bg-blue-950/30 border border-blue-500/20 p-4 rounded">
+                        <h3 className="text-blue-400 font-bold mb-2">Damage Events ({battleSummary.damageEvents.length})</h3>
+                        <div className="max-h-32 overflow-y-auto text-xs text-blue-200">
+                          {battleSummary.damageEvents.length > 0 ? (
+                            battleSummary.damageEvents.map((eventObj: any, index: number) => {
+                              const entityId = Object.keys(eventObj)[0];
+                              const event = eventObj[entityId];
+                              return (
+                                <div key={index} className="mb-1">
+                                  Unit {event.attacker_id} → {event.target_id}: {event.damage} dmg
+                                </div>
+                              );
+                            })
+                          ) : (
+                            <div className="text-blue-200/50">No damage events</div>
+                          )}
+                        </div>
+                      </div>
+                      
+                      <div className="bg-blue-950/30 border border-blue-500/20 p-4 rounded">
+                        <h3 className="text-blue-400 font-bold mb-2">Defeat Events ({battleSummary.defeatEvents.length})</h3>
+                        <div className="max-h-32 overflow-y-auto text-xs text-blue-200">
+                          {battleSummary.defeatEvents.length > 0 ? (
+                            battleSummary.defeatEvents.map((eventObj: any, index: number) => {
+                              const entityId = Object.keys(eventObj)[0];
+                              const event = eventObj[entityId];
+                              const unitType = event.is_adventurer ? "Adventurer" : "Beast";
+                              return (
+                                <div key={index} className="mb-1">
+                                  {unitType} {event.unit_id} defeated at pos {event.position}
+                                </div>
+                              );
+                            })
+                          ) : (
+                            <div className="text-blue-200/50">No defeats</div>
+                          )}
+                        </div>
+                      </div>
+                      
+                      <div className="bg-blue-950/30 border border-blue-500/20 p-4 rounded">
+                        <h3 className="text-blue-400 font-bold mb-2">Round Events ({battleSummary.roundEvents.length})</h3>
+                        <div className="max-h-32 overflow-y-auto text-xs text-blue-200">
+                          {battleSummary.roundEvents.length > 0 ? (
+                            battleSummary.roundEvents.map((eventObj: any, index: number) => {
+                              const entityId = Object.keys(eventObj)[0];
+                              const event = eventObj[entityId];
+                              return (
+                                <div key={index} className="mb-1">
+                                  Round {event.round}: {event.attacker_survivors} vs {event.defender_survivors}
+                                </div>
+                              );
+                            })
+                          ) : (
+                            <div className="text-blue-200/50">No round events</div>
+                          )}
+                        </div>
+                      </div>
+                      
+                      <div className="bg-blue-950/30 border border-blue-500/20 p-4 rounded">
+                        <h3 className="text-blue-400 font-bold mb-2">Battle Completion ({battleSummary.battleEvents.length})</h3>
+                        <div className="max-h-32 overflow-y-auto text-xs text-blue-200">
+                          {battleSummary.battleEvents.length > 0 ? (
+                            battleSummary.battleEvents.map((eventObj: any, index: number) => {
+                              const entityId = Object.keys(eventObj)[0];
+                              const event = eventObj[entityId];
+                              return (
+                                <div key={index} className="mb-1">
+                                  Winner: {event.winner.slice(0, 8)}...{event.winner.slice(-6)}
+                                </div>
+                              );
+                            })
+                          ) : (
+                            <div className="text-blue-200/50">No completion events</div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </motion.div>
+            )}
 
             {/* Enemy Selection Section - Only show if no enemy selected */}
             {!selectedEnemy && !battleResult && (
