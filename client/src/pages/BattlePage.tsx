@@ -1,6 +1,6 @@
 import { motion } from "framer-motion";
 import { useParams } from "react-router-dom";
-import { Swords, Play, Pause, RotateCcw } from "lucide-react";
+import { Swords, Play, Pause, RotateCcw, Shield, Zap, Heart } from "lucide-react";
 import { useMemo, useState, useCallback, useEffect, useRef } from "react";
 import { Navbar } from "../components/navbar";
 import { useBattleDetails } from "../hooks/useBattleDetails";
@@ -254,51 +254,145 @@ export function BattlePage() {
   }
 
   return (
-    <div className="min-h-screen bg-black text-white relative overflow-hidden">
-      {/* Background effect */}
+    <div className="min-h-screen bg-gradient-to-b from-gray-900 via-black to-red-900/20 text-white relative overflow-hidden">
+      {/* Dungeon Atmosphere Background */}
       <div className="absolute inset-0">
+        {/* Main ambient glow */}
         <motion.div
           animate={{
-            opacity: [0.1, 0.15, 0.1],
+            opacity: [0.1, 0.2, 0.1],
+          }}
+          transition={{
+            duration: 6,
+            repeat: Infinity,
+            ease: "easeInOut",
+          }}
+          className="absolute top-0 left-1/2 -translate-x-1/2 w-[1200px] h-[600px] bg-red-600/10 rounded-full blur-[200px]"
+        />
+        
+        {/* Secondary glows for depth */}
+        <motion.div
+          animate={{
+            opacity: [0.05, 0.1, 0.05],
           }}
           transition={{
             duration: 8,
             repeat: Infinity,
             ease: "easeInOut",
+            delay: 2,
           }}
-          className="absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[400px] bg-red-600/10 rounded-full blur-[150px]"
+          className="absolute bottom-20 left-1/4 w-[400px] h-[300px] bg-amber-500/5 rounded-full blur-[150px]"
+        />
+        
+        <motion.div
+          animate={{
+            opacity: [0.03, 0.08, 0.03],
+          }}
+          transition={{
+            duration: 10,
+            repeat: Infinity,
+            ease: "easeInOut",
+            delay: 4,
+          }}
+          className="absolute top-40 right-1/4 w-[500px] h-[400px] bg-emerald-600/5 rounded-full blur-[180px]"
+        />
+        
+        {/* Texture overlay for dungeon feel */}
+        <div 
+          className="absolute inset-0 opacity-[0.02]"
+          style={{
+            backgroundImage: `
+              radial-gradient(circle at 25% 25%, rgba(255,255,255,0.1) 1px, transparent 1px),
+              radial-gradient(circle at 75% 75%, rgba(255,255,255,0.05) 1px, transparent 1px)
+            `,
+            backgroundSize: '50px 50px, 30px 30px',
+          }}
         />
       </div>
 
       <Navbar />
 
       <div className="relative z-10 container mx-auto px-4 py-12 max-w-4xl">
-        {/* Battle header */}
+        {/* Dungeon Battle Header */}
         <motion.div
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="text-center mb-12"
+          className="text-center mb-12 relative"
         >
-          <h1 className="text-4xl md:text-5xl font-bold mb-4 text-red-500">
-            Battle #{battleId}
-          </h1>
-          <div className="flex items-center justify-center gap-4 text-red-200/60 text-sm">
-            <span>
-              {battleDetails.attacker.slice(0, 8)}...
-              {battleDetails.attacker.slice(-6)}
-            </span>
-            <Swords className="w-4 h-4" />
-            <span>
-              {battleDetails.defender.slice(0, 8)}...
-              {battleDetails.defender.slice(-6)}
-            </span>
-          </div>
-          <div className="mt-2">
-            <span
-              className={`font-bold ${battleDetails.isVictory ? "text-green-400" : "text-red-400"}`}
+          {/* Decorative border */}
+          <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-red-500/50 to-transparent" />
+          <div className="absolute inset-x-0 bottom-0 h-px bg-gradient-to-r from-transparent via-red-500/30 to-transparent" />
+          
+          <div className="py-8">
+            <motion.h1 
+              className="text-5xl md:text-6xl font-bold mb-4 text-transparent bg-clip-text bg-gradient-to-r from-red-400 via-red-500 to-red-600"
+              style={{
+                fontFamily: 'serif',
+                textShadow: '0 0 30px rgba(239, 68, 68, 0.5), 0 0 60px rgba(239, 68, 68, 0.2)',
+              }}
+              animate={{
+                textShadow: [
+                  '0 0 30px rgba(239, 68, 68, 0.5), 0 0 60px rgba(239, 68, 68, 0.2)',
+                  '0 0 40px rgba(239, 68, 68, 0.7), 0 0 80px rgba(239, 68, 68, 0.3)',
+                  '0 0 30px rgba(239, 68, 68, 0.5), 0 0 60px rgba(239, 68, 68, 0.2)',
+                ],
+              }}
+              transition={{
+                duration: 3,
+                repeat: Infinity,
+                ease: 'easeInOut',
+              }}
             >
-              {battleDetails.isVictory ? "VICTORY" : "DEFEAT"}
-            </span>
+              BATTLE ARENA #{battleId}
+            </motion.h1>
+            
+            {/* Warriors facing off */}
+            <div className="flex items-center justify-center gap-6 text-red-200/60 text-sm mb-4">
+              <div className="flex items-center gap-2 bg-red-950/30 px-4 py-2 rounded-lg border border-red-500/20">
+                <Shield className="w-4 h-4 text-emerald-400" />
+                <span className="font-mono">
+                  {battleDetails.attacker.slice(0, 6)}...{battleDetails.attacker.slice(-4)}
+                </span>
+              </div>
+              <motion.div
+                animate={{
+                  rotate: [0, 5, -5, 0],
+                  scale: [1, 1.1, 1],
+                }}
+                transition={{
+                  duration: 2,
+                  repeat: Infinity,
+                  ease: 'easeInOut',
+                }}
+              >
+                <Swords className="w-6 h-6 text-red-500" />
+              </motion.div>
+              <div className="flex items-center gap-2 bg-amber-950/30 px-4 py-2 rounded-lg border border-amber-600/20">
+                <Zap className="w-4 h-4 text-amber-400" />
+                <span className="font-mono">
+                  {battleDetails.defender.slice(0, 6)}...{battleDetails.defender.slice(-4)}
+                </span>
+              </div>
+            </div>
+            
+            {/* Battle Outcome Banner */}
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              transition={{ delay: 0.3 }}
+              className={`inline-block px-6 py-3 rounded-lg font-bold text-lg tracking-wider border-2 ${
+                battleDetails.isVictory 
+                  ? 'bg-green-950/50 border-green-500/50 text-green-300 shadow-lg shadow-green-500/20' 
+                  : 'bg-red-950/50 border-red-500/50 text-red-300 shadow-lg shadow-red-500/20'
+              }`}
+              style={{
+                textShadow: battleDetails.isVictory 
+                  ? '0 0 10px rgba(34, 197, 94, 0.5)' 
+                  : '0 0 10px rgba(239, 68, 68, 0.5)',
+              }}
+            >
+              {battleDetails.isVictory ? '⚔️ VICTORIOUS ⚔️' : '💀 DEFEATED 💀'}
+            </motion.div>
           </div>
         </motion.div>
 
@@ -669,75 +763,210 @@ export function BattlePage() {
           </div>
         </motion.div>
 
-        {/* Battle log */}
+        {/* Battle Chronicle - Enhanced Dungeon Style */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.2 }}
-          className="mb-16"
+          className="mb-16 relative"
         >
-          <div className="border border-red-500/30 bg-red-950/20 p-8">
-            <h2 className="text-center text-xl font-bold text-red-400 mb-6 tracking-wider uppercase">
-              Battle Chronicle
-            </h2>
-            <div className="border border-red-500/20 bg-black/40 p-6 max-h-96 overflow-y-auto">
-              <div className="space-y-1">
-                {battleDetails.battleLog.map((logEntry, index) => {
-                  const isSeparator =
-                    logEntry.includes("---") || logEntry.includes("═══");
-                  const isHeader = logEntry.includes("Battle Chronicle");
+          <div className="relative border-2 border-red-500/40 bg-gradient-to-b from-red-950/30 via-red-950/20 to-black/40 p-8 overflow-hidden">
+            {/* Decorative Corner Elements */}
+            <div className="absolute top-0 left-0 w-8 h-8 border-l-4 border-t-4 border-amber-500/50"></div>
+            <div className="absolute top-0 right-0 w-8 h-8 border-r-4 border-t-4 border-amber-500/50"></div>
+            <div className="absolute bottom-0 left-0 w-8 h-8 border-l-4 border-b-4 border-amber-500/50"></div>
+            <div className="absolute bottom-0 right-0 w-8 h-8 border-r-4 border-b-4 border-amber-500/50"></div>
+            
+            {/* Atmospheric Glow */}
+            <div className="absolute top-4 right-4 w-32 h-32 bg-red-600/5 rounded-full blur-[60px]"></div>
+            
+            <div className="relative z-10">
+              {/* Chronicle Header */}
+              <div className="flex items-center justify-center gap-3 mb-6">
+                <motion.div
+                  animate={{ rotate: [0, 5, -5, 0] }}
+                  transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
+                >
+                </motion.div>
+                <h2 className="text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-amber-400 via-red-400 to-amber-400 tracking-wider uppercase">
+                  BATTLE CHRONICLE
+                </h2>
+                <motion.div
+                  animate={{ rotate: [0, -5, 5, 0] }}
+                  transition={{ duration: 4, repeat: Infinity, ease: "easeInOut", delay: 2 }}
+                >
+                </motion.div>
+              </div>
+              
+              {/* Chronicle Content */}
+              <div className="bg-black/50 border border-amber-500/30 rounded-lg p-6 max-h-96 overflow-y-auto custom-scrollbar">
+                <div className="space-y-1">
+                  {battleDetails.battleLog.map((logEntry, index) => {
+                    const isSeparator = logEntry.includes("---") || logEntry.includes("═══");
+                    const isHeader = logEntry.includes("Battle Chronicle");
+                    const isRoundEnd = logEntry.includes("Round") && logEntry.includes("End");
+                    const isDefeat = logEntry.includes("💀") || logEntry.includes("fainted!");
+                    const isDamage = logEntry.includes("dealt") && logEntry.includes("HP damage");
+                    const isBattleEnd = logEntry.includes("Battle #") && logEntry.includes("complete!");
+                    const isVictory = logEntry.includes("You won the battle!");
+                    const isDefeat2 = logEntry.includes("You were defeated!");
 
-                  return (
-                    <motion.div
-                      key={index}
-                      initial={{ opacity: 0, x: -10 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      transition={{ delay: index * 0.02 }}
-                      className={`
-                        font-mono text-sm
-                        ${isSeparator ? "text-red-500/40 text-center my-1" : ""}
-                        ${isHeader ? "text-red-400 font-bold text-center my-2" : ""}
-                        ${!isSeparator && !isHeader ? "text-red-200/70 pl-2" : ""}
-                      `}
-                      style={{
-                        whiteSpace: "pre-line",
-                        lineHeight: isSeparator ? "1.2" : "1.6",
-                      }}
-                    >
-                      {logEntry}
-                    </motion.div>
-                  );
-                })}
+                    return (
+                      <motion.div
+                        key={index}
+                        initial={{ opacity: 0, x: -10 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        transition={{ delay: index * 0.02 }}
+                        className={`
+                          font-mono text-sm transition-all hover:bg-red-950/20 rounded px-2 py-1
+                          ${isSeparator ? "text-red-500/50 text-center my-1 border-b border-red-500/20" : ""}
+                          ${isHeader ? "text-red-400 font-bold text-center my-2" : ""}
+                          ${isRoundEnd ? "text-amber-300 font-bold bg-gradient-to-r from-amber-950/40 to-orange-950/30 p-2 rounded border-l-4 border-amber-500 shadow-md" : ""}
+                          ${isDefeat ? "text-red-400 bg-gradient-to-r from-red-950/50 to-black/30 p-2 rounded border-l-3 border-red-600 shadow-md" : ""}
+                          ${isDamage ? "text-orange-300 bg-orange-950/20 p-1 rounded border-l-2 border-orange-600/50" : ""}
+                          ${isBattleEnd ? "text-red-300 font-bold bg-gradient-to-r from-red-950/60 to-red-900/40 p-3 rounded-lg border-l-4 border-red-400 shadow-lg shadow-red-500/20" : ""}
+                          ${isVictory ? "text-green-300 font-bold bg-gradient-to-r from-green-950/60 to-green-900/40 p-3 rounded-lg border-l-4 border-green-400 shadow-lg shadow-green-500/20" : ""}
+                          ${isDefeat2 ? "text-red-400 font-bold bg-gradient-to-r from-red-950/60 to-red-900/40 p-3 rounded-lg border-l-4 border-red-400 shadow-lg shadow-red-500/20" : ""}
+                          ${!isSeparator && !isHeader && !isRoundEnd && !isDefeat && !isDamage && !isBattleEnd && !isVictory && !isDefeat2 ? "text-red-200/90 hover:text-red-100 pl-2" : ""}
+                        `}
+                        style={{
+                          whiteSpace: "pre-line",
+                          lineHeight: isSeparator ? "1.2" : "1.6",
+                          textShadow: isVictory 
+                            ? '0 0 8px rgba(34, 197, 94, 0.5)' 
+                            : (isBattleEnd || isDefeat2)
+                              ? '0 0 8px rgba(239, 68, 68, 0.5)' 
+                              : isRoundEnd 
+                                ? '0 0 6px rgba(245, 158, 11, 0.4)'
+                                : isDefeat
+                                  ? '0 0 4px rgba(239, 68, 68, 0.3)'
+                                  : 'none',
+                        }}
+                      >
+                        {logEntry}
+                      </motion.div>
+                    );
+                  })}
+                </div>
               </div>
             </div>
           </div>
         </motion.div>
 
-        {/* Battle statistics */}
+        {/* Battle Statistics - Dungeon Style */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.4 }}
           className="grid grid-cols-1 md:grid-cols-3 gap-6"
         >
-          <div className="border border-red-500/30 bg-red-950/20 p-6 text-center">
-            <h3 className="text-red-400 font-bold mb-2">Total Events</h3>
-            <div className="text-2xl font-bold text-red-300">
-              {battleDetails.events.length}
+          {/* Total Events Stat */}
+          <motion.div
+            whileHover={{ scale: 1.02 }}
+            className="relative border-2 border-amber-500/40 bg-gradient-to-br from-amber-950/30 via-red-950/20 to-black/40 p-6 text-center overflow-hidden group"
+          >
+            {/* Corner decorations */}
+            <div className="absolute top-1 left-1 w-4 h-4 border-l-2 border-t-2 border-amber-400/60"></div>
+            <div className="absolute top-1 right-1 w-4 h-4 border-r-2 border-t-2 border-amber-400/60"></div>
+            <div className="absolute bottom-1 left-1 w-4 h-4 border-l-2 border-b-2 border-amber-400/60"></div>
+            <div className="absolute bottom-1 right-1 w-4 h-4 border-r-2 border-b-2 border-amber-400/60"></div>
+            
+            {/* Background glow */}
+            <div className="absolute inset-0 bg-amber-600/5 rounded-lg group-hover:bg-amber-600/10 transition-all duration-500"></div>
+            
+            <div className="relative z-10">
+              <div className="flex items-center justify-center gap-2 mb-2">
+                <Heart className="w-5 h-5 text-amber-400" />
+                <h3 className="text-amber-400 font-bold uppercase tracking-wider text-sm">Total Events</h3>
+                <Heart className="w-5 h-5 text-amber-400" />
+              </div>
+              <motion.div 
+                className="text-3xl font-bold text-amber-300"
+                animate={{ 
+                  textShadow: [
+                    '0 0 10px rgba(245, 158, 11, 0.5)',
+                    '0 0 20px rgba(245, 158, 11, 0.8)',
+                    '0 0 10px rgba(245, 158, 11, 0.5)'
+                  ]
+                }}
+                transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
+              >
+                {battleDetails.events.length}
+              </motion.div>
             </div>
-          </div>
-          <div className="border border-red-500/30 bg-red-950/20 p-6 text-center">
-            <h3 className="text-red-400 font-bold mb-2">Damage Events</h3>
-            <div className="text-2xl font-bold text-red-300">
-              {battleDetails.events.filter((e) => e.type === "damage").length}
+          </motion.div>
+
+          {/* Damage Events Stat */}
+          <motion.div
+            whileHover={{ scale: 1.02 }}
+            className="relative border-2 border-red-500/40 bg-gradient-to-br from-red-950/30 via-orange-950/20 to-black/40 p-6 text-center overflow-hidden group"
+          >
+            {/* Corner decorations */}
+            <div className="absolute top-1 left-1 w-4 h-4 border-l-2 border-t-2 border-red-400/60"></div>
+            <div className="absolute top-1 right-1 w-4 h-4 border-r-2 border-t-2 border-red-400/60"></div>
+            <div className="absolute bottom-1 left-1 w-4 h-4 border-l-2 border-b-2 border-red-400/60"></div>
+            <div className="absolute bottom-1 right-1 w-4 h-4 border-r-2 border-b-2 border-red-400/60"></div>
+            
+            {/* Background glow */}
+            <div className="absolute inset-0 bg-red-600/5 rounded-lg group-hover:bg-red-600/10 transition-all duration-500"></div>
+            
+            <div className="relative z-10">
+              <div className="flex items-center justify-center gap-2 mb-2">
+                <Zap className="w-5 h-5 text-red-400" />
+                <h3 className="text-red-400 font-bold uppercase tracking-wider text-sm">Damage Events</h3>
+                <Zap className="w-5 h-5 text-red-400" />
+              </div>
+              <motion.div 
+                className="text-3xl font-bold text-red-300"
+                animate={{ 
+                  textShadow: [
+                    '0 0 10px rgba(239, 68, 68, 0.5)',
+                    '0 0 20px rgba(239, 68, 68, 0.8)',
+                    '0 0 10px rgba(239, 68, 68, 0.5)'
+                  ]
+                }}
+                transition={{ duration: 3, repeat: Infinity, ease: "easeInOut", delay: 1 }}
+              >
+                {battleDetails.events.filter((e) => e.type === "damage").length}
+              </motion.div>
             </div>
-          </div>
-          <div className="border border-red-500/30 bg-red-950/20 p-6 text-center">
-            <h3 className="text-red-400 font-bold mb-2">Units Defeated</h3>
-            <div className="text-2xl font-bold text-red-300">
-              {battleDetails.events.filter((e) => e.type === "defeat").length}
+          </motion.div>
+
+          {/* Units Defeated Stat */}
+          <motion.div
+            whileHover={{ scale: 1.02 }}
+            className="relative border-2 border-purple-500/40 bg-gradient-to-br from-purple-950/30 via-red-950/20 to-black/40 p-6 text-center overflow-hidden group"
+          >
+            {/* Corner decorations */}
+            <div className="absolute top-1 left-1 w-4 h-4 border-l-2 border-t-2 border-purple-400/60"></div>
+            <div className="absolute top-1 right-1 w-4 h-4 border-r-2 border-t-2 border-purple-400/60"></div>
+            <div className="absolute bottom-1 left-1 w-4 h-4 border-l-2 border-b-2 border-purple-400/60"></div>
+            <div className="absolute bottom-1 right-1 w-4 h-4 border-r-2 border-b-2 border-purple-400/60"></div>
+            
+            {/* Background glow */}
+            <div className="absolute inset-0 bg-purple-600/5 rounded-lg group-hover:bg-purple-600/10 transition-all duration-500"></div>
+            
+            <div className="relative z-10">
+              <div className="flex items-center justify-center gap-2 mb-2">
+                <Shield className="w-5 h-5 text-purple-400" />
+                <h3 className="text-purple-400 font-bold uppercase tracking-wider text-sm">Units Defeated</h3>
+                <Shield className="w-5 h-5 text-purple-400" />
+              </div>
+              <motion.div 
+                className="text-3xl font-bold text-purple-300"
+                animate={{ 
+                  textShadow: [
+                    '0 0 10px rgba(147, 51, 234, 0.5)',
+                    '0 0 20px rgba(147, 51, 234, 0.8)',
+                    '0 0 10px rgba(147, 51, 234, 0.5)'
+                  ]
+                }}
+                transition={{ duration: 3, repeat: Infinity, ease: "easeInOut", delay: 2 }}
+              >
+                {battleDetails.events.filter((e) => e.type === "defeat").length}
+              </motion.div>
             </div>
-          </div>
+          </motion.div>
         </motion.div>
       </div>
     </div>
