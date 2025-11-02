@@ -172,7 +172,6 @@ const getAdventurerCollection = async (
         const adventurerId = toNumber(row.token_id);
         
         const playerName = getAttributeValue(attributes, "Player Name");
-        const gameOver = getAttributeValue(attributes, "Game Over") === "True";
         const health = toNumber(getAttributeValue(attributes, "Health"));
         
         // Create name from player name or adventurer ID
