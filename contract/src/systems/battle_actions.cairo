@@ -8,9 +8,9 @@ pub trait IBattleActions<T> {
 pub mod battle_actions {
     use dojo::event::EventStorage;
     use dojo::model::ModelStorage;
-    use survivor_valhalla::models::{BeastLineup, PlayerEnergy, Battle, AttackLineup, CachedAdventurer};
-    use survivor_valhalla::interfaces::adventurer::{IAdventurerSystemsDispatcher, IAdventurerSystemsDispatcherTrait, IERC721Dispatcher, IERC721DispatcherTrait};
-    use survivor_valhalla::constants::{LOOT_SURVIVOR_ERC721, ADVENTURER_SYSTEMS, BEASTMODE_DUNGEON};
+    use survivor_valhalla::models::{BeastLineup, PlayerEnergy, Battle, AttackLineup, CachedAdventurer, AdventurerWeapon};
+    use survivor_valhalla::interfaces::adventurer::{IAdventurerSystemsDispatcher, IAdventurerSystemsDispatcherTrait, IERC721Dispatcher, IERC721DispatcherTrait, ILootSystemsDispatcher, ILootSystemsDispatcherTrait, ItemTrait};
+    use survivor_valhalla::constants::{LOOT_SURVIVOR_ERC721, ADVENTURER_SYSTEMS, BEASTMODE_DUNGEON, LOOT_SYSTEMS};
     use starknet::{ContractAddress, get_caller_address, get_block_timestamp};
     use super::IBattleActions;
 
@@ -108,9 +108,11 @@ pub mod battle_actions {
             let loot_survivor_address: ContractAddress = LOOT_SURVIVOR_ERC721.try_into().unwrap();
             let adventurer_systems_address: ContractAddress = ADVENTURER_SYSTEMS.try_into().unwrap();
             let beastmode_dungeon_address: ContractAddress = BEASTMODE_DUNGEON.try_into().unwrap();
+            let loot_systems_address: ContractAddress = LOOT_SYSTEMS.try_into().unwrap();
             
             let adventurer_dispatcher = IAdventurerSystemsDispatcher { contract_address: adventurer_systems_address };
             let erc721_dispatcher = IERC721Dispatcher { contract_address: loot_survivor_address };
+            let loot_dispatcher = ILootSystemsDispatcher { contract_address: loot_systems_address };
             
             // Validate and cache each adventurer
             let adventurer_ids = array![adventurer1_id, adventurer2_id, adventurer3_id, adventurer4_id, adventurer5_id];
@@ -154,6 +156,18 @@ pub mod battle_actions {
                         luck: adventurer.stats.luck,
                     };
                     world.write_model(@cached);
+                    
+                    // Extract weapon info using Death Mountain loot dispatcher
+                    let weapon_loot = loot_dispatcher.get_item(adventurer.equipment.weapon);
+                    let weapon_power = calculate_weapon_power(adventurer.equipment.weapon, weapon_loot.tier);
+                    
+                    let weapon = AdventurerWeapon {
+                        player,
+                        adventurer_id,
+                        weapon_type: weapon_loot.item_type,
+                        weapon_power,
+                    };
+                    world.write_model(@weapon);
                 }
                 
                 i += 1;
@@ -186,5 +200,16 @@ pub mod battle_actions {
         fn world_default(self: @ContractState) -> dojo::world::WorldStorage {
             self.world(@"survivor_valhalla")
         }
+    }
+    
+    // Calculate weapon power using Death Mountain formula: Base Attack = Item Level × (6 - Tier)
+    fn calculate_weapon_power(weapon: survivor_valhalla::interfaces::adventurer::Item, weapon_tier: u8) -> u16 {
+        // Get greatness (level) from weapon XP
+        let level = weapon.get_greatness();
+        
+        // Death Mountain formula: Base Attack = Item Level × (6 - Tier)
+        let base_attack = level.into() * (6 - weapon_tier.into());
+        
+        base_attack
     }
 }

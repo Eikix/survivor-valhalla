@@ -76,3 +76,14 @@ pub struct CachedAdventurer {
     pub charisma: u8,
     pub luck: u8,
 }
+
+#[derive(Copy, Drop, Serde, Debug)]
+#[dojo::model]
+pub struct AdventurerWeapon {
+    #[key]
+    pub player: ContractAddress,
+    #[key]
+    pub adventurer_id: u64,
+    pub weapon_type: u8, // 1=Magic, 2=Blade, 3=Bludgeon
+    pub weapon_power: u16,
+}
