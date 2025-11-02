@@ -18,7 +18,6 @@ import {
   getWeaponTypeIcon,
   getArmorTypeIcon,
 } from "../hooks/useAdventurerWeapons";
-import { AddressDisplay } from "../components/AddressDisplay";
 
 export function BattlePage() {
   const { battleId } = useParams<{ battleId: string }>();
@@ -218,9 +217,6 @@ export function BattlePage() {
       
       const attackerKey = attackerIsAdventurer ? `adventurer_${attackerId}` : `beast_${attackerId}`;
       const targetKey = targetIsAdventurer ? `adventurer_${targetId}` : `beast_${targetId}`;
-      
-      const attackerType = attackerIsAdventurer ? 'Adventurer' : 'Beast';
-      const targetType = targetIsAdventurer ? 'Adventurer' : 'Beast';
       
       // Create mysterious battle description instead of specific details
       const mysteriousDescriptions = [
