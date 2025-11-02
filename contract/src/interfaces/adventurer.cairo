@@ -1,5 +1,5 @@
-use starknet::ContractAddress;
 use core::num::traits::Sqrt;
+use starknet::ContractAddress;
 
 // Stats structure matching Death Mountain
 #[derive(Copy, Drop, Serde)]
@@ -84,10 +84,10 @@ pub struct Loot {
     pub id: u8,
     pub tier: u8, // 1=T1, 2=T2, 3=T3, 4=T4, 5=T5
     pub item_type: u8, // 1=Magic, 2=Blade, 3=Bludgeon, 4=Necklace, 5=Ring
-    pub slot: u8, // 1=Weapon, 2=Chest, 3=Head, etc.
+    pub slot: u8 // 1=Weapon, 2=Chest, 3=Head, etc.
 }
 
-// Death Mountain loot systems interface  
+// Death Mountain loot systems interface
 #[starknet::interface]
 pub trait ILootSystems<TState> {
     fn get_item(self: @TState, item: u8) -> Loot;
