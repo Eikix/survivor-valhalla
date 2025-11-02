@@ -530,104 +530,6 @@ export function AttackLineupPage() {
               </motion.div>
             )}
 
-            {/* VS Display Section */}
-            {selectedEnemy && !battleResult && (
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.1 }}
-                className="mb-16"
-              >
-                <div className="border border-red-500/30 bg-red-950/20 p-8">
-                  <h2 className="text-center text-2xl font-bold text-red-400 mb-8 tracking-wider uppercase">
-                    Battle Preview
-                  </h2>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-8 items-center">
-                    {/* Your Lineup */}
-                    <div className="text-center">
-                      <h3 className="text-lg font-bold text-red-300 mb-4 uppercase">Your Force</h3>
-                      <div className="grid grid-cols-5 gap-2">
-                        {attackLineup.map((adventurer, index) => (
-                          <div key={index} className="aspect-square border border-red-500/30 bg-red-950/10 rounded flex items-center justify-center">
-                            {adventurer && adventurer.image ? (
-                              <img
-                                src={adventurer.image}
-                                alt={`Adventurer ${adventurer.adventurer_id}`}
-                                className="w-full h-full object-cover rounded"
-                              />
-                            ) : (
-                              <span className="text-red-200/30 text-xs">—</span>
-                            )}
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                    
-                    {/* VS */}
-                    <div className="text-center">
-                      <div className="text-4xl font-bold text-red-500 mb-4">VS</div>
-                      {hasLineup && attackLineup.every((a) => a !== null) ? (
-                        <motion.button
-                          onClick={executeBattle}
-                          whileHover={{ scale: 1.05 }}
-                          whileTap={{ scale: 0.95 }}
-                          className="px-8 py-3 text-lg font-bold tracking-wider uppercase border-2 border-red-500/50 hover:border-red-500 transition-all cursor-pointer"
-                          style={{
-                            background: "linear-gradient(to bottom, rgba(239, 68, 68, 0.1), rgba(0, 0, 0, 0.4))",
-                            textShadow: "0 0 10px rgba(239, 68, 68, 0.5)",
-                          }}
-                        >
-                          <span className="text-red-500">BATTLE!</span>
-                        </motion.button>
-                      ) : (
-                        <div className="text-red-400/50 text-sm uppercase tracking-wider">
-                          Complete Your Lineup
-                        </div>
-                      )}
-                    </div>
-                    
-                    {/* Enemy Lineup */}
-                    <div className="text-center">
-                      <h3 className="text-lg font-bold text-emerald-300 mb-4 uppercase">Enemy Force</h3>
-                      <div className="grid grid-cols-5 gap-2">
-                        {[1, 2, 3, 4, 5].map((pos) => {
-                          const beastId = selectedEnemy[`beast${pos}_id` as keyof typeof selectedEnemy];
-                          const hasBeast = beastId && Number(beastId) > 0;
-                          const lookupKey = hasBeast ? String(Number(beastId)) : "";
-                          const imageUrl = hasBeast ? beastLineupImages[lookupKey] : null;
-                          return (
-                            <div key={pos} className="aspect-square border border-emerald-500/30 bg-emerald-950/10 rounded flex items-center justify-center">
-                              {hasBeast && imageUrl ? (
-                                <img
-                                  src={imageUrl}
-                                  alt={`Beast ${beastId}`}
-                                  className="w-full h-full object-cover rounded"
-                                />
-                              ) : hasBeast ? (
-                                <span className="text-emerald-400 text-xs">#{String(beastId).slice(-4)}</span>
-                              ) : (
-                                <span className="text-emerald-200/30 text-xs">—</span>
-                              )}
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  </div>
-                  
-                  <div className="mt-6 text-center">
-                    <motion.button
-                      onClick={() => setSelectedEnemy(null)}
-                      whileHover={{ scale: 1.05 }}
-                      whileTap={{ scale: 0.95 }}
-                      className="px-4 py-2 text-sm font-bold tracking-wider uppercase border border-gray-500/50 hover:border-gray-400 transition-all cursor-pointer text-gray-300"
-                    >
-                      Choose Different Enemy
-                    </motion.button>
-                  </div>
-                </div>
-              </motion.div>
-            )}
 
             {/* Enemy Selection Section - Only show if no enemy selected */}
             {!selectedEnemy && !battleResult && (
@@ -650,11 +552,91 @@ export function AttackLineupPage() {
             {/* Formation Section - Only show when enemy is selected */}
             {selectedEnemy && !battleResult && (
               <>
-                {/* Create Attack Lineup Section */}
+                {/* Enemy Force Section */}
                 <motion.div
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: 0.3 }}
+                  className="mb-8"
+                >
+                  <div className="border border-emerald-500/30 bg-emerald-950/20 p-8">
+                    <div className="text-center">
+                      <Swords className="w-12 h-12 text-emerald-500/50 mx-auto mb-4 rotate-180" />
+                      <h2 className="text-2xl font-bold text-emerald-400 mb-4 tracking-wider uppercase">
+                        Enemy Force
+                      </h2>
+                      <div className="grid grid-cols-5 gap-4 p-4">
+                        {[1, 2, 3, 4, 5].map((pos) => {
+                          const beastId = selectedEnemy[`beast${pos}_id` as keyof typeof selectedEnemy];
+                          const hasBeast = beastId && Number(beastId) > 0;
+                          const lookupKey = hasBeast ? String(Number(beastId)) : "";
+                          const imageUrl = hasBeast ? beastLineupImages[lookupKey] : null;
+                          return (
+                            <div
+                              key={pos}
+                              className="min-h-[150px] border-2 border-solid rounded-lg flex items-center justify-center border-emerald-500/30"
+                            >
+                              {hasBeast ? (
+                                <motion.div
+                                  initial={{ opacity: 0, scale: 0.9 }}
+                                  animate={{ opacity: 1, scale: 1 }}
+                                  className="text-center"
+                                >
+                                  {imageUrl && (
+                                    <img
+                                      src={imageUrl}
+                                      alt={`Beast ${beastId}`}
+                                      className="w-24 h-24 mx-auto mb-1"
+                                    />
+                                  )}
+                                  <div className="text-emerald-300 text-xs">#{String(beastId).slice(-4)}</div>
+                                </motion.div>
+                              ) : (
+                                <div className="text-emerald-200/20 text-xs text-center">
+                                  Slot {pos}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </div>
+                </motion.div>
+
+                {/* VS Divider */}
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.8 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  transition={{ delay: 0.4 }}
+                  className="text-center mb-8"
+                >
+                  <div className="text-4xl font-bold text-red-500 mb-4">VS</div>
+                  {hasLineup && attackLineup.every((a) => a !== null) ? (
+                    <motion.button
+                      onClick={executeBattle}
+                      whileHover={{ scale: 1.05 }}
+                      whileTap={{ scale: 0.95 }}
+                      className="px-8 py-3 text-lg font-bold tracking-wider uppercase border-2 border-red-500/50 hover:border-red-500 transition-all cursor-pointer"
+                      style={{
+                        background: "linear-gradient(to bottom, rgba(239, 68, 68, 0.1), rgba(0, 0, 0, 0.4))",
+                        textShadow: "0 0 10px rgba(239, 68, 68, 0.5)",
+                      }}
+                    >
+                      <span className="text-red-500">BATTLE!</span>
+                    </motion.button>
+                  ) : (
+                    <div className="text-red-400/50 text-sm uppercase tracking-wider">
+                      Complete Your Lineup Below
+                    </div>
+                  )}
+                </motion.div>
+
+                {/* Your Attack Force Section */}
+                <motion.div
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.5 }}
                   className="mb-16"
                 >
                   <div className="border border-red-500/30 bg-red-950/20 p-8 relative">
@@ -693,7 +675,7 @@ export function AttackLineupPage() {
                     <div className="text-center">
                       <Swords className="w-12 h-12 text-red-500/50 mx-auto mb-4" />
                       <h2 className="text-2xl font-bold text-red-400 mb-4 tracking-wider uppercase">
-                        {hasLineup ? "Your Attack Force" : "Assemble Your Force"}
+                        Your Attack Force
                       </h2>
                       <div className="grid grid-cols-5 gap-4 p-4">
                         {attackLineup.map((adventurer, index) => (
@@ -821,6 +803,17 @@ export function AttackLineupPage() {
                           </span>
                         </motion.button>
                       ) : null}
+                      
+                      <div className="mt-4 text-center">
+                        <motion.button
+                          onClick={() => setSelectedEnemy(null)}
+                          whileHover={{ scale: 1.05 }}
+                          whileTap={{ scale: 0.95 }}
+                          className="px-4 py-2 text-sm font-bold tracking-wider uppercase border border-gray-500/50 hover:border-gray-400 transition-all cursor-pointer text-gray-300"
+                        >
+                          Choose Different Enemy
+                        </motion.button>
+                      </div>
                     </div>
                   </div>
                 </motion.div>
