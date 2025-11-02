@@ -10,7 +10,7 @@ pub mod battle_actions {
     use dojo::model::ModelStorage;
     use survivor_valhalla::models::{BeastLineup, PlayerEnergy, Battle, AttackLineup, CachedAdventurer};
     use survivor_valhalla::interfaces::adventurer::{IAdventurerSystemsDispatcher, IAdventurerSystemsDispatcherTrait, IERC721Dispatcher, IERC721DispatcherTrait};
-    use survivor_valhalla::constants::BEASTMODE_CONTRACT;
+    use survivor_valhalla::constants::{LOOT_SURVIVOR_ERC721, ADVENTURER_SYSTEMS, BEASTMODE_DUNGEON};
     use starknet::{ContractAddress, get_caller_address, get_block_timestamp};
     use super::IBattleActions;
 
@@ -104,10 +104,13 @@ pub mod battle_actions {
             let mut world = self.world_default();
             let player = get_caller_address();
             
-            // Get Death Mountain contract dispatcher
-            let beastmode_address: ContractAddress = BEASTMODE_CONTRACT.try_into().unwrap();
-            let adventurer_dispatcher = IAdventurerSystemsDispatcher { contract_address: beastmode_address };
-            let erc721_dispatcher = IERC721Dispatcher { contract_address: beastmode_address };
+            // Get contract dispatchers
+            let loot_survivor_address: ContractAddress = LOOT_SURVIVOR_ERC721.try_into().unwrap();
+            let adventurer_systems_address: ContractAddress = ADVENTURER_SYSTEMS.try_into().unwrap();
+            let beastmode_dungeon_address: ContractAddress = BEASTMODE_DUNGEON.try_into().unwrap();
+            
+            let adventurer_dispatcher = IAdventurerSystemsDispatcher { contract_address: adventurer_systems_address };
+            let erc721_dispatcher = IERC721Dispatcher { contract_address: loot_survivor_address };
             
             // Validate and cache each adventurer
             let adventurer_ids = array![adventurer1_id, adventurer2_id, adventurer3_id, adventurer4_id, adventurer5_id];
@@ -127,11 +130,11 @@ pub mod battle_actions {
                     
                     // Verify adventurer is from beastmode dungeon
                     let dungeon = adventurer_dispatcher.get_adventurer_dungeon(adventurer_id);
-                    assert(dungeon == beastmode_address, 'Wrong dungeon');
+                    assert(dungeon == beastmode_dungeon_address, 'Wrong dungeon');
                     
                     // Get adventurer data
                     let adventurer = adventurer_dispatcher.get_adventurer(adventurer_id);
-                    assert(adventurer.health > 0, 'Adventurer is dead');
+                    assert(adventurer.health == 0, 'Adventurer is not dead');
                     
                     // Calculate level from XP (roughly following Death Mountain logic)
                     let level = if adventurer.xp == 0 { 1 } else { ((adventurer.xp / 100) + 1).try_into().unwrap() };
