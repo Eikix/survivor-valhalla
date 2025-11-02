@@ -6,12 +6,10 @@ import { Navbar } from "../components/navbar";
 import { useBattleDetails } from "../hooks/useBattleDetails";
 import { useAdventurers } from "../hooks/useAdventurers";
 import { useBeastLineupImages } from "../hooks/useBeasts";
-import { useAccount } from "@starknet-react/core";
 
 export function BattlePage() {
   const { battleId } = useParams<{ battleId: string }>();
   const numericBattleId = battleId ? parseInt(battleId, 10) : 0;
-  const { address, status } = useAccount();
   const { battleDetails } = useBattleDetails(numericBattleId);
   
   // Load adventurers for attacker images
