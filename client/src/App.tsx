@@ -1,4 +1,5 @@
 // src/App.tsx
+import { useEffect, useRef } from "react";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { LandingPage } from "./pages/LandingPage";
@@ -43,6 +44,45 @@ const sdk = await init<SchemaType>({
 });
 
 function App() {
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      audioRef.current = new Audio('/sfx/music.mp3');
+      audioRef.current.loop = true;
+      audioRef.current.volume = 0.2; // Set to 20% volume for subtle background ambiance
+      
+      const playMusic = async () => {
+        try {
+          if (audioRef.current) {
+            await audioRef.current.play();
+          }
+        } catch (error) {
+                    const startMusicOnInteraction = () => {
+            if (audioRef.current) {
+              audioRef.current.play().catch(console.error);
+            }
+            document.removeEventListener('click', startMusicOnInteraction);
+            document.removeEventListener('keydown', startMusicOnInteraction);
+          };
+          
+          document.addEventListener('click', startMusicOnInteraction);
+          document.addEventListener('keydown', startMusicOnInteraction);
+        }
+      };
+      
+      playMusic();
+    }
+
+    // Cleanup function
+    return () => {
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current.currentTime = 0;
+      }
+    };
+  }, []);
+
   return (
     <QueryClientProvider client={queryClient}>
       <DojoSdkProvider sdk={sdk} dojoConfig={dojoConfig} clientFn={setupWorld}>
