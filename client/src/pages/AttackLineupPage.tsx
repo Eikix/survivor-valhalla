@@ -9,6 +9,7 @@ import { Navbar } from "../components/navbar";
 import { WorldBeastLineups } from "../components/WorldBeastLineups";
 import { useAdventurers, useAdventurerLineupImages } from "../hooks/useAdventurers";
 import { useBeasts, useBeastLineupImages } from "../hooks/useBeasts";
+import { useBattleEvents } from "../hooks/useBattleEvents";
 import type { Adventurer } from "../hooks/useAdventurers";
 import {
   ModelsMapping,
@@ -26,11 +27,20 @@ export function AttackLineupPage() {
     Array(5).fill(null),
   );
   const [selectedEnemy, setSelectedEnemy] = useState<BeastLineupWithId | null>(null);
-  const [battleResult, setBattleResult] = useState<string | null>(null);
   const [isDraggingOver, setIsDraggingOver] = useState<number>(-1);
   const [sortBy, setSortBy] = useState<keyof Adventurer | "">("");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
   const [swappedPosition, setSwappedPosition] = useState<number | null>(null);
+
+  // Use battle events hook
+  const {
+    battleInProgress,
+    battleLog,
+    battleResult,
+    currentBattleId,
+    startBattle,
+    clearBattleState,
+  } = useBattleEvents();
 
   const { connect, connectors } = useConnect();
   const { status, address, account } = useAccount();
@@ -96,20 +106,22 @@ export function AttackLineupPage() {
   const executeBattle = async () => {
     if (!client || !account || !selectedEnemy || !hasLineup) return;
     
-    setBattleResult(null);
     const tx = showTransaction(undefined, "Initiating battle...");
-    console.log("selectedEnemy", selectedEnemy);
+    
     try {
+      // Start battle tracking with hook
+      startBattle();
+      
       await client.battle_actions.battle(
         account,
         selectedEnemy.player
       );
       tx.success("Battle initiated!");
-      // For now, show a simple result - in a real implementation you'd query the battle result
-      setBattleResult(Math.random() > 0.5 ? "Victory!" : "Defeat!");
+      
     } catch (error) {
       console.error("Failed to start battle:", error);
       tx.error("Failed to start battle");
+      clearBattleState();
     }
   };
 
@@ -237,7 +249,6 @@ export function AttackLineupPage() {
         }
       });
     });
-    console.log("[AttackLineupPage] Extracted adventurer IDs for world lineups:", adventurerIds);
     return adventurerIds;
   }, [worldLineups]);
 
@@ -257,7 +268,6 @@ export function AttackLineupPage() {
         }
       });
     });
-    console.log("[AttackLineupPage] Extracted token IDs for beast lineups:", tokenIds);
     return tokenIds;
   }, [worldBeastLineups]);
 
@@ -271,8 +281,6 @@ export function AttackLineupPage() {
     enabled: allBeastLineupTokenIds.length > 0,
   });
 
-  console.log("[AttackLineupPage] Lineup images received:", lineupImages);
-  console.log("[AttackLineupPage] Beast lineup images received:", beastLineupImages);
 
   const hasLineup = !!userLineup;
   const lastProcessedLineupRef = useRef<string>("");
@@ -517,7 +525,7 @@ export function AttackLineupPage() {
                   </h2>
                   <motion.button
                     onClick={() => {
-                      setBattleResult(null);
+                      clearBattleState();
                       setSelectedEnemy(null);
                     }}
                     whileHover={{ scale: 1.05 }}
@@ -818,13 +826,54 @@ export function AttackLineupPage() {
                   </div>
                 </motion.div>
 
-                {/* Dead Adventurers Collection Section */}
-                <motion.div
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.4 }}
-                  className="mb-16"
-                >
+                {/* Battle Log Section - Show during combat */}
+                {(battleInProgress || battleLog.length > 0) && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.4 }}
+                    className="mb-16"
+                  >
+                    <div className="border border-yellow-500/30 bg-yellow-950/20 p-8">
+                      <h2 className="text-center text-xl font-bold text-yellow-400 mb-6 tracking-wider uppercase flex items-center justify-center gap-2">
+                        ⚔️ Battle Log
+                        {battleInProgress && (
+                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-yellow-400"></div>
+                        )}
+                      </h2>
+                      <div className="max-h-80 overflow-y-auto border border-yellow-500/20 bg-black/30 p-4 rounded">
+                        {battleLog.length > 0 ? (
+                          <div className="space-y-2">
+                            {battleLog.map((logEntry, index) => (
+                              <motion.div
+                                key={index}
+                                initial={{ opacity: 0, x: -10 }}
+                                animate={{ opacity: 1, x: 0 }}
+                                transition={{ delay: index * 0.1 }}
+                                className="text-sm font-mono text-yellow-200/90 border-l-2 border-yellow-500/30 pl-4"
+                              >
+                                {logEntry}
+                              </motion.div>
+                            ))}
+                          </div>
+                        ) : battleInProgress ? (
+                          <div className="text-center text-yellow-400/60 text-sm uppercase tracking-wide">
+                            Waiting for battle events...
+                          </div>
+                        ) : null}
+                      </div>
+                    </div>
+                  </motion.div>
+                )}
+
+                {/* Dead Adventurers Collection Section - Hide during battle */}
+                {!battleInProgress && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.4 }}
+                    className="mb-16"
+                  >
                   <h2 className="text-center text-xl font-bold text-red-400 mb-6 tracking-wider uppercase">
                     Fallen Heroes
                   </h2>
@@ -925,7 +974,8 @@ export function AttackLineupPage() {
                       </div>
                     )}
                   </div>
-                </motion.div>
+                  </motion.div>
+                )}
               </>
             )}
           </>
