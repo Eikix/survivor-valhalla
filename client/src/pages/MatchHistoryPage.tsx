@@ -2,7 +2,7 @@
 import { motion, AnimatePresence } from "framer-motion";
 import { useState } from "react";
 import { useAccount } from "@starknet-react/core";
-import { useEntityQuery, useModels } from "@dojoengine/sdk/react";
+import { useEventQuery, useModels } from "@dojoengine/sdk/react";
 import { ToriiQueryBuilder } from "@dojoengine/sdk";
 import { useNavigate } from "react-router-dom";
 import { Navbar } from "../components/navbar";
@@ -29,7 +29,7 @@ export function MatchHistoryPage() {
   const [expandedBattleId, setExpandedBattleId] = useState<number | null>(null);
 
   // Query all battle completed events
-  useEntityQuery(
+  useEventQuery(
     new ToriiQueryBuilder()
       .includeHashedKeys()
       .withEntityModels([
