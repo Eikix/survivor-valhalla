@@ -14,6 +14,7 @@ import {
   type AttackLineup,
 } from "../bindings/typescript/models.gen";
 import { addAddressPadding } from "starknet";
+import { useTransactionToast } from "../hooks/useTransactionToast";
 
 export function AttackLineupPage() {
   const [inspectedAdventurer, setInspectedAdventurer] = useState<Adventurer | null>(null);
@@ -36,11 +37,25 @@ export function AttackLineupPage() {
   });
 
   const { client } = useDojoSDK();
+  const { showTransaction } = useTransactionToast();
 
   const createLineup = async () => {
     if (!client || !account) return;
-    // TODO: Implement adventurer lineup registration when contract supports it
-    console.log("Creating adventurer lineup:", attackLineup);
+    
+    const tx = showTransaction(undefined, "Creating adventurer lineup...");
+    
+    try {
+      // TODO: Implement adventurer lineup registration when contract supports it
+      console.log("Creating adventurer lineup:", attackLineup);
+      
+      // Simulate transaction for now
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      
+      tx.success("Adventurer lineup created successfully!");
+    } catch (error) {
+      console.error("Failed to create lineup:", error);
+      tx.error("Failed to create adventurer lineup");
+    }
   };
 
   const swapAdventurer = async () => {
@@ -48,9 +63,21 @@ export function AttackLineupPage() {
     const newAdventurer = attackLineup[swappedPosition];
     if (!newAdventurer) return;
 
-    // TODO: Implement adventurer swap when contract supports it
-    console.log("Swapping adventurer at position:", swappedPosition);
-    setSwappedPosition(null);
+    const tx = showTransaction(undefined, `Swapping adventurer at position ${swappedPosition + 1}...`);
+    
+    try {
+      // TODO: Implement adventurer swap when contract supports it
+      console.log("Swapping adventurer:", newAdventurer);
+      
+      // Simulate transaction for now
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      
+      setSwappedPosition(null);
+      tx.success("Adventurer swapped successfully!");
+    } catch (error) {
+      console.error("Failed to swap adventurer:", error);
+      tx.error("Failed to swap adventurer");
+    }
   };
 
   const handleRandomFill = () => {

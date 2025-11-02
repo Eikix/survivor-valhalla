@@ -10,6 +10,7 @@ import { init } from "@dojoengine/sdk";
 import { dojoConfig } from "./dojoConfig.ts";
 import { setupWorld } from "./bindings/typescript/contracts.gen.ts";
 import type { SchemaType } from "./bindings/typescript/models.gen.ts";
+import { Toaster } from "react-hot-toast";
 
 export const TORII_URL = "https://api.cartridge.gg/x/survivor-valhalla/torii";
 
@@ -51,6 +52,36 @@ function App() {
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
           </BrowserRouter>
+          <Toaster 
+            position="bottom-right"
+            toastOptions={{
+              duration: 5000,
+              style: {
+                background: '#1a0a0a',
+                color: '#fff',
+                border: '1px solid rgba(239, 68, 68, 0.3)',
+                borderRadius: '0.5rem',
+              },
+              success: {
+                iconTheme: {
+                  primary: '#10b981',
+                  secondary: '#fff',
+                },
+              },
+              error: {
+                iconTheme: {
+                  primary: '#ef4444',
+                  secondary: '#fff',
+                },
+              },
+              loading: {
+                iconTheme: {
+                  primary: '#f59e0b',
+                  secondary: '#fff',
+                },
+              },
+            }}
+          />
         </StarknetProvider>
       </DojoSdkProvider>
     </QueryClientProvider>
