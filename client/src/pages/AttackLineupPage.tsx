@@ -10,6 +10,10 @@ import { WorldBeastLineups } from "../components/WorldBeastLineups";
 import { useAdventurers } from "../hooks/useAdventurers";
 import { useBeastLineupImages } from "../hooks/useBeasts";
 import { useBattleEvents } from "../hooks/useBattleEvents";
+import {
+  useAdventurerWeapons,
+  getWeaponTypeIcon,
+} from "../hooks/useAdventurerWeapons";
 import type { Adventurer } from "../hooks/useAdventurers";
 import {
   ModelsMapping,
@@ -122,10 +126,10 @@ export function AttackLineupPage() {
   };
 
   const handleRandomFill = () => {
-    if (adventurers.length === 0) return;
+    if (enrichedAdventurers.length === 0) return;
 
     // Shuffle adventurers array and take first 5
-    const shuffled = [...adventurers].sort(() => Math.random() - 0.5);
+    const shuffled = [...enrichedAdventurers].sort(() => Math.random() - 0.5);
     const randomAdventurers = shuffled.slice(0, 5);
 
     // Fill remaining slots with null if we have fewer than 5 adventurers
@@ -152,6 +156,14 @@ export function AttackLineupPage() {
       .withEntityModels([ModelsMapping.BeastLineup]),
   );
   const allBeastLineups = useModels(ModelsMapping.BeastLineup);
+
+  // Query adventurer weapons for stat enrichment
+  useEntityQuery(
+    new ToriiQueryBuilder()
+      .includeHashedKeys()
+      .withEntityModels([ModelsMapping.AdventurerWeapon]),
+  );
+  const weaponMap = useAdventurerWeapons();
 
   // Type for lineup objects returned by useModels
   type LineupObj = Record<string, AttackLineup>;
@@ -243,20 +255,37 @@ export function AttackLineupPage() {
     },
   );
 
+  // Enrich adventurers with combat stats (combat health, weapon power, weapon type)
+  const enrichedAdventurers = useMemo((): Adventurer[] => {
+    if (!weaponMap) return adventurers;
+
+    return adventurers.map((adventurer) => {
+      const weapon = weaponMap[adventurer.adventurer_id];
+      const combatHealth = 100 + adventurer.vitality * 15;
+
+      return {
+        ...adventurer,
+        combatHealth,
+        weaponPower: weapon?.weapon_power,
+        weaponType: weapon?.weapon_type,
+      };
+    });
+  }, [adventurers, weaponMap]);
+
   const hasLineup = !!userLineup;
   const lastProcessedLineupRef = useRef<string>("");
   const adventurersIdsString = useMemo(
     () =>
-      adventurers
+      enrichedAdventurers
         .map((a) => a.id)
         .sort()
         .join(","),
-    [adventurers],
+    [enrichedAdventurers],
   );
 
   // Load attack lineup from on-chain data when lineup exists
   useEffect(() => {
-    if (hasLineup && userLineup && adventurers.length > 0) {
+    if (hasLineup && userLineup && enrichedAdventurers.length > 0) {
       const lineupAdventurerIds = [
         userLineup.adventurer1_id,
         userLineup.adventurer2_id,
@@ -279,8 +308,9 @@ export function AttackLineupPage() {
       const loadedAdventurers = lineupAdventurerIds.map((adventurerId) => {
         if (adventurerId && Number(adventurerId) > 0) {
           return (
-            adventurers.find((a) => a.adventurer_id === Number(adventurerId)) ||
-            null
+            enrichedAdventurers.find(
+              (a) => a.adventurer_id === Number(adventurerId),
+            ) || null
           );
         }
         return null;
@@ -295,7 +325,7 @@ export function AttackLineupPage() {
         lastProcessedLineupRef.current = "empty";
       }
     }
-  }, [hasLineup, userLineup, adventurersIdsString, adventurers]);
+  }, [hasLineup, userLineup, adventurersIdsString, enrichedAdventurers]);
 
   // Check if current lineup differs from on-chain lineup
   const hasLineupChanges = useMemo(() => {
@@ -318,7 +348,7 @@ export function AttackLineupPage() {
     // Remove duplicates first (by id)
     const uniqueAdventurers = Array.from(
       new Map(
-        adventurers.map((adventurer) => [adventurer.id, adventurer]),
+        enrichedAdventurers.map((adventurer) => [adventurer.id, adventurer]),
       ).values(),
     );
 
@@ -361,7 +391,7 @@ export function AttackLineupPage() {
     });
 
     return sorted;
-  }, [adventurers, sortBy, sortDirection]);
+  }, [enrichedAdventurers, sortBy, sortDirection]);
 
   const cartridgeConnector = connectors.find(
     (connector) => connector.id === "controller",
@@ -701,7 +731,7 @@ export function AttackLineupPage() {
                   <div className="border border-emerald-500/30 bg-emerald-950/20 p-8 relative">
                     {!hasLineup && (
                       <div className="absolute top-4 right-4 flex gap-2">
-                        {adventurers.length > 0 && (
+                        {enrichedAdventurers.length > 0 && (
                           <motion.button
                             onClick={handleRandomFill}
                             whileHover={{ scale: 1.05 }}
@@ -758,7 +788,7 @@ export function AttackLineupPage() {
                               const adventurerId = parseInt(
                                 e.dataTransfer.getData("adventurerId"),
                               );
-                              const adventurerToAdd = adventurers.find(
+                              const adventurerToAdd = enrichedAdventurers.find(
                                 (a) => a.id === adventurerId,
                               );
                               // Check if adventurer is already in lineup
@@ -776,21 +806,44 @@ export function AttackLineupPage() {
                               <motion.div
                                 initial={{ opacity: 0, scale: 0.9 }}
                                 animate={{ opacity: 1, scale: 1 }}
-                                className="cursor-pointer text-center"
+                                className="cursor-pointer text-center w-full"
                               >
                                 {adventurer.image && (
                                   <img
                                     src={adventurer.image}
                                     alt={`${adventurer.name} - Level: ${adventurer.level}, Health: ${adventurer.health}`}
-                                    className="w-24 h-24 mx-auto mb-1"
+                                    className="w-20 h-20 mx-auto mb-1"
                                     onClick={(e) => {
                                       e.stopPropagation();
                                       setInspectedAdventurer(adventurer);
                                     }}
                                   />
                                 )}
-                                <div className="text-emerald-300 text-xs">
-                                  Lvl {adventurer.level}
+
+                                <div className="text-emerald-200/80 text-[9px] space-y-0.5">
+                                  <div className="flex items-center justify-center gap-1">
+                                    <span className="text-emerald-400/60">
+                                      HP:
+                                    </span>
+                                    <span className="font-bold">
+                                      {adventurer.combatHealth || 0}
+                                    </span>
+                                  </div>
+                                  <div className="flex items-center justify-center gap-1">
+                                    <span className="text-emerald-400/60">
+                                      PWR:
+                                    </span>
+                                    <span className="font-bold">
+                                      {adventurer.weaponPower || 0}
+                                    </span>
+                                  </div>
+                                  <div className="flex items-center justify-center gap-1">
+                                    <span className="text-[8px]">
+                                      {getWeaponTypeIcon(
+                                        adventurer.weaponType || 0,
+                                      )}
+                                    </span>
+                                  </div>
                                 </div>
                               </motion.div>
                             ) : (
@@ -894,7 +947,7 @@ export function AttackLineupPage() {
                           Error summoning heroes
                         </p>
                       </div>
-                    ) : adventurers.length > 0 ? (
+                    ) : enrichedAdventurers.length > 0 ? (
                       <>
                         <div className="mb-6 flex flex-wrap justify-center gap-4">
                           {[
@@ -1090,6 +1143,34 @@ export function AttackLineupPage() {
               <h3 className="text-xl font-bold text-emerald-400 mb-3">
                 {inspectedAdventurer.name}
               </h3>
+
+              {/* Combat Stats Row */}
+              <div className="grid grid-cols-3 gap-3 max-w-md mx-auto mb-4">
+                <div className="bg-emerald-900/30 border-2 border-emerald-500/40 rounded p-3">
+                  <div className="text-emerald-200/70 uppercase tracking-wider text-[10px] mb-1">
+                    Combat HP
+                  </div>
+                  <div className="text-emerald-300 font-bold text-lg">
+                    {inspectedAdventurer.combatHealth || 0}
+                  </div>
+                </div>
+                <div className="bg-emerald-900/30 border-2 border-emerald-500/40 rounded p-3">
+                  <div className="text-emerald-200/70 uppercase tracking-wider text-[10px] mb-1">
+                    Power
+                  </div>
+                  <div className="text-emerald-300 font-bold text-lg">
+                    {inspectedAdventurer.weaponPower || 0}
+                  </div>
+                </div>
+                <div className="bg-emerald-900/30 border-2 border-emerald-500/40 rounded p-3">
+                  <div className="text-emerald-200/70 uppercase tracking-wider text-[10px] mb-1">
+                    Weapon
+                  </div>
+                  <div className="text-emerald-300 font-bold text-2xl">
+                    {getWeaponTypeIcon(inspectedAdventurer.weaponType || 0)}
+                  </div>
+                </div>
+              </div>
 
               {/* Compact Stats Grid */}
               <div className="grid grid-cols-5 gap-2 max-w-lg mx-auto text-xs">
