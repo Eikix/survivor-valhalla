@@ -1,6 +1,6 @@
 import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import { useAccount } from '@starknet-react/core';
-import { useEntityQuery, useEventQuery, useModels } from '@dojoengine/sdk/react';
+import { useEventQuery, useModels } from '@dojoengine/sdk/react';
 import { ToriiQueryBuilder } from '@dojoengine/sdk';
 import { ModelsMapping } from '../bindings/typescript/models.gen';
 
@@ -17,7 +17,7 @@ export function useBattleEvents() {
   const [battleResult, setBattleResult] = useState<string | null>(null);
   const [currentBattleId, setCurrentBattleId] = useState<number | null>(null);
   
-  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const timeoutRef = useRef< ReturnType<typeof setTimeout> | null>(null);
   const startTimeRef = useRef<number | null>(null);
   const processedEventsRef = useRef<Set<string>>(new Set());
 
