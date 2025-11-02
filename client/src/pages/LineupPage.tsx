@@ -737,14 +737,14 @@ export function LineupPage() {
           <motion.div
             initial={{ opacity: 0, scale: 0.8 }}
             animate={{ opacity: 1, scale: 1 }}
-            className="w-1/2 md:w-1/3 max-h-[50vh] w-full"
+            className="max-w-xs w-full"
             onClick={(e) => e.stopPropagation()}
           >
             {inspectedBeast.image && (
               <img
                 src={inspectedBeast.image}
                 alt={`${inspectedBeast.name} - Level: ${inspectedBeast.level}, Health: ${inspectedBeast.health}, Power: ${inspectedBeast.power}, Tier: ${inspectedBeast.tier}, Type: ${inspectedBeast.type}, Prefix: ${inspectedBeast.prefix}, Suffix: ${inspectedBeast.suffix}, Shiny: ${inspectedBeast.shiny}, Animated: ${inspectedBeast.animated}`}
-                className="w-full h-full object-contain"
+                className="w-full h-auto object-contain"
               />
             )}
           </motion.div>
