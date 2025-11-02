@@ -94,13 +94,13 @@ pub mod battle_actions {
             // assert(energy.energy > 0, 'Not enough energy');
             
             // Deduct energy
-            energy.energy -= 1;
-            world.write_model(@energy);
-            world.emit_event(@EnergyConsumed { 
-                player: attacker, 
-                energy_remaining: energy.energy, 
-                timestamp: current_time 
-            });
+            // energy.energy -= 1;
+            // world.write_model(@energy);
+            // world.emit_event(@EnergyConsumed { 
+            //     player: attacker, 
+            //     energy_remaining: energy.energy, 
+            //     timestamp: current_time 
+            // });
             
             // Generate battle ID (using timestamp + addresses for uniqueness)
             let battle_seed: u256 = current_time.into() + Into::<ContractAddress, felt252>::into(attacker).into() + Into::<ContractAddress, felt252>::into(defender).into();
