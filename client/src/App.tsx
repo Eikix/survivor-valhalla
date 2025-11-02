@@ -4,6 +4,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { LandingPage } from "./pages/LandingPage";
 import { LineupPage } from "./pages/LineupPage";
 import { AttackLineupPage } from "./pages/AttackLineupPage";
+import { MatchHistoryPage } from "./pages/MatchHistoryPage";
 import { StarknetProvider } from "./components/starknet-provider";
 import { DojoSdkProvider } from "@dojoengine/sdk/react";
 import { init } from "@dojoengine/sdk";
@@ -49,6 +50,7 @@ function App() {
               <Route path="/" element={<LandingPage />} />
               <Route path="/home" element={<LineupPage />} />
               <Route path="/attack" element={<AttackLineupPage />} />
+              <Route path="/history" element={<MatchHistoryPage />} />
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
           </BrowserRouter>

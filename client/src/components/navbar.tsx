@@ -1,5 +1,5 @@
 import { motion } from "framer-motion";
-import { LogOut, ExternalLink, Copy, Check, Shield, Swords } from "lucide-react";
+import { LogOut, ExternalLink, Copy, Check, Shield, Swords, ScrollText } from "lucide-react";
 import { useState } from "react";
 import { useConnect, useAccount, useDisconnect } from "@starknet-react/core";
 import { useLocation, Link } from "react-router-dom";
@@ -40,7 +40,7 @@ export function Navbar() {
                     <span>Beast Lineup</span>
                   </motion.button>
                 </Link>
-                
+
                 <Link to="/attack">
                   <motion.button
                     whileHover={{ scale: 1.05 }}
@@ -53,6 +53,21 @@ export function Navbar() {
                   >
                     <Swords className="w-4 h-4" />
                     <span>Attack Lineup</span>
+                  </motion.button>
+                </Link>
+
+                <Link to="/history">
+                  <motion.button
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                    className={`flex items-center gap-2 px-4 py-2 text-sm font-bold tracking-wider uppercase transition-all cursor-pointer ${
+                      location.pathname === "/history"
+                        ? "text-emerald-400 border-b-2 border-emerald-400"
+                        : "text-emerald-200/60 hover:text-emerald-300 border-b-2 border-transparent"
+                    }`}
+                  >
+                    <ScrollText className="w-4 h-4" />
+                    <span>Match History</span>
                   </motion.button>
                 </Link>
               </div>
