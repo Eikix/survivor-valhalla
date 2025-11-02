@@ -37,7 +37,6 @@ export function AttackLineupPage() {
     battleInProgress,
     battleLog,
     battleResult,
-    currentBattleId,
     battleSummary,
     startBattle,
     clearBattleState,

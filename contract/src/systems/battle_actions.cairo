@@ -8,7 +8,7 @@ pub trait IBattleActions<T> {
 pub mod battle_actions {
     use dojo::event::EventStorage;
     use dojo::model::ModelStorage;
-    use survivor_valhalla::models::{BeastLineup, PlayerEnergy, Battle, AttackLineup, CachedAdventurer, AdventurerWeapon, BattleState, CombatUnit, Beast};
+    use survivor_valhalla::models::{BeastLineup, PlayerEnergy, Battle, AttackLineup, CachedAdventurer, AdventurerWeapon, CombatUnit, Beast};
     use survivor_valhalla::interfaces::adventurer::{IAdventurerSystemsDispatcher, IAdventurerSystemsDispatcherTrait, IERC721Dispatcher, IERC721DispatcherTrait, ILootSystemsDispatcher, ILootSystemsDispatcherTrait, ItemTrait};
     use survivor_valhalla::constants::{LOOT_SURVIVOR_ERC721, ADVENTURER_SYSTEMS, BEASTMODE_DUNGEON, LOOT_SYSTEMS};
     use starknet::{ContractAddress, get_caller_address, get_block_timestamp};
@@ -264,9 +264,9 @@ pub mod battle_actions {
         base_attack
     }
 
-    // Calculate adventurer HP: 100 + vitality * 10
+    // Calculate adventurer HP: 100 + vitality * 15
     fn calculate_adventurer_hp(vitality: u8) -> u16 {
-        100 + (vitality.into() * 10)
+        100 + (vitality.into() * 15)
     }
 
     // Calculate beast damage: level * (6 - tier)
@@ -395,7 +395,7 @@ pub mod battle_actions {
             
             let beast_id = *beast_ids.at((pos - 1).into());
             if beast_id != 0 {
-                let beast: Beast = world.read_model((defender, pos));
+                let beast: Beast = world.read_model((defender, pos - 1));
                 let damage = calculate_beast_damage(beast.level, beast.tier);
 
                 let unit = CombatUnit {
@@ -561,10 +561,10 @@ pub mod battle_actions {
                                         damage: final_damage,
                                         type_multiplier: multiplier,
                                     });
-                                    
+
                                     // Check if target is defeated
                                     if new_hp == 0 {
-                                        // Mark as dead (rebuild alive array - this is simplified)
+                                        // Mark as dead (rebuild alive array)
                                         let mut new_beasts_alive = array![];
                                         let mut j = 0;
                                         loop {
@@ -612,7 +612,7 @@ pub mod battle_actions {
                                     
                                     // Beast damage has no type effectiveness
                                     let final_damage = *unit.damage;
-                                    
+
                                     // Apply damage to target
                                     let current_hp = *adventurer_hp.at(target_idx);
                                     let new_hp = if final_damage >= current_hp { 0 } else { current_hp - final_damage };
@@ -641,10 +641,10 @@ pub mod battle_actions {
                                         damage: final_damage,
                                         type_multiplier: 100, // No type effectiveness for beasts
                                     });
-                                    
+
                                     // Check if target is defeated
                                     if new_hp == 0 {
-                                        // Mark as dead (rebuild alive array - this is simplified)
+                                        // Mark as dead (rebuild alive array)
                                         let mut new_adventurers_alive = array![];
                                         let mut j = 0;
                                         loop {
