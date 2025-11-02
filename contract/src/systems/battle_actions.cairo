@@ -88,9 +88,10 @@ pub mod battle_actions {
             assert(defender_lineup.beast1_id != 0, 'Defender has no lineup');
             
             // Check and update energy
-            let mut energy: PlayerEnergy = world.read_model(attacker);
-            update_energy(ref energy, current_time);
-            assert(energy.energy > 0, 'Not enough energy');
+            // @NOTICE: disabled for dev purposes
+            // let mut energy: PlayerEnergy = world.read_model(attacker);
+            // update_energy(ref energy, current_time);
+            // assert(energy.energy > 0, 'Not enough energy');
             
             // Deduct energy
             energy.energy -= 1;
