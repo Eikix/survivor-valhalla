@@ -17,6 +17,9 @@ pub mod battle_actions {
     const MAX_ENERGY: u8 = 5;
     const ENERGY_REFILL_SECONDS: u64 = 86400; // 24 hours
 
+    // Global battle counter - will be managed by storage
+    use starknet::storage::{StoragePointerReadAccess, StoragePointerWriteAccess};
+
     #[derive(Copy, Drop, Serde)]
     #[dojo::event]
     pub struct BattleCompleted {
@@ -70,6 +73,11 @@ pub mod battle_actions {
         pub type_multiplier: u16, // x100 for precision (150 = 1.5x)
     }
 
+    #[storage]
+    struct Storage {
+        battle_counter: u32,
+    }
+
     #[abi(embed_v0)]
     impl BattleActionsImpl of IBattleActions<ContractState> {
         fn battle(ref self: ContractState, defender: ContractAddress) {
@@ -102,9 +110,10 @@ pub mod battle_actions {
             //     timestamp: current_time 
             // });
             
-            // Generate battle ID (using timestamp + addresses for uniqueness)
-            let battle_seed: u256 = current_time.into() + Into::<ContractAddress, felt252>::into(attacker).into() + Into::<ContractAddress, felt252>::into(defender).into();
-            let battle_id: u32 = (battle_seed % 999999).try_into().unwrap() + 1;
+            // Generate simple incrementing battle ID
+            let current_counter = self.battle_counter.read();
+            let battle_id = current_counter + 1;
+            self.battle_counter.write(battle_id);
             
             // Setup combat units
             let (mut adventurer_units, mut beast_units, initiative_order) = setup_combat_units(
@@ -484,14 +493,24 @@ pub mod battle_actions {
             i += 1;
         };
         
-        let round = 1_u8;
+        let mut round = 1_u8;
         
-        // Execute combat turns - each living unit attacks once
-        i = 0;
+        // Execute combat rounds until one side is defeated
         loop {
-            if i >= adventurer_units.len() + beast_units.len() {
+            let adventurer_count = count_survivors(@adventurers_alive);
+            let beast_count = count_survivors(@beasts_alive);
+            
+            // Check if battle is over
+            if adventurer_count == 0 || beast_count == 0 {
                 break;
             }
+            
+            // Execute one round - each living unit attacks once
+            i = 0;
+            loop {
+                if i >= adventurer_units.len() + beast_units.len() {
+                    break;
+                }
             
             // Determine if it's adventurer or beast turn (alternate)
             let is_adventurer_turn = i < adventurer_units.len();
@@ -517,6 +536,22 @@ pub mod battle_actions {
                                     // Apply damage to target
                                     let current_hp = *beast_hp.at(target_idx);
                                     let new_hp = if final_damage >= current_hp { 0 } else { current_hp - final_damage };
+                                    
+                                    // Update HP array
+                                    let mut new_beast_hp = array![];
+                                    let mut j = 0;
+                                    loop {
+                                        if j >= beast_hp.len() {
+                                            break;
+                                        }
+                                        if j == target_idx {
+                                            new_beast_hp.append(new_hp);
+                                        } else {
+                                            new_beast_hp.append(*beast_hp.at(j));
+                                        }
+                                        j += 1;
+                                    };
+                                    beast_hp = new_beast_hp;
                                     
                                     // Emit damage event
                                     world.emit_event(@DamageDealt {
@@ -582,6 +617,22 @@ pub mod battle_actions {
                                     let current_hp = *adventurer_hp.at(target_idx);
                                     let new_hp = if final_damage >= current_hp { 0 } else { current_hp - final_damage };
                                     
+                                    // Update HP array
+                                    let mut new_adventurer_hp = array![];
+                                    let mut j = 0;
+                                    loop {
+                                        if j >= adventurer_hp.len() {
+                                            break;
+                                        }
+                                        if j == target_idx {
+                                            new_adventurer_hp.append(new_hp);
+                                        } else {
+                                            new_adventurer_hp.append(*adventurer_hp.at(j));
+                                        }
+                                        j += 1;
+                                    };
+                                    adventurer_hp = new_adventurer_hp;
+                                    
                                     // Emit damage event
                                     world.emit_event(@DamageDealt {
                                         battle_id,
@@ -626,14 +677,37 @@ pub mod battle_actions {
                 }
             }
             
-            i += 1;
+                i += 1;
+            };
+            
+            // After each round, emit round completed event
+            let adventurer_survivors = count_survivors(@adventurers_alive);
+            let beast_survivors = count_survivors(@beasts_alive);
+            
+            let round_winner = if adventurer_survivors > beast_survivors {
+                attacker
+            } else if beast_survivors > adventurer_survivors {
+                defender
+            } else {
+                attacker // Tie defaults to attacker
+            };
+            
+            world.emit_event(@RoundCompleted {
+                battle_id,
+                round,
+                winner: round_winner,
+                attacker_survivors: adventurer_survivors,
+                defender_survivors: beast_survivors,
+            });
+            
+            round += 1;
         };
         
-        // Count survivors and determine winner
+        // Count final survivors and determine winner
         let adventurer_survivors = count_survivors(@adventurers_alive);
         let beast_survivors = count_survivors(@beasts_alive);
         
-        // Emit round completed event
+        // Determine final battle winner
         let winner = if adventurer_survivors > 0 && beast_survivors == 0 {
             attacker // Adventurers win
         } else if beast_survivors > 0 && adventurer_survivors == 0 {
@@ -642,14 +716,6 @@ pub mod battle_actions {
             // If both have survivors or both are dead, default to attacker for now
             attacker
         };
-        
-        world.emit_event(@RoundCompleted {
-            battle_id,
-            round,
-            winner,
-            attacker_survivors: adventurer_survivors,
-            defender_survivors: beast_survivors,
-        });
         
         winner
     }
