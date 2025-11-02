@@ -6,7 +6,7 @@ icon_uri = "file://assets/icon.png"
 website = "https://github.com/survivor-valhalla"
 seed = "dojo_survivor_valhalla_mainnet"
 storage_snapshot_url = ""
-version = "0.1.4"
+version = "0.1.5"
 
 [namespace]
 default = "survivor_valhalla"
