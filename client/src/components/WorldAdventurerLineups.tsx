@@ -1,6 +1,7 @@
 // src/components/WorldAdventurerLineups.tsx
 import { motion } from "framer-motion";
 import { type AttackLineup } from "../bindings/typescript/models.gen";
+import { AddressDisplay } from "./AddressDisplay";
 
 type AttackLineupWithId = AttackLineup & { entityId: string };
 
@@ -34,8 +35,8 @@ export function WorldAdventurerLineups(props: {
               className="border border-emerald-500/20 bg-emerald-950/10 p-6"
             >
               <div className="space-y-4">
-                <div className="text-emerald-300/70 font-mono text-xs text-center">
-                  {lineup.player?.slice(0, 6)}...{lineup.player?.slice(-4)}
+                <div className="text-emerald-300/70 text-xs text-center">
+                  <AddressDisplay address={lineup.player} />
                 </div>
                 <div className="grid grid-cols-5 gap-2">
                     {[1, 2, 3, 4, 5].map((pos) => {

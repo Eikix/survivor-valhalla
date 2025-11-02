@@ -27,6 +27,7 @@ import {
 } from "../bindings/typescript/models.gen";
 import { addAddressPadding } from "starknet";
 import { useTransactionToast } from "../hooks/useTransactionToast";
+import { AddressDisplay } from "../components/AddressDisplay";
 
 type BeastLineupWithId = BeastLineup & { entityId: string };
 
@@ -619,9 +620,8 @@ export function AttackLineupPage() {
                       >
                         Enemy Force
                       </h2>
-                      <div className="text-amber-700/70 font-mono text-xs mb-4">
-                        {selectedEnemy.player?.slice(0, 6)}...
-                        {selectedEnemy.player?.slice(-4)}
+                      <div className="text-amber-700/70 text-xs mb-4">
+                        <AddressDisplay address={selectedEnemy.player} />
                       </div>
                       <div className="grid grid-cols-5 gap-4 p-4">
                         {[1, 2, 3, 4, 5].map((pos) => {

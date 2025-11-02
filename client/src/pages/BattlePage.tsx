@@ -18,6 +18,7 @@ import {
   getWeaponTypeIcon,
   getArmorTypeIcon,
 } from "../hooks/useAdventurerWeapons";
+import { AddressDisplay } from "../components/AddressDisplay";
 
 export function BattlePage() {
   const { battleId } = useParams<{ battleId: string }>();
@@ -283,15 +284,9 @@ export function BattlePage() {
             Battle #{battleId}
           </h1>
           <div className="flex items-center justify-center gap-4 text-red-200/60 text-sm">
-            <span>
-              {battleDetails.attacker.slice(0, 8)}...
-              {battleDetails.attacker.slice(-6)}
-            </span>
+            <AddressDisplay address={battleDetails.attacker} format="long" />
             <Swords className="w-4 h-4" />
-            <span>
-              {battleDetails.defender.slice(0, 8)}...
-              {battleDetails.defender.slice(-6)}
-            </span>
+            <AddressDisplay address={battleDetails.defender} format="long" />
           </div>
           <div className="mt-2">
             <span
