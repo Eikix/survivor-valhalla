@@ -292,9 +292,9 @@ pub mod battle_actions {
         base_attack
     }
 
-    // Calculate adventurer HP: 100 + vitality * 10
+    // Calculate adventurer HP: 100 + vitality * 15
     fn calculate_adventurer_hp(vitality: u8) -> u16 {
-        100 + (vitality.into() * 10)
+        100 + (vitality.into() * 15)
     }
 
     // Calculate beast damage: level * (6 - tier)

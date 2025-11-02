@@ -1,6 +1,10 @@
-import { useState, useEffect, useMemo } from "react";
+import { useMemo } from "react";
 import { useAccount } from "@starknet-react/core";
-import { useEventQuery, useModels, useEntityQuery } from "@dojoengine/sdk/react";
+import {
+  useEventQuery,
+  useModels,
+  useEntityQuery,
+} from "@dojoengine/sdk/react";
 import { ToriiQueryBuilder } from "@dojoengine/sdk";
 import { ModelsMapping } from "../bindings/typescript/models.gen";
 
@@ -230,7 +234,11 @@ export function useBattleDetails(battleId: number) {
       attackLineups.forEach((lineupObj: any) => {
         const entityId = Object.keys(lineupObj)[0];
         const lineup = lineupObj[entityId];
-        if (lineup && lineup.player?.toLowerCase() === battleCompletionEvent.attacker?.toLowerCase()) {
+        if (
+          lineup &&
+          lineup.player?.toLowerCase() ===
+            battleCompletionEvent.attacker?.toLowerCase()
+        ) {
           attackerLineup = lineup;
         }
       });
@@ -240,7 +248,11 @@ export function useBattleDetails(battleId: number) {
       beastLineups.forEach((lineupObj: any) => {
         const entityId = Object.keys(lineupObj)[0];
         const lineup = lineupObj[entityId];
-        if (lineup && lineup.player?.toLowerCase() === battleCompletionEvent.defender?.toLowerCase()) {
+        if (
+          lineup &&
+          lineup.player?.toLowerCase() ===
+            battleCompletionEvent.defender?.toLowerCase()
+        ) {
           defenderLineup = lineup;
         }
       });
@@ -254,7 +266,8 @@ export function useBattleDetails(battleId: number) {
       timestamp: battleCompletionEvent.timestamp,
       events: allEvents,
       battleLog: logEntries,
-      isVictory: battleCompletionEvent.winner?.toLowerCase() === address?.toLowerCase(),
+      isVictory:
+        battleCompletionEvent.winner?.toLowerCase() === address?.toLowerCase(),
       attackerLineup,
       defenderLineup,
     };

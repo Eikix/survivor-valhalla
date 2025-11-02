@@ -5,14 +5,6 @@ import { ToriiQueryBuilder } from "@dojoengine/sdk";
 import { ModelsMapping } from "../bindings/typescript/models.gen";
 import { useNavigate } from "react-router-dom";
 
-interface BattleEvent {
-  type: "damage" | "defeat" | "round" | "battle";
-  battle_id: number;
-  data: any;
-  round: number;
-  sequence: number; // For ordering within a round
-}
-
 export function useBattleEvents() {
   const [battleLog, setBattleLog] = useState<string[]>([]);
   const [battleResult, setBattleResult] = useState<string | null>(null);
@@ -52,7 +44,7 @@ export function useBattleEvents() {
     let maxBattleId = 0;
     if (address && Array.isArray(battleEvents)) {
       const paddedAddress = address.toLowerCase();
-      
+
       battleEvents.forEach((eventObj: any) => {
         const entityId = Object.keys(eventObj)[0];
         const event = eventObj[entityId];
@@ -68,7 +60,7 @@ export function useBattleEvents() {
 
     setLastBattleIdBeforeFight(maxBattleId);
     setIsWaitingForBattle(true);
-    
+
     // Navigate to loading page with the last battle ID as a parameter
     navigate(`/battle/loading?lastBattleId=${maxBattleId}`);
     console.log(
@@ -77,7 +69,7 @@ export function useBattleEvents() {
   }, [address, battleEvents, navigate]);
 
   useEffect(() => {
-    console.log("battleEvents haha", battleEvents);    
+    console.log("battleEvents haha", battleEvents);
   }, [battleEvents]);
 
   // Listen for new BattleCompleted events where we're the attacker
@@ -107,7 +99,7 @@ export function useBattleEvents() {
           battleId > lastBattleIdBeforeFight &&
           (mostRecentBattle === null || battleId > mostRecentBattle)
         ) {
-          console.log("found the fight battleId", battleId)
+          console.log("found the fight battleId", battleId);
           mostRecentBattle = battleId;
         }
       }
@@ -123,13 +115,7 @@ export function useBattleEvents() {
       navigate(`/battle/${mostRecentBattle}`);
       return;
     }
-  }, [
-    battleEvents,
-    address,
-    lastBattleIdBeforeFight,
-    navigate,
-  ]);
-
+  }, [battleEvents, address, lastBattleIdBeforeFight, navigate]);
 
   return {
     battleLog,

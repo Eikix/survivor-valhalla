@@ -8,8 +8,17 @@ import { ToriiQueryBuilder } from "@dojoengine/sdk";
 import { Navbar } from "../components/navbar";
 import { WorldBeastLineups } from "../components/WorldBeastLineups";
 import { useAdventurers } from "../hooks/useAdventurers";
-import { useBeastLineupImages } from "../hooks/useBeasts";
+import {
+  useBeastLineupImages,
+  useBeastLineupStats,
+  getBeastWeaponType,
+} from "../hooks/useBeasts";
 import { useBattleEvents } from "../hooks/useBattleEvents";
+import {
+  useAdventurerWeapons,
+  getWeaponTypeIcon,
+  getArmorTypeIcon,
+} from "../hooks/useAdventurerWeapons";
 import type { Adventurer } from "../hooks/useAdventurers";
 import {
   ModelsMapping,
@@ -112,7 +121,7 @@ export function AttackLineupPage() {
       // Execute battle transaction (synchronous on-chain)
       await client.battle_actions.battle(account, selectedEnemy.player);
       tx.success("Battle initiated! Loading results...");
-      
+
       // After successful transaction, prepare for battle and navigate to loading
       prepareForBattle();
     } catch (error) {
@@ -122,10 +131,10 @@ export function AttackLineupPage() {
   };
 
   const handleRandomFill = () => {
-    if (adventurers.length === 0) return;
+    if (enrichedAdventurers.length === 0) return;
 
     // Shuffle adventurers array and take first 5
-    const shuffled = [...adventurers].sort(() => Math.random() - 0.5);
+    const shuffled = [...enrichedAdventurers].sort(() => Math.random() - 0.5);
     const randomAdventurers = shuffled.slice(0, 5);
 
     // Fill remaining slots with null if we have fewer than 5 adventurers
@@ -152,6 +161,14 @@ export function AttackLineupPage() {
       .withEntityModels([ModelsMapping.BeastLineup]),
   );
   const allBeastLineups = useModels(ModelsMapping.BeastLineup);
+
+  // Query adventurer weapons for stat enrichment
+  useEntityQuery(
+    new ToriiQueryBuilder()
+      .includeHashedKeys()
+      .withEntityModels([ModelsMapping.AdventurerWeapon]),
+  );
+  const weaponMap = useAdventurerWeapons();
 
   // Type for lineup objects returned by useModels
   type LineupObj = Record<string, AttackLineup>;
@@ -243,20 +260,45 @@ export function AttackLineupPage() {
     },
   );
 
+  // Fetch stats for all beast lineup beasts
+  const { data: beastLineupStats = {} } = useBeastLineupStats(
+    allBeastLineupTokenIds,
+    {
+      enabled: allBeastLineupTokenIds.length > 0,
+    },
+  );
+
+  // Enrich adventurers with combat stats (combat health, weapon power, weapon type)
+  const enrichedAdventurers = useMemo((): Adventurer[] => {
+    if (!weaponMap) return adventurers;
+
+    return adventurers.map((adventurer) => {
+      const weapon = weaponMap[adventurer.adventurer_id];
+      const combatHealth = 100 + adventurer.vitality * 15;
+
+      return {
+        ...adventurer,
+        combatHealth,
+        weaponPower: weapon?.weapon_power,
+        weaponType: weapon?.weapon_type,
+      };
+    });
+  }, [adventurers, weaponMap]);
+
   const hasLineup = !!userLineup;
   const lastProcessedLineupRef = useRef<string>("");
   const adventurersIdsString = useMemo(
     () =>
-      adventurers
+      enrichedAdventurers
         .map((a) => a.id)
         .sort()
         .join(","),
-    [adventurers],
+    [enrichedAdventurers],
   );
 
   // Load attack lineup from on-chain data when lineup exists
   useEffect(() => {
-    if (hasLineup && userLineup && adventurers.length > 0) {
+    if (hasLineup && userLineup && enrichedAdventurers.length > 0) {
       const lineupAdventurerIds = [
         userLineup.adventurer1_id,
         userLineup.adventurer2_id,
@@ -279,8 +321,9 @@ export function AttackLineupPage() {
       const loadedAdventurers = lineupAdventurerIds.map((adventurerId) => {
         if (adventurerId && Number(adventurerId) > 0) {
           return (
-            adventurers.find((a) => a.adventurer_id === Number(adventurerId)) ||
-            null
+            enrichedAdventurers.find(
+              (a) => a.adventurer_id === Number(adventurerId),
+            ) || null
           );
         }
         return null;
@@ -295,7 +338,7 @@ export function AttackLineupPage() {
         lastProcessedLineupRef.current = "empty";
       }
     }
-  }, [hasLineup, userLineup, adventurersIdsString, adventurers]);
+  }, [hasLineup, userLineup, adventurersIdsString, enrichedAdventurers]);
 
   // Check if current lineup differs from on-chain lineup
   const hasLineupChanges = useMemo(() => {
@@ -318,7 +361,7 @@ export function AttackLineupPage() {
     // Remove duplicates first (by id)
     const uniqueAdventurers = Array.from(
       new Map(
-        adventurers.map((adventurer) => [adventurer.id, adventurer]),
+        enrichedAdventurers.map((adventurer) => [adventurer.id, adventurer]),
       ).values(),
     );
 
@@ -361,7 +404,7 @@ export function AttackLineupPage() {
     });
 
     return sorted;
-  }, [adventurers, sortBy, sortDirection]);
+  }, [enrichedAdventurers, sortBy, sortDirection]);
 
   const cartridgeConnector = connectors.find(
     (connector) => connector.id === "controller",
@@ -593,22 +636,68 @@ export function AttackLineupPage() {
                           const imageUrl = hasBeast
                             ? beastLineupImages[lookupKey]
                             : null;
+                          const beastStats = hasBeast
+                            ? beastLineupStats[lookupKey]
+                            : null;
                           return (
                             <div
                               key={pos}
-                              className="aspect-square flex items-center justify-center relative rounded-lg bg-emerald-950/30"
+                              className="min-h-[200px] border-2 border-dashed rounded-lg flex items-center justify-center transition-colors border-amber-900/50"
                             >
                               {hasBeast && imageUrl ? (
-                                <motion.img
+                                <motion.div
                                   initial={{ opacity: 0, scale: 0.9 }}
                                   animate={{ opacity: 1, scale: 1 }}
-                                  src={imageUrl}
-                                  alt={`Beast ${beastId}`}
-                                  className="w-full h-full object-contain cursor-pointer"
+                                  className="cursor-pointer w-full h-full relative overflow-hidden rounded-lg border-2 border-amber-500/30"
+                                  style={{
+                                    background:
+                                      "linear-gradient(135deg, rgba(245, 158, 11, 0.1) 0%, rgba(0, 0, 0, 0.4) 100%)",
+                                  }}
                                   onClick={() =>
                                     setInspectedEnemyBeast(imageUrl)
                                   }
-                                />
+                                >
+                                  {/* Background Beast Image */}
+                                  <div className="absolute inset-0">
+                                    <img
+                                      src={imageUrl}
+                                      alt={`Beast ${beastId}`}
+                                      className="w-full h-full object-cover"
+                                    />
+                                  </div>
+
+                                  {/* Level - Top Left Corner */}
+                                  <div className="absolute top-1 left-1 bg-amber-900/95 border-2 border-amber-500/70 rounded-md w-10 h-10 flex items-center justify-center shadow-lg">
+                                    <span className="text-amber-300 text-sm font-bold">
+                                      {beastStats?.level || 0}
+                                    </span>
+                                  </div>
+
+                                  {/* Beast Armor Type Icon - Top Right Corner */}
+                                  <div className="absolute top-1 right-1 bg-amber-900/95 border-2 border-amber-500/70 rounded-md w-10 h-10 flex items-center justify-center shadow-lg">
+                                    <span className="text-xl">
+                                      {getArmorTypeIcon(
+                                        getBeastWeaponType(
+                                          beastStats?.type || "",
+                                        ),
+                                      )}
+                                    </span>
+                                  </div>
+
+                                  {/* HP - Bottom Left Corner (Half Circle) */}
+                                  <div className="absolute bottom-0 left-0 bg-emerald-900/95 border-2 border-emerald-500/70 rounded-tr-full w-11 h-11 flex items-end justify-start shadow-lg pl-1 pb-1">
+                                    <span className="text-emerald-300 text-xs font-bold leading-none">
+                                      {beastStats?.health || 0}
+                                    </span>
+                                  </div>
+
+                                  {/* ATK - Bottom Right Corner (Half Circle) */}
+                                  <div className="absolute bottom-0 right-0 bg-amber-900/95 border-2 border-amber-500/70 rounded-tl-full w-11 h-11 flex items-end justify-end shadow-lg pr-1 pb-1">
+                                    <span className="text-amber-300 text-xs font-bold leading-none">
+                                      {beastStats?.power || 0}
+                                    </span>
+                                  </div>
+                                </motion.div>
                               ) : null}
                             </div>
                           );
@@ -701,7 +790,7 @@ export function AttackLineupPage() {
                   <div className="border border-emerald-500/30 bg-emerald-950/20 p-8 relative">
                     {!hasLineup && (
                       <div className="absolute top-4 right-4 flex gap-2">
-                        {adventurers.length > 0 && (
+                        {enrichedAdventurers.length > 0 && (
                           <motion.button
                             onClick={handleRandomFill}
                             whileHover={{ scale: 1.05 }}
@@ -740,9 +829,9 @@ export function AttackLineupPage() {
                         {attackLineup.map((adventurer, index) => (
                           <div
                             key={index}
-                            className={`min-h-[150px] border-2 border-dashed rounded-lg flex items-center justify-center transition-colors ${
+                            className={`min-h-[200px] border-2 border-dashed rounded-lg flex items-center justify-center transition-all ${
                               isDraggingOver === index
-                                ? "border-emerald-500 bg-emerald-950/30"
+                                ? "border-emerald-500 bg-emerald-950/30 scale-105"
                                 : "border-emerald-500/30"
                             }`}
                             onDragOver={(e: React.DragEvent) => {
@@ -758,7 +847,7 @@ export function AttackLineupPage() {
                               const adventurerId = parseInt(
                                 e.dataTransfer.getData("adventurerId"),
                               );
-                              const adventurerToAdd = adventurers.find(
+                              const adventurerToAdd = enrichedAdventurers.find(
                                 (a) => a.id === adventurerId,
                               );
                               // Check if adventurer is already in lineup
@@ -776,26 +865,65 @@ export function AttackLineupPage() {
                               <motion.div
                                 initial={{ opacity: 0, scale: 0.9 }}
                                 animate={{ opacity: 1, scale: 1 }}
-                                className="cursor-pointer text-center"
+                                className="cursor-pointer w-full h-full relative overflow-hidden rounded-lg border-2 border-emerald-500/30"
+                                style={{
+                                  background:
+                                    "linear-gradient(135deg, rgba(16, 185, 129, 0.1) 0%, rgba(0, 0, 0, 0.4) 100%)",
+                                }}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setInspectedAdventurer(adventurer);
+                                }}
                               >
+                                {/* Background Character Image */}
                                 {adventurer.image && (
-                                  <img
-                                    src={adventurer.image}
-                                    alt={`${adventurer.name} - Level: ${adventurer.level}, Health: ${adventurer.health}`}
-                                    className="w-24 h-24 mx-auto mb-1"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      setInspectedAdventurer(adventurer);
-                                    }}
-                                  />
+                                  <div className="absolute inset-0">
+                                    <img
+                                      src={adventurer.image}
+                                      alt={`${adventurer.name}`}
+                                      className="w-full h-full object-cover"
+                                    />
+                                  </div>
                                 )}
-                                <div className="text-emerald-300 text-xs">
-                                  Lvl {adventurer.level}
+
+                                {/* Level - Top Left Corner */}
+                                <div className="absolute top-1 left-1 bg-emerald-900/95 border-2 border-emerald-500/70 rounded-md w-10 h-10 flex items-center justify-center shadow-lg">
+                                  <span className="text-emerald-300 text-sm font-bold">
+                                    {adventurer.level}
+                                  </span>
+                                </div>
+
+                                {/* Weapon Type Icon - Top Right Corner */}
+                                <div className="absolute top-1 right-1 bg-emerald-900/95 border-2 border-emerald-500/70 rounded-md w-10 h-10 flex items-center justify-center shadow-lg">
+                                  <span className="text-xl">
+                                    {getWeaponTypeIcon(
+                                      adventurer.weaponType || 0,
+                                    )}
+                                  </span>
+                                </div>
+
+                                {/* HP - Bottom Left Corner (Half Circle) */}
+                                <div className="absolute bottom-0 left-0 bg-emerald-900/95 border-2 border-emerald-500/70 rounded-tr-full w-11 h-11 flex items-end justify-start shadow-lg pl-1 pb-1">
+                                  <span className="text-emerald-300 text-xs font-bold leading-none">
+                                    {adventurer.combatHealth || 0}
+                                  </span>
+                                </div>
+
+                                {/* ATK - Bottom Right Corner (Half Circle) */}
+                                <div className="absolute bottom-0 right-0 bg-amber-900/95 border-2 border-amber-500/70 rounded-tl-full w-11 h-11 flex items-end justify-end shadow-lg pr-1 pb-1">
+                                  <span className="text-amber-300 text-xs font-bold leading-none">
+                                    {adventurer.weaponPower || 0}
+                                  </span>
                                 </div>
                               </motion.div>
                             ) : (
                               <div className="text-emerald-200/20 text-xs text-center">
-                                Slot {index + 1}
+                                <div className="mb-2 text-emerald-500/20 text-2xl">
+                                  ⬚
+                                </div>
+                                <div className="text-[10px]">
+                                  SLOT {index + 1}
+                                </div>
                               </div>
                             )}
                           </div>
@@ -894,7 +1022,7 @@ export function AttackLineupPage() {
                           Error summoning heroes
                         </p>
                       </div>
-                    ) : adventurers.length > 0 ? (
+                    ) : enrichedAdventurers.length > 0 ? (
                       <>
                         <div className="mb-6 flex flex-wrap justify-center gap-4">
                           {[
@@ -1090,6 +1218,34 @@ export function AttackLineupPage() {
               <h3 className="text-xl font-bold text-emerald-400 mb-3">
                 {inspectedAdventurer.name}
               </h3>
+
+              {/* Combat Stats Row */}
+              <div className="grid grid-cols-3 gap-3 max-w-md mx-auto mb-4">
+                <div className="bg-emerald-900/30 border-2 border-emerald-500/40 rounded p-3">
+                  <div className="text-emerald-200/70 uppercase tracking-wider text-[10px] mb-1">
+                    Combat HP
+                  </div>
+                  <div className="text-emerald-300 font-bold text-lg">
+                    {inspectedAdventurer.combatHealth || 0}
+                  </div>
+                </div>
+                <div className="bg-emerald-900/30 border-2 border-emerald-500/40 rounded p-3">
+                  <div className="text-emerald-200/70 uppercase tracking-wider text-[10px] mb-1">
+                    Power
+                  </div>
+                  <div className="text-emerald-300 font-bold text-lg">
+                    {inspectedAdventurer.weaponPower || 0}
+                  </div>
+                </div>
+                <div className="bg-emerald-900/30 border-2 border-emerald-500/40 rounded p-3">
+                  <div className="text-emerald-200/70 uppercase tracking-wider text-[10px] mb-1">
+                    Weapon
+                  </div>
+                  <div className="text-emerald-300 font-bold text-2xl">
+                    {getWeaponTypeIcon(inspectedAdventurer.weaponType || 0)}
+                  </div>
+                </div>
+              </div>
 
               {/* Compact Stats Grid */}
               <div className="grid grid-cols-5 gap-2 max-w-lg mx-auto text-xs">

@@ -19,13 +19,17 @@ export type Adventurer = {
   gold: number;
   name?: string;
   image?: string;
+  // Combat stats
+  combatHealth?: number;
+  weaponPower?: number;
+  weaponType?: number;
 };
 
 /**
  * Default constants for the Loot Survivor contract
  * This is the mainnet address for Loot Survivor adventurers
  */
-const LOOT_SURVIVOR_CONTRACT = 
+const LOOT_SURVIVOR_CONTRACT =
   "0x036017E69D21D6D8c13E266EaBB73ef1f1D02722D86BDcAbe5f168f8e549d3cD";
 
 const getAdventurerCollection = async (
@@ -43,8 +47,6 @@ const getAdventurerCollection = async (
       AND balance = '0x0000000000000000000000000000000000000000000000000000000000000001'
     LIMIT 10000
   `;
-
-      
 
   // First, get the owned token IDs
   const tokenBalancesUrl = `${toriiUrl}/sql?query=${encodeURIComponent(tokenBalancesQuery)}`;
@@ -77,8 +79,10 @@ const getAdventurerCollection = async (
     }
 
     // Extract token IDs
-    const tokenIds = tokenBalances.map((tb: any) => `'${tb.token_id}'`).join(',');
-    
+    const tokenIds = tokenBalances
+      .map((tb: any) => `'${tb.token_id}'`)
+      .join(",");
+
     // Second query: Get token details for owned tokens
     let tokensQuery = `
       SELECT *
@@ -89,7 +93,7 @@ const getAdventurerCollection = async (
     `;
 
     const tokensUrl = `${toriiUrl}/sql?query=${encodeURIComponent(tokensQuery)}`;
-    
+
     const tokensResponse = await fetch(tokensUrl, {
       method: "GET",
       headers: {
@@ -147,7 +151,9 @@ const getAdventurerCollection = async (
           if (row.metadata) {
             const metadata = JSON.parse(row.metadata);
             const attributes = metadata.attributes || [];
-            const gameOverAttr = attributes.find((a: any) => a.trait === "Game Over");
+            const gameOverAttr = attributes.find(
+              (a: any) => a.trait === "Game Over",
+            );
             return gameOverAttr?.value === "True";
           }
         } catch (e) {
@@ -170,16 +176,19 @@ const getAdventurerCollection = async (
 
         // Extract adventurer ID from token_id (hex string)
         const adventurerId = toNumber(row.token_id);
-        
+
         const playerName = getAttributeValue(attributes, "Player Name");
         const health = toNumber(getAttributeValue(attributes, "Health"));
-        
+
         // Create name from player name or adventurer ID
-        const name = playerName ? `${playerName}'s Adventurer` : `Adventurer #${adventurerId}`;
-        
+        // Avoid redundant names like "Adventurer's Adventurer"
+        const name = playerName && playerName.toLowerCase() !== "adventurer"
+          ? `${playerName}'s Adventurer`
+          : `Adventurer #${adventurerId}`;
+
         // Extract image from metadata
         const image = metadata?.image || generateAdventurerImage(adventurerId);
-        
+
         let adventurer: Adventurer = {
           id: index,
           adventurer_id: adventurerId,
@@ -279,7 +288,7 @@ const getAdventurerLineupImages = async (
   // For now, generate placeholder images
   // In a real implementation, you'd query the actual NFT metadata
   const imageMap: Record<string, string> = {};
-  
+
   validAdventurerIds.forEach((id) => {
     imageMap[String(id)] = generateAdventurerImage(id);
   });
@@ -298,7 +307,11 @@ export const useAdventurerLineupImages = (
   },
 ) => {
   return useQuery({
-    queryKey: ["adventurerLineupImages", adventurerIds.join(","), options?.toriiUrl],
+    queryKey: [
+      "adventurerLineupImages",
+      adventurerIds.join(","),
+      options?.toriiUrl,
+    ],
     queryFn: () => getAdventurerLineupImages(adventurerIds),
     enabled: options?.enabled ?? adventurerIds.length > 0,
     staleTime: 100000, // Consider data fresh for 100 seconds
