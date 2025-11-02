@@ -23,6 +23,7 @@ type BeastLineupWithId = BeastLineup & { entityId: string };
 
 export function AttackLineupPage() {
   const [inspectedAdventurer, setInspectedAdventurer] = useState<Adventurer | null>(null);
+  const [inspectedEnemyBeast, setInspectedEnemyBeast] = useState<string | null>(null);
   const [attackLineup, setAttackLineup] = useState<(Adventurer | null)[]>(
     Array(5).fill(null),
   );
@@ -30,7 +31,6 @@ export function AttackLineupPage() {
   const [isDraggingOver, setIsDraggingOver] = useState<number>(-1);
   const [sortBy, setSortBy] = useState<keyof Adventurer | "">("");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
-  const [swappedPosition, setSwappedPosition] = useState<number | null>(null);
 
   // Use battle events hook
   const {
@@ -76,15 +76,12 @@ export function AttackLineupPage() {
     }
   };
 
-  const swapAdventurer = async () => {
-    if (!client || !account || swappedPosition === null) return;
-    const newAdventurer = attackLineup[swappedPosition];
-    if (!newAdventurer) return;
+  const updateLineup = async () => {
+    if (!client || !account) return;
 
     const tx = showTransaction(undefined, `Updating adventurer lineup...`);
     
     try {
-      // Since there's no swap function, we need to set the entire lineup again
       // Convert to numbers to ensure u64 compatibility
       await client.battle_actions.setAttackLineup(
         account,
@@ -94,7 +91,6 @@ export function AttackLineupPage() {
         Number(attackLineup[3]?.adventurer_id || 0),
         Number(attackLineup[4]?.adventurer_id || 0),
       );
-      setSwappedPosition(null);
       tx.success("Adventurer lineup updated successfully!");
     } catch (error) {
       console.error("Failed to update lineup:", error);
@@ -184,9 +180,13 @@ export function AttackLineupPage() {
     };
   }, [allLineups, address]);
 
-  // Beast lineups for enemy selection
+  // Beast lineups for enemy selection (excluding user's own base)
   const worldBeastLineups = useMemo((): BeastLineupWithId[] => {
     if (!Array.isArray(allBeastLineups)) return [];
+
+    const paddedAddress = address
+      ? addAddressPadding(address.toLowerCase()).toLowerCase()
+      : null;
 
     return allBeastLineups
       .map((lineupObj: Record<string, BeastLineup>) => {
@@ -205,8 +205,15 @@ export function AttackLineupPage() {
           beast5_id: lineup.beast5_id,
         };
       })
-      .filter((lineup): lineup is BeastLineupWithId => lineup !== null);
-  }, [allBeastLineups]);
+      .filter((lineup): lineup is BeastLineupWithId => {
+        if (lineup === null) return false;
+        // Filter out user's own base
+        if (paddedAddress && lineup.player?.toLowerCase() === paddedAddress) {
+          return false;
+        }
+        return true;
+      });
+  }, [allBeastLineups, address]);
 
  
 
@@ -275,17 +282,31 @@ export function AttackLineupPage() {
       });
 
       setAttackLineup(loadedAdventurers);
-      setSwappedPosition(null); // Reset swap state when loading lineup
       lastProcessedLineupRef.current = combinedKey;
     } else if (!hasLineup) {
       // Only clear if we haven't already cleared it
       if (lastProcessedLineupRef.current !== "empty") {
         setAttackLineup(Array(5).fill(null));
-        setSwappedPosition(null); // Reset swap state
         lastProcessedLineupRef.current = "empty";
       }
     }
   }, [hasLineup, userLineup, adventurersIdsString, adventurers]);
+
+  // Check if current lineup differs from on-chain lineup
+  const hasLineupChanges = useMemo(() => {
+    if (!hasLineup || !userLineup) return false;
+    
+    const currentIds = attackLineup.map(a => a?.adventurer_id || 0);
+    const onChainIds = [
+      Number(userLineup.adventurer1_id || 0),
+      Number(userLineup.adventurer2_id || 0),
+      Number(userLineup.adventurer3_id || 0),
+      Number(userLineup.adventurer4_id || 0),
+      Number(userLineup.adventurer5_id || 0),
+    ];
+    
+    return currentIds.some((id, index) => id !== onChainIds[index]);
+  }, [hasLineup, userLineup, attackLineup]);
 
   // Sort adventurers based on sortBy and sortDirection
   const sortedAdventurers = useMemo(() => {
@@ -349,15 +370,15 @@ export function AttackLineupPage() {
             animate={{ opacity: 1, y: 0 }}
             className="text-center"
           >
-            <div className="border border-red-500/30 bg-red-950/20 p-12">
-              <Swords className="w-16 h-16 text-red-500/50 mx-auto mb-6" />
-              <h2 className="text-2xl font-bold text-red-400 mb-4 tracking-wider uppercase">
+            <div className="border border-emerald-500/30 bg-emerald-950/20 p-12">
+              <Swords className="w-16 h-16 text-emerald-500/50 mx-auto mb-6" />
+              <h2 className="text-2xl font-bold text-emerald-400 mb-4 tracking-wider uppercase">
                 Connector Not Found
               </h2>
-              <p className="text-red-200/60 mb-4 text-sm tracking-wide">
+              <p className="text-emerald-200/60 mb-4 text-sm tracking-wide">
                 The Cartridge Controller connector is not available.
               </p>
-              <p className="text-red-200/40 text-xs">
+              <p className="text-emerald-200/40 text-xs">
                 Please ensure the Cartridge wallet is installed and properly
                 configured.
               </p>
@@ -369,15 +390,18 @@ export function AttackLineupPage() {
   }
 
   useEffect(() => {
-    if (!inspectedAdventurer) return;
+    if (!inspectedAdventurer && !inspectedEnemyBeast) return;
 
     const handleEscape = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setInspectedAdventurer(null);
+      if (e.key === "Escape") {
+        setInspectedAdventurer(null);
+        setInspectedEnemyBeast(null);
+      }
     };
 
     document.addEventListener("keydown", handleEscape);
     return () => document.removeEventListener("keydown", handleEscape);
-  }, [inspectedAdventurer]);
+  }, [inspectedAdventurer, inspectedEnemyBeast]);
 
   return (
     <div className="min-h-screen bg-black text-white relative overflow-hidden">
@@ -392,7 +416,7 @@ export function AttackLineupPage() {
             repeat: Infinity,
             ease: "easeInOut",
           }}
-          className="absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[400px] bg-red-600/10 rounded-full blur-[150px]"
+          className="absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[400px] bg-emerald-600/10 rounded-full blur-[150px]"
         />
       </div>
 
@@ -408,15 +432,15 @@ export function AttackLineupPage() {
           className="text-center mb-16"
         >
           <h1
-            className="text-5xl md:text-6xl font-bold mb-2 text-red-500"
+            className="text-5xl md:text-6xl font-bold mb-2 text-emerald-500"
             style={{
-              textShadow: "0 0 30px rgba(239, 68, 68, 0.3)",
+              textShadow: "0 0 30px rgba(16, 185, 129, 0.3)",
               fontFamily: "serif",
             }}
           >
             ATTACK MODE
           </h1>
-          <p className="text-red-200/40 text-sm tracking-widest uppercase">
+          <p className="text-emerald-200/40 text-sm tracking-widest uppercase">
             Choose your enemy and battle
           </p>
         </motion.div>
@@ -429,9 +453,9 @@ export function AttackLineupPage() {
             transition={{ delay: 0.2 }}
             className="text-center mb-16"
           >
-            <div className="border border-red-500/30 bg-red-950/20 p-12 mb-8">
-              <Swords className="w-16 h-16 text-red-500/50 mx-auto mb-6" />
-              <p className="text-red-200/60 mb-8 text-sm tracking-wide uppercase">
+            <div className="border border-emerald-500/30 bg-emerald-950/20 p-12 mb-8">
+              <Swords className="w-16 h-16 text-emerald-500/50 mx-auto mb-6" />
+              <p className="text-emerald-200/60 mb-8 text-sm tracking-wide uppercase">
                 Connect your wallet to enter battle mode
               </p>
               <motion.button
@@ -439,14 +463,14 @@ export function AttackLineupPage() {
                 disabled={status === "connecting"}
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
-                className="px-10 py-4 text-lg font-bold tracking-wider uppercase border-2 border-red-500/50 hover:border-red-500 transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+                className="px-10 py-4 text-lg font-bold tracking-wider uppercase border-2 border-emerald-500/50 hover:border-emerald-500 transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
                 style={{
                   background:
-                    "linear-gradient(to bottom, rgba(239, 68, 68, 0.1), rgba(0, 0, 0, 0.4))",
-                  textShadow: "0 0 10px rgba(239, 68, 68, 0.5)",
+                    "linear-gradient(to bottom, rgba(16, 185, 129, 0.1), rgba(0, 0, 0, 0.4))",
+                  textShadow: "0 0 10px rgba(16, 185, 129, 0.5)",
                 }}
               >
-                <span className="text-red-500">
+                <span className="text-emerald-500">
                   {status === "connecting" ? "CONNECTING..." : "CONNECT WALLET"}
                 </span>
               </motion.button>
@@ -464,10 +488,10 @@ export function AttackLineupPage() {
                 <div className={`border p-8 ${
                   battleResult.includes("Victory") 
                     ? "border-emerald-500/50 bg-emerald-950/20"
-                    : "border-red-500/50 bg-red-950/20"
+                    : "border-emerald-500/50 bg-emerald-950/20"
                 }`}>
                   <h2 className={`text-4xl font-bold mb-4 tracking-wider uppercase ${
-                    battleResult.includes("Victory") ? "text-emerald-400" : "text-red-400"
+                    battleResult.includes("Victory") ? "text-emerald-400" : "text-emerald-400"
                   }`}>
                     {battleResult}
                   </h2>
@@ -515,12 +539,23 @@ export function AttackLineupPage() {
                   transition={{ delay: 0.3 }}
                   className="mb-8"
                 >
-                  <div className="border border-emerald-500/30 bg-emerald-950/20 p-8">
-                    <div className="text-center">
-                      <Swords className="w-12 h-12 text-emerald-500/50 mx-auto mb-4 rotate-180" />
-                      <h2 className="text-2xl font-bold text-emerald-400 mb-4 tracking-wider uppercase">
+                  <div className="border-2 border-amber-900/50 bg-emerald-950/20 p-8 relative overflow-hidden" style={{
+                    boxShadow: "0 0 20px rgba(120, 53, 15, 0.2), inset 0 0 20px rgba(120, 53, 15, 0.05)"
+                  }}>
+                    {/* Accent pattern overlay */}
+                    <div className="absolute inset-0 opacity-10 pointer-events-none" style={{
+                      backgroundImage: "repeating-linear-gradient(45deg, transparent, transparent 10px, rgba(120, 53, 15, 0.1) 10px, rgba(120, 53, 15, 0.1) 20px)"
+                    }} />
+                    <div className="text-center relative z-10">
+                      <Swords className="w-12 h-12 text-amber-900/70 mx-auto mb-4 rotate-180" />
+                      <h2 className="text-2xl font-bold text-amber-800 mb-2 tracking-wider uppercase" style={{
+                        textShadow: "0 0 10px rgba(120, 53, 15, 0.5)"
+                      }}>
                         Enemy Force
                       </h2>
+                      <div className="text-amber-700/70 font-mono text-xs mb-4">
+                        {selectedEnemy.player?.slice(0, 6)}...{selectedEnemy.player?.slice(-4)}
+                      </div>
                       <div className="grid grid-cols-5 gap-4 p-4">
                         {[1, 2, 3, 4, 5].map((pos) => {
                           const beastId = selectedEnemy[`beast${pos}_id` as keyof typeof selectedEnemy];
@@ -530,28 +565,18 @@ export function AttackLineupPage() {
                           return (
                             <div
                               key={pos}
-                              className="min-h-[150px] border-2 border-solid rounded-lg flex items-center justify-center border-emerald-500/30"
+                              className="aspect-square flex items-center justify-center relative rounded-lg bg-emerald-950/30"
                             >
-                              {hasBeast ? (
-                                <motion.div
+                              {hasBeast && imageUrl ? (
+                                <motion.img
                                   initial={{ opacity: 0, scale: 0.9 }}
                                   animate={{ opacity: 1, scale: 1 }}
-                                  className="text-center"
-                                >
-                                  {imageUrl && (
-                                    <img
-                                      src={imageUrl}
-                                      alt={`Beast ${beastId}`}
-                                      className="w-24 h-24 mx-auto mb-1"
-                                    />
-                                  )}
-                                  <div className="text-emerald-300 text-xs">#{String(beastId).slice(-4)}</div>
-                                </motion.div>
-                              ) : (
-                                <div className="text-emerald-200/20 text-xs text-center">
-                                  Slot {pos}
-                                </div>
-                              )}
+                                  src={imageUrl}
+                                  alt={`Beast ${beastId}`}
+                                  className="w-full h-full object-contain cursor-pointer"
+                                  onClick={() => setInspectedEnemyBeast(imageUrl)}
+                                />
+                              ) : null}
                             </div>
                           );
                         })}
@@ -567,22 +592,22 @@ export function AttackLineupPage() {
                   transition={{ delay: 0.4 }}
                   className="text-center mb-8"
                 >
-                  <div className="text-4xl font-bold text-red-500 mb-4">VS</div>
+                  <div className="text-4xl font-bold text-emerald-500 mb-4">VS</div>
                   {hasLineup && attackLineup.every((a) => a !== null) ? (
                     <motion.button
                       onClick={executeBattle}
                       whileHover={{ scale: 1.05 }}
                       whileTap={{ scale: 0.95 }}
-                      className="px-8 py-3 text-lg font-bold tracking-wider uppercase border-2 border-red-500/50 hover:border-red-500 transition-all cursor-pointer"
+                      className="px-8 py-3 text-lg font-bold tracking-wider uppercase border-2 border-emerald-500/50 hover:border-emerald-500 transition-all cursor-pointer"
                       style={{
-                        background: "linear-gradient(to bottom, rgba(239, 68, 68, 0.1), rgba(0, 0, 0, 0.4))",
-                        textShadow: "0 0 10px rgba(239, 68, 68, 0.5)",
+                        background: "linear-gradient(to bottom, rgba(16, 185, 129, 0.1), rgba(0, 0, 0, 0.4))",
+                        textShadow: "0 0 10px rgba(16, 185, 129, 0.5)",
                       }}
                     >
-                      <span className="text-red-500">BATTLE!</span>
+                      <span className="text-emerald-500">BATTLE!</span>
                     </motion.button>
                   ) : (
-                    <div className="text-red-400/50 text-sm uppercase tracking-wider">
+                    <div className="text-emerald-400/50 text-sm uppercase tracking-wider">
                       Complete Your Lineup Below
                     </div>
                   )}
@@ -595,7 +620,7 @@ export function AttackLineupPage() {
                   transition={{ delay: 0.5 }}
                   className="mb-16"
                 >
-                  <div className="border border-red-500/30 bg-red-950/20 p-8 relative">
+                  <div className="border border-emerald-500/30 bg-emerald-950/20 p-8 relative">
                     {!hasLineup && (
                       <div className="absolute top-4 right-4 flex gap-2">
                         {adventurers.length > 0 && (
@@ -603,10 +628,10 @@ export function AttackLineupPage() {
                             onClick={handleRandomFill}
                             whileHover={{ scale: 1.05 }}
                             whileTap={{ scale: 0.95 }}
-                            className="px-4 py-2 text-xs font-bold tracking-wider uppercase border border-red-500/50 hover:border-red-500 transition-all cursor-pointer text-red-400"
+                            className="px-4 py-2 text-xs font-bold tracking-wider uppercase border border-emerald-500/50 hover:border-emerald-500 transition-all cursor-pointer text-emerald-400"
                             style={{
                               background:
-                                "linear-gradient(to bottom, rgba(239, 68, 68, 0.1), rgba(0, 0, 0, 0.4))",
+                                "linear-gradient(to bottom, rgba(16, 185, 129, 0.1), rgba(0, 0, 0, 0.4))",
                             }}
                           >
                             Random Fill
@@ -629,8 +654,8 @@ export function AttackLineupPage() {
                       </div>
                     )}
                     <div className="text-center">
-                      <Swords className="w-12 h-12 text-red-500/50 mx-auto mb-4" />
-                      <h2 className="text-2xl font-bold text-red-400 mb-4 tracking-wider uppercase">
+                      <Swords className="w-12 h-12 text-emerald-500/50 mx-auto mb-4" />
+                      <h2 className="text-2xl font-bold text-emerald-400 mb-4 tracking-wider uppercase">
                         Your Attack Force
                       </h2>
                       <div className="grid grid-cols-5 gap-4 p-4">
@@ -639,8 +664,8 @@ export function AttackLineupPage() {
                             key={index}
                             className={`min-h-[150px] border-2 border-dashed rounded-lg flex items-center justify-center transition-colors ${
                               isDraggingOver === index
-                                ? "border-red-500 bg-red-950/30"
-                                : "border-red-500/30"
+                                ? "border-emerald-500 bg-emerald-950/30"
+                                : "border-emerald-500/30"
                             }`}
                             onDragOver={(e: React.DragEvent) => {
                               e.preventDefault();
@@ -664,14 +689,8 @@ export function AttackLineupPage() {
                               );
                               if (adventurerToAdd && !isAlreadyInLineup) {
                                 const newAttackLineup = [...attackLineup];
-                                const originalAdventurer = newAttackLineup[index];
                                 newAttackLineup[index] = adventurerToAdd;
                                 setAttackLineup(newAttackLineup);
-
-                                // If lineup is registered and we're swapping an adventurer, track it
-                                if (hasLineup && originalAdventurer) {
-                                  setSwappedPosition(index);
-                                }
                               }
                             }}
                           >
@@ -692,10 +711,10 @@ export function AttackLineupPage() {
                                     }}
                                   />
                                 )}
-                                <div className="text-red-300 text-xs">Lvl {adventurer.level}</div>
+                                <div className="text-emerald-300 text-xs">Lvl {adventurer.level}</div>
                               </motion.div>
                             ) : (
-                              <div className="text-red-200/20 text-xs text-center">
+                              <div className="text-emerald-200/20 text-xs text-center">
                                 Slot {index + 1}
                               </div>
                             )}
@@ -719,21 +738,21 @@ export function AttackLineupPage() {
                           className="mt-6 px-8 py-3 text-base font-bold tracking-wider uppercase border-2 transition-all cursor-pointer disabled:opacity-50"
                           style={{
                             borderColor: attackLineup.every((a) => a !== null)
-                              ? "rgba(239, 68, 68, 0.5)"
-                              : "rgba(239, 68, 68, 0.3)",
+                              ? "rgba(16, 185, 129, 0.5)"
+                              : "rgba(16, 185, 129, 0.3)",
                             background: attackLineup.every((a) => a !== null)
-                              ? "linear-gradient(to bottom, rgba(239, 68, 68, 0.1), rgba(0, 0, 0, 0.4))"
-                              : "linear-gradient(to bottom, rgba(239, 68, 68, 0.05), rgba(0, 0, 0, 0.3))",
+                              ? "linear-gradient(to bottom, rgba(16, 185, 129, 0.1), rgba(0, 0, 0, 0.4))"
+                              : "linear-gradient(to bottom, rgba(16, 185, 129, 0.05), rgba(0, 0, 0, 0.3))",
                             textShadow: attackLineup.every((a) => a !== null)
-                              ? "0 0 10px rgba(239, 68, 68, 0.5)"
+                              ? "0 0 10px rgba(16, 185, 129, 0.5)"
                               : "none",
                           }}
                         >
                           <span
                             className={
                               attackLineup.every((a) => a !== null)
-                                ? "text-red-500"
-                                : "text-red-400/50"
+                                ? "text-emerald-500"
+                                : "text-emerald-400/50"
                             }
                           >
                             {attackLineup.every((a) => a !== null)
@@ -741,21 +760,21 @@ export function AttackLineupPage() {
                               : "Force Incomplete"}
                           </span>
                         </motion.button>
-                      ) : swappedPosition !== null ? (
+                      ) : hasLineupChanges ? (
                         <motion.button
-                          onClick={swapAdventurer}
+                          onClick={updateLineup}
                           whileHover={{ scale: 1.05 }}
                           whileTap={{ scale: 0.95 }}
                           className="mt-6 px-8 py-3 text-base font-bold tracking-wider uppercase border-2 transition-all cursor-pointer"
                           style={{
-                            borderColor: "rgba(239, 68, 68, 0.5)",
+                            borderColor: "rgba(16, 185, 129, 0.5)",
                             background:
-                              "linear-gradient(to bottom, rgba(239, 68, 68, 0.1), rgba(0, 0, 0, 0.4))",
-                            textShadow: "0 0 10px rgba(239, 68, 68, 0.5)",
+                              "linear-gradient(to bottom, rgba(16, 185, 129, 0.1), rgba(0, 0, 0, 0.4))",
+                            textShadow: "0 0 10px rgba(16, 185, 129, 0.5)",
                           }}
                         >
-                          <span className="text-red-500">
-                            Replace Hero (Position {swappedPosition + 1})
+                          <span className="text-emerald-500">
+                            Update
                           </span>
                         </motion.button>
                       ) : null}
@@ -822,13 +841,13 @@ export function AttackLineupPage() {
                     transition={{ delay: 0.4 }}
                     className="mb-16"
                   >
-                  <h2 className="text-center text-xl font-bold text-red-400 mb-6 tracking-wider uppercase">
+                  <h2 className="text-center text-xl font-bold text-emerald-400 mb-6 tracking-wider uppercase">
                     Fallen Heroes
                   </h2>
-                  <div className="border border-red-500/30 bg-red-950/20 p-8">
+                  <div className="border border-emerald-500/30 bg-emerald-950/20 p-8">
                     {isLoadingAdventurers ? (
                       <div className="text-center">
-                        <p className="text-red-200/60 text-sm tracking-wide uppercase">
+                        <p className="text-emerald-200/60 text-sm tracking-wide uppercase">
                           Summoning fallen heroes...
                         </p>
                       </div>
@@ -862,19 +881,19 @@ export function AttackLineupPage() {
                               }}
                               className={`px-4 py-2 text-sm font-bold tracking-wider uppercase transition-all cursor-pointer flex items-center gap-2 ${
                                 sortBy === key
-                                  ? "text-red-400 border-red-500/50"
-                                  : "text-red-200/60 border-red-500/20 hover:text-red-300"
+                                  ? "text-emerald-400 border-emerald-500/50"
+                                  : "text-emerald-200/60 border-emerald-500/20 hover:text-emerald-300"
                               } border rounded`}
                               style={{
                                 background:
                                   sortBy === key
-                                    ? "linear-gradient(to bottom, rgba(239, 68, 68, 0.1), rgba(0, 0, 0, 0.3))"
-                                    : "linear-gradient(to bottom, rgba(239, 68, 68, 0.05), rgba(0, 0, 0, 0.2))",
+                                    ? "linear-gradient(to bottom, rgba(16, 185, 129, 0.1), rgba(0, 0, 0, 0.3))"
+                                    : "linear-gradient(to bottom, rgba(16, 185, 129, 0.05), rgba(0, 0, 0, 0.2))",
                               }}
                             >
                               <span>{label}</span>
                               {sortBy === key && (
-                                <span className="text-red-400">
+                                <span className="text-emerald-400">
                                   {sortDirection === "asc" ? "↑" : "↓"}
                                 </span>
                               )}
@@ -907,14 +926,14 @@ export function AttackLineupPage() {
                                   }}
                                 />
                               )}
-                              <div className="text-red-300 text-xs">Lvl {adventurer.level}</div>
+                              <div className="text-emerald-300 text-xs">Lvl {adventurer.level}</div>
                             </motion.div>
                           ))}
                         </div>
                       </>
                     ) : (
                       <div className="text-center">
-                        <p className="text-red-200/60 text-sm tracking-wide uppercase">
+                        <p className="text-emerald-200/60 text-sm tracking-wide uppercase">
                           No fallen heroes found
                         </p>
                       </div>
@@ -937,7 +956,7 @@ export function AttackLineupPage() {
           <motion.div
             initial={{ opacity: 0, scale: 0.8 }}
             animate={{ opacity: 1, scale: 1 }}
-            className="max-w-2xl w-full bg-red-950/90 border border-red-500/30 rounded-lg p-6"
+            className="max-w-2xl w-full bg-emerald-950/90 border border-emerald-500/30 rounded-lg p-6"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="text-center">
@@ -951,51 +970,51 @@ export function AttackLineupPage() {
               )}
               
               {/* Name */}
-              <h3 className="text-xl font-bold text-red-400 mb-3">
+              <h3 className="text-xl font-bold text-emerald-400 mb-3">
                 {inspectedAdventurer.name}
               </h3>
               
               {/* Compact Stats Grid */}
               <div className="grid grid-cols-5 gap-2 max-w-lg mx-auto text-xs">
-                <div className="bg-red-950/50 border border-red-500/20 rounded p-2">
-                  <div className="text-red-200/60 uppercase tracking-wider text-[10px]">LVL</div>
-                  <div className="text-red-300 font-bold">{inspectedAdventurer.level}</div>
+                <div className="bg-emerald-950/50 border border-emerald-500/20 rounded p-2">
+                  <div className="text-emerald-200/60 uppercase tracking-wider text-[10px]">LVL</div>
+                  <div className="text-emerald-300 font-bold">{inspectedAdventurer.level}</div>
                 </div>
-                <div className="bg-red-950/50 border border-red-500/20 rounded p-2">
-                  <div className="text-red-200/60 uppercase tracking-wider text-[10px]">HP</div>
-                  <div className="text-red-300 font-bold">{inspectedAdventurer.health}</div>
+                <div className="bg-emerald-950/50 border border-emerald-500/20 rounded p-2">
+                  <div className="text-emerald-200/60 uppercase tracking-wider text-[10px]">HP</div>
+                  <div className="text-emerald-300 font-bold">{inspectedAdventurer.health}</div>
                 </div>
-                <div className="bg-red-950/50 border border-red-500/20 rounded p-2">
-                  <div className="text-red-200/60 uppercase tracking-wider text-[10px]">STR</div>
-                  <div className="text-red-300 font-bold">{inspectedAdventurer.strength}</div>
+                <div className="bg-emerald-950/50 border border-emerald-500/20 rounded p-2">
+                  <div className="text-emerald-200/60 uppercase tracking-wider text-[10px]">STR</div>
+                  <div className="text-emerald-300 font-bold">{inspectedAdventurer.strength}</div>
                 </div>
-                <div className="bg-red-950/50 border border-red-500/20 rounded p-2">
-                  <div className="text-red-200/60 uppercase tracking-wider text-[10px]">DEX</div>
-                  <div className="text-red-300 font-bold">{inspectedAdventurer.dexterity}</div>
+                <div className="bg-emerald-950/50 border border-emerald-500/20 rounded p-2">
+                  <div className="text-emerald-200/60 uppercase tracking-wider text-[10px]">DEX</div>
+                  <div className="text-emerald-300 font-bold">{inspectedAdventurer.dexterity}</div>
                 </div>
-                <div className="bg-red-950/50 border border-red-500/20 rounded p-2">
-                  <div className="text-red-200/60 uppercase tracking-wider text-[10px]">VIT</div>
-                  <div className="text-red-300 font-bold">{inspectedAdventurer.vitality}</div>
+                <div className="bg-emerald-950/50 border border-emerald-500/20 rounded p-2">
+                  <div className="text-emerald-200/60 uppercase tracking-wider text-[10px]">VIT</div>
+                  <div className="text-emerald-300 font-bold">{inspectedAdventurer.vitality}</div>
                 </div>
-                <div className="bg-red-950/50 border border-red-500/20 rounded p-2">
-                  <div className="text-red-200/60 uppercase tracking-wider text-[10px]">INT</div>
-                  <div className="text-red-300 font-bold">{inspectedAdventurer.intelligence}</div>
+                <div className="bg-emerald-950/50 border border-emerald-500/20 rounded p-2">
+                  <div className="text-emerald-200/60 uppercase tracking-wider text-[10px]">INT</div>
+                  <div className="text-emerald-300 font-bold">{inspectedAdventurer.intelligence}</div>
                 </div>
-                <div className="bg-red-950/50 border border-red-500/20 rounded p-2">
-                  <div className="text-red-200/60 uppercase tracking-wider text-[10px]">WIS</div>
-                  <div className="text-red-300 font-bold">{inspectedAdventurer.wisdom}</div>
+                <div className="bg-emerald-950/50 border border-emerald-500/20 rounded p-2">
+                  <div className="text-emerald-200/60 uppercase tracking-wider text-[10px]">WIS</div>
+                  <div className="text-emerald-300 font-bold">{inspectedAdventurer.wisdom}</div>
                 </div>
-                <div className="bg-red-950/50 border border-red-500/20 rounded p-2">
-                  <div className="text-red-200/60 uppercase tracking-wider text-[10px]">CHA</div>
-                  <div className="text-red-300 font-bold">{inspectedAdventurer.charisma}</div>
+                <div className="bg-emerald-950/50 border border-emerald-500/20 rounded p-2">
+                  <div className="text-emerald-200/60 uppercase tracking-wider text-[10px]">CHA</div>
+                  <div className="text-emerald-300 font-bold">{inspectedAdventurer.charisma}</div>
                 </div>
-                <div className="bg-red-950/50 border border-red-500/20 rounded p-2">
-                  <div className="text-red-200/60 uppercase tracking-wider text-[10px]">LUCK</div>
-                  <div className="text-red-300 font-bold">{inspectedAdventurer.luck}</div>
+                <div className="bg-emerald-950/50 border border-emerald-500/20 rounded p-2">
+                  <div className="text-emerald-200/60 uppercase tracking-wider text-[10px]">LUCK</div>
+                  <div className="text-emerald-300 font-bold">{inspectedAdventurer.luck}</div>
                 </div>
-                <div className="bg-red-950/50 border border-red-500/20 rounded p-2">
-                  <div className="text-red-200/60 uppercase tracking-wider text-[10px]">XP</div>
-                  <div className="text-red-300 font-bold">{inspectedAdventurer.xp}</div>
+                <div className="bg-emerald-950/50 border border-emerald-500/20 rounded p-2">
+                  <div className="text-emerald-200/60 uppercase tracking-wider text-[10px]">XP</div>
+                  <div className="text-emerald-300 font-bold">{inspectedAdventurer.xp}</div>
                 </div>
               </div>
             </div>
@@ -1003,7 +1022,36 @@ export function AttackLineupPage() {
             <div className="mt-4 text-center">
               <button
                 onClick={() => setInspectedAdventurer(null)}
-                className="text-red-400 text-xs uppercase tracking-wider hover:text-red-300 transition-colors"
+                className="text-emerald-400 text-xs uppercase tracking-wider hover:text-emerald-300 transition-colors"
+              >
+                Close (ESC)
+              </button>
+            </div>
+          </motion.div>
+        </div>
+      )}
+
+      {/* Enemy Beast Inspection Modal */}
+      {inspectedEnemyBeast && (
+        <div
+          className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4"
+          onClick={() => setInspectedEnemyBeast(null)}
+        >
+          <motion.div
+            initial={{ opacity: 0, scale: 0.8 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="max-w-xs w-full"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <img
+              src={inspectedEnemyBeast}
+              alt="Enemy Beast"
+              className="w-full h-auto object-contain"
+            />
+            <div className="mt-4 text-center">
+              <button
+                onClick={() => setInspectedEnemyBeast(null)}
+                className="text-emerald-400 text-xs uppercase tracking-wider hover:text-emerald-300 transition-colors"
               >
                 Close (ESC)
               </button>
