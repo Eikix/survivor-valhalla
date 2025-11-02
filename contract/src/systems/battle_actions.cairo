@@ -729,6 +729,7 @@ pub mod battle_actions {
                                             .emit_event(
                                                 @DamageDealt {
                                                     battle_id,
+                                                    round,
                                                     attacker_id: *unit.unit_id,
                                                     target_id: *target.unit_id,
                                                     damage: final_damage,
