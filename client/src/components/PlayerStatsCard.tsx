@@ -40,65 +40,66 @@ export function PlayerStatsCard({
       animate={{ opacity: 1, y: 0 }}
       className="border border-emerald-500/30 bg-gradient-to-br from-emerald-950/30 via-emerald-950/20 to-black/40 p-4 sm:p-6 mb-6 sm:mb-8"
     >
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+      {/* Top Row: Battles, Wins, Losses - 3 columns on all screen sizes */}
+      <div className="grid grid-cols-3 gap-3 sm:gap-4 mb-4">
         {/* Total Battles */}
         <div className="text-center">
-          <div className="flex items-center justify-center gap-2 mb-2">
-            <Target className="w-4 h-4 text-emerald-400" />
-            <h4 className="text-emerald-400 font-bold text-xs uppercase tracking-wider">
+          <div className="flex items-center justify-center gap-1 mb-2">
+            <Target className="w-3 h-3 sm:w-4 sm:h-4 text-emerald-400" />
+            <h4 className="text-emerald-400 font-bold text-[10px] sm:text-xs uppercase tracking-wider">
               Battles
             </h4>
           </div>
-          <div className="text-2xl sm:text-3xl font-bold text-emerald-300">
+          <div className="text-xl sm:text-2xl md:text-3xl font-bold text-emerald-300">
             {total}
           </div>
         </div>
 
         {/* Wins */}
         <div className="text-center">
-          <div className="flex items-center justify-center gap-2 mb-2">
-            <Trophy className="w-4 h-4 text-yellow-400" />
-            <h4 className="text-yellow-400 font-bold text-xs uppercase tracking-wider">
+          <div className="flex items-center justify-center gap-1 mb-2">
+            <Trophy className="w-3 h-3 sm:w-4 sm:h-4 text-yellow-400" />
+            <h4 className="text-yellow-400 font-bold text-[10px] sm:text-xs uppercase tracking-wider">
               Wins
             </h4>
           </div>
-          <div className="text-2xl sm:text-3xl font-bold text-yellow-300">
+          <div className="text-xl sm:text-2xl md:text-3xl font-bold text-yellow-300">
             {wins}
           </div>
         </div>
 
         {/* Losses */}
         <div className="text-center">
-          <div className="flex items-center justify-center gap-2 mb-2">
-            <Skull className="w-4 h-4 text-red-400" />
-            <h4 className="text-red-400 font-bold text-xs uppercase tracking-wider">
+          <div className="flex items-center justify-center gap-1 mb-2">
+            <Skull className="w-3 h-3 sm:w-4 sm:h-4 text-red-400" />
+            <h4 className="text-red-400 font-bold text-[10px] sm:text-xs uppercase tracking-wider">
               Losses
             </h4>
           </div>
-          <div className="text-2xl sm:text-3xl font-bold text-red-300">
+          <div className="text-xl sm:text-2xl md:text-3xl font-bold text-red-300">
             {losses}
           </div>
         </div>
+      </div>
 
-        {/* Win Rate */}
-        <div className="text-center col-span-2 sm:col-span-1">
-          <div className="flex items-center justify-center gap-2 mb-2">
-            <TrendingUp className="w-4 h-4 text-emerald-400" />
-            <h4 className="text-emerald-400 font-bold text-xs uppercase tracking-wider">
-              Win Rate
-            </h4>
-          </div>
-          <div
-            className={`text-2xl sm:text-3xl font-bold ${
-              winRate >= 60
-                ? "text-green-300"
-                : winRate >= 40
-                  ? "text-yellow-300"
-                  : "text-red-300"
-            }`}
-          >
-            {winRate.toFixed(1)}%
-          </div>
+      {/* Win Rate - Full width row */}
+      <div className="text-center mb-4 pb-4 border-b border-emerald-500/20">
+        <div className="flex items-center justify-center gap-2 mb-2">
+          <TrendingUp className="w-4 h-4 sm:w-5 sm:h-5 text-emerald-400" />
+          <h4 className="text-emerald-400 font-bold text-xs sm:text-sm uppercase tracking-wider">
+            Win Rate
+          </h4>
+        </div>
+        <div
+          className={`text-3xl sm:text-4xl font-bold ${
+            winRate >= 60
+              ? "text-green-300"
+              : winRate >= 40
+                ? "text-yellow-300"
+                : "text-red-300"
+          }`}
+        >
+          {winRate.toFixed(1)}%
         </div>
       </div>
 
