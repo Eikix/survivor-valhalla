@@ -37,6 +37,22 @@ export function BattlePage() {
   
   const simulationIntervalRef = useRef<number | null>(null);
 
+  // Sound effect utility function
+  const playSound = useCallback((soundPath: string, volume: number = 0.3) => {
+    if (typeof window !== 'undefined') {
+      const audio = new Audio(soundPath);
+      audio.volume = volume;
+      audio.play().catch(console.error);
+    }
+  }, []);
+
+  // Play random attack sound
+  const playAttackSound = useCallback(() => {
+    const attackSounds = ['/sfx/slash1.mp3', '/sfx/slash2.mp3'];
+    const randomSound = attackSounds[Math.floor(Math.random() * attackSounds.length)];
+    playSound(randomSound, 0.4);
+  }, [playSound]);
+
   // Query adventurer weapons for stat enrichment
   useEntityQuery(
     new ToriiQueryBuilder()
@@ -151,6 +167,12 @@ export function BattlePage() {
     if (simulationStep >= simulationEvents.length) {
       setIsSimulating(false);
       setCurrentEventDescription("Battle simulation complete!");
+      
+      // Play victory sound if user won the battle
+      if (battleDetails?.isVictory) {
+        playSound('/sfx/victory.mp3', 0.6);
+      }
+      
       if (simulationIntervalRef.current) {
         clearInterval(simulationIntervalRef.current);
         simulationIntervalRef.current = null;
@@ -179,6 +201,9 @@ export function BattlePage() {
       // Update description
       setCurrentEventDescription(`${attackerType} #${attackerId} attacks ${targetType} #${targetId} for ${damage} damage`);
       
+      // Play attack sound effect
+      playAttackSound();
+      
       // Highlight attacker
       setHighlightedAttacker(attackerKey);
       
@@ -205,11 +230,14 @@ export function BattlePage() {
       
       setCurrentEventDescription(`${isAdventurer ? 'Adventurer' : 'Beast'} #${unitId} is defeated!`);
       
+      // Play death sound effect
+      playSound('/sfx/inventory-change.mp3', 0.5);
+      
       setDefeatedUnits(prev => new Set([...prev, unitKey]));
     }
     
     setSimulationStep(prev => prev + 1);
-  }, [simulationStep, simulationEvents, enrichedAdventurers]);
+  }, [simulationStep, simulationEvents, enrichedAdventurers, battleDetails?.isVictory, playSound, playAttackSound]);
   
   // Start/stop simulation
   const toggleSimulation = useCallback(() => {
