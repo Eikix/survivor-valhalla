@@ -8,11 +8,16 @@ import { ToriiQueryBuilder } from "@dojoengine/sdk";
 import { Navbar } from "../components/navbar";
 import { WorldBeastLineups } from "../components/WorldBeastLineups";
 import { useAdventurers } from "../hooks/useAdventurers";
-import { useBeastLineupImages } from "../hooks/useBeasts";
+import {
+  useBeastLineupImages,
+  useBeastLineupStats,
+  getBeastWeaponType,
+} from "../hooks/useBeasts";
 import { useBattleEvents } from "../hooks/useBattleEvents";
 import {
   useAdventurerWeapons,
   getWeaponTypeIcon,
+  getArmorTypeIcon,
 } from "../hooks/useAdventurerWeapons";
 import type { Adventurer } from "../hooks/useAdventurers";
 import {
@@ -116,7 +121,7 @@ export function AttackLineupPage() {
       // Execute battle transaction (synchronous on-chain)
       await client.battle_actions.battle(account, selectedEnemy.player);
       tx.success("Battle initiated! Loading results...");
-      
+
       // After successful transaction, prepare for battle and navigate to loading
       prepareForBattle();
     } catch (error) {
@@ -249,6 +254,14 @@ export function AttackLineupPage() {
 
   // Fetch images for all beast lineup beasts
   const { data: beastLineupImages = {} } = useBeastLineupImages(
+    allBeastLineupTokenIds,
+    {
+      enabled: allBeastLineupTokenIds.length > 0,
+    },
+  );
+
+  // Fetch stats for all beast lineup beasts
+  const { data: beastLineupStats = {} } = useBeastLineupStats(
     allBeastLineupTokenIds,
     {
       enabled: allBeastLineupTokenIds.length > 0,
@@ -623,22 +636,68 @@ export function AttackLineupPage() {
                           const imageUrl = hasBeast
                             ? beastLineupImages[lookupKey]
                             : null;
+                          const beastStats = hasBeast
+                            ? beastLineupStats[lookupKey]
+                            : null;
                           return (
                             <div
                               key={pos}
-                              className="aspect-square flex items-center justify-center relative rounded-lg bg-emerald-950/30"
+                              className="min-h-[200px] border-2 border-dashed rounded-lg flex items-center justify-center transition-colors border-amber-900/50"
                             >
                               {hasBeast && imageUrl ? (
-                                <motion.img
+                                <motion.div
                                   initial={{ opacity: 0, scale: 0.9 }}
                                   animate={{ opacity: 1, scale: 1 }}
-                                  src={imageUrl}
-                                  alt={`Beast ${beastId}`}
-                                  className="w-full h-full object-contain cursor-pointer"
+                                  className="cursor-pointer w-full h-full relative overflow-hidden rounded-lg border-2 border-amber-500/30"
+                                  style={{
+                                    background:
+                                      "linear-gradient(135deg, rgba(245, 158, 11, 0.1) 0%, rgba(0, 0, 0, 0.4) 100%)",
+                                  }}
                                   onClick={() =>
                                     setInspectedEnemyBeast(imageUrl)
                                   }
-                                />
+                                >
+                                  {/* Background Beast Image */}
+                                  <div className="absolute inset-0">
+                                    <img
+                                      src={imageUrl}
+                                      alt={`Beast ${beastId}`}
+                                      className="w-full h-full object-cover"
+                                    />
+                                  </div>
+
+                                  {/* Level - Top Left Corner */}
+                                  <div className="absolute top-1 left-1 bg-amber-900/95 border-2 border-amber-500/70 rounded-md w-10 h-10 flex items-center justify-center shadow-lg">
+                                    <span className="text-amber-300 text-sm font-bold">
+                                      {beastStats?.level || 0}
+                                    </span>
+                                  </div>
+
+                                  {/* Beast Armor Type Icon - Top Right Corner */}
+                                  <div className="absolute top-1 right-1 bg-amber-900/95 border-2 border-amber-500/70 rounded-md w-10 h-10 flex items-center justify-center shadow-lg">
+                                    <span className="text-xl">
+                                      {getArmorTypeIcon(
+                                        getBeastWeaponType(
+                                          beastStats?.type || "",
+                                        ),
+                                      )}
+                                    </span>
+                                  </div>
+
+                                  {/* HP - Bottom Left Corner (Half Circle) */}
+                                  <div className="absolute bottom-0 left-0 bg-emerald-900/95 border-2 border-emerald-500/70 rounded-tr-full w-11 h-11 flex items-end justify-start shadow-lg pl-1 pb-1">
+                                    <span className="text-emerald-300 text-xs font-bold leading-none">
+                                      {beastStats?.health || 0}
+                                    </span>
+                                  </div>
+
+                                  {/* ATK - Bottom Right Corner (Half Circle) */}
+                                  <div className="absolute bottom-0 right-0 bg-amber-900/95 border-2 border-amber-500/70 rounded-tl-full w-11 h-11 flex items-end justify-end shadow-lg pr-1 pb-1">
+                                    <span className="text-amber-300 text-xs font-bold leading-none">
+                                      {beastStats?.power || 0}
+                                    </span>
+                                  </div>
+                                </motion.div>
                               ) : null}
                             </div>
                           );
@@ -806,9 +865,10 @@ export function AttackLineupPage() {
                               <motion.div
                                 initial={{ opacity: 0, scale: 0.9 }}
                                 animate={{ opacity: 1, scale: 1 }}
-                                className="cursor-pointer w-full h-full relative overflow-hidden rounded-lg"
+                                className="cursor-pointer w-full h-full relative overflow-hidden rounded-lg border-2 border-emerald-500/30"
                                 style={{
-                                  background: "linear-gradient(135deg, rgba(16, 185, 129, 0.1) 0%, rgba(0, 0, 0, 0.4) 100%)",
+                                  background:
+                                    "linear-gradient(135deg, rgba(16, 185, 129, 0.1) 0%, rgba(0, 0, 0, 0.4) 100%)",
                                 }}
                                 onClick={(e) => {
                                   e.stopPropagation();
@@ -817,49 +877,53 @@ export function AttackLineupPage() {
                               >
                                 {/* Background Character Image */}
                                 {adventurer.image && (
-                                  <div
-                                    className="absolute inset-0 flex items-center justify-center"
-                                    style={{
-                                      opacity: 0.15,
-                                    }}
-                                  >
+                                  <div className="absolute inset-0">
                                     <img
                                       src={adventurer.image}
                                       alt={`${adventurer.name}`}
-                                      className="w-32 h-32 object-contain"
+                                      className="w-full h-full object-cover"
                                     />
                                   </div>
                                 )}
 
-                                {/* Level Badge - Top Center */}
-                                <div className="absolute top-2 left-1/2 -translate-x-1/2 bg-emerald-900/90 border border-emerald-500/60 rounded px-3 py-1 shadow-lg">
-                                  <span className="text-emerald-300 text-[10px] font-bold tracking-wider">LVL {adventurer.level}</span>
+                                {/* Level - Top Left Corner */}
+                                <div className="absolute top-1 left-1 bg-emerald-900/95 border-2 border-emerald-500/70 rounded-md w-10 h-10 flex items-center justify-center shadow-lg">
+                                  <span className="text-emerald-300 text-sm font-bold">
+                                    {adventurer.level}
+                                  </span>
                                 </div>
 
-                                {/* Weapon Type Icon - Top Center Below Level */}
-                                <div className="absolute top-9 left-1/2 -translate-x-1/2 bg-emerald-900/90 border border-emerald-500/60 rounded-full w-8 h-8 flex items-center justify-center shadow-lg">
-                                  <span className="text-lg">{getWeaponTypeIcon(adventurer.weaponType || 0)}</span>
+                                {/* Weapon Type Icon - Top Right Corner */}
+                                <div className="absolute top-1 right-1 bg-emerald-900/95 border-2 border-emerald-500/70 rounded-md w-10 h-10 flex items-center justify-center shadow-lg">
+                                  <span className="text-xl">
+                                    {getWeaponTypeIcon(
+                                      adventurer.weaponType || 0,
+                                    )}
+                                  </span>
                                 </div>
 
-                                {/* Stats on Sides - Bottom */}
-                                <div className="absolute bottom-2 left-2 right-2 flex justify-between items-stretch gap-2">
-                                  {/* HP - Left Side */}
-                                  <div className="bg-emerald-900/90 border-2 border-emerald-500/60 rounded px-3 py-2 shadow-lg flex-1 flex flex-col items-center justify-center">
-                                    <div className="text-emerald-400/80 text-[9px] font-bold uppercase tracking-wider text-center mb-0.5">HP</div>
-                                    <div className="text-emerald-300 text-lg font-bold text-center leading-none">{adventurer.combatHealth || 0}</div>
-                                  </div>
+                                {/* HP - Bottom Left Corner (Half Circle) */}
+                                <div className="absolute bottom-0 left-0 bg-emerald-900/95 border-2 border-emerald-500/70 rounded-tr-full w-11 h-11 flex items-end justify-start shadow-lg pl-1 pb-1">
+                                  <span className="text-emerald-300 text-xs font-bold leading-none">
+                                    {adventurer.combatHealth || 0}
+                                  </span>
+                                </div>
 
-                                  {/* Power - Right Side */}
-                                  <div className="bg-amber-900/90 border-2 border-amber-500/60 rounded px-3 py-2 shadow-lg flex-1 flex flex-col items-center justify-center">
-                                    <div className="text-amber-400/80 text-[9px] font-bold uppercase tracking-wider text-center mb-0.5">ATK</div>
-                                    <div className="text-amber-300 text-lg font-bold text-center leading-none">{adventurer.weaponPower || 0}</div>
-                                  </div>
+                                {/* ATK - Bottom Right Corner (Half Circle) */}
+                                <div className="absolute bottom-0 right-0 bg-amber-900/95 border-2 border-amber-500/70 rounded-tl-full w-11 h-11 flex items-end justify-end shadow-lg pr-1 pb-1">
+                                  <span className="text-amber-300 text-xs font-bold leading-none">
+                                    {adventurer.weaponPower || 0}
+                                  </span>
                                 </div>
                               </motion.div>
                             ) : (
                               <div className="text-emerald-200/20 text-xs text-center">
-                                <div className="mb-2 text-emerald-500/20 text-2xl">⬚</div>
-                                <div className="text-[10px]">SLOT {index + 1}</div>
+                                <div className="mb-2 text-emerald-500/20 text-2xl">
+                                  ⬚
+                                </div>
+                                <div className="text-[10px]">
+                                  SLOT {index + 1}
+                                </div>
                               </div>
                             )}
                           </div>

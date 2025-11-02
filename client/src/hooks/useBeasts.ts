@@ -309,3 +309,128 @@ export const useBeastLineupImages = (
     staleTime: 100000, // Consider data fresh for 100 seconds
   });
 };
+
+/**
+ * Fetch beast stats by token IDs
+ * Returns a map of token_id -> beast data
+ */
+const getBeastLineupStats = async (
+  tokenIds: (string | number | bigint)[],
+  toriiUrl: string = TORII_URL,
+): Promise<Record<string, { power: number; health: number; type: string; level: number }>> => {
+  if (tokenIds.length === 0) return {};
+
+  // Helper to convert BigNumberish to number
+  const toNumber = (id: string | number | bigint): number => {
+    if (typeof id === "number") return id;
+    if (typeof id === "bigint") return Number(id);
+    if (typeof id === "string") {
+      if (id.startsWith("0x")) {
+        return parseInt(id, 16);
+      }
+      return parseInt(id, 10);
+    }
+    return 0;
+  };
+
+  const validTokenIds = tokenIds.map(toNumber).filter((id) => id > 0);
+  if (validTokenIds.length === 0) return {};
+
+  const contractAddressHex = addAddressPadding(BEASTS_CONTRACT.toLowerCase());
+  const tokenIdConditions = validTokenIds
+    .map((id) => `ta.trait_value = '${id}'`)
+    .join(" OR ");
+
+  const q = `
+    WITH token_ids AS (
+      SELECT DISTINCT ta.token_id
+      FROM token_attributes ta
+      WHERE ta.trait_name = 'Token ID'
+        AND (${tokenIdConditions})
+    )
+    SELECT
+      ta.token_id,
+      MAX(CASE WHEN ta.trait_name='Token ID' THEN ta.trait_value END) AS "Token ID",
+      MAX(CASE WHEN ta.trait_name='Type' THEN ta.trait_value END) AS "Type",
+      MAX(CASE WHEN ta.trait_name='Level' THEN ta.trait_value END) AS "Level",
+      MAX(CASE WHEN ta.trait_name='Health' THEN ta.trait_value END) AS "Health",
+      MAX(CASE WHEN ta.trait_name='Power' THEN ta.trait_value END) AS "Power"
+    FROM token_attributes ta
+    JOIN token_ids ti ON ta.token_id = ti.token_id
+    GROUP BY ta.token_id
+  `;
+
+  const url = `${toriiUrl}/sql?query=${encodeURIComponent(q)}`;
+
+  try {
+    const sql = await fetch(url, {
+      method: "GET",
+      headers: {
+        "Content-Type": "application/json",
+      },
+    });
+
+    if (!sql.ok) {
+      throw new Error(`Failed to fetch beast stats: ${sql.status} ${sql.statusText}`);
+    }
+
+    const data = await sql.json();
+    const statsMap: Record<string, { power: number; health: number; type: string; level: number }> = {};
+
+    data.forEach((row: any) => {
+      const tokenId = row["Token ID"];
+      if (tokenId) {
+        const toNum = (val: any): number => {
+          if (val == null || val === "") return 0;
+          const num = typeof val === "string" ? parseInt(val, 10) : Number(val);
+          return isNaN(num) ? 0 : num;
+        };
+
+        statsMap[tokenId] = {
+          power: toNum(row["Power"]),
+          health: toNum(row["Health"]),
+          type: row["Type"] || "Unknown",
+          level: toNum(row["Level"]),
+        };
+      }
+    });
+
+    return statsMap;
+  } catch (error) {
+    console.error("[getBeastLineupStats] Error fetching stats:", error);
+    throw error;
+  }
+};
+
+/**
+ * Hook to fetch beast stats for lineup display
+ */
+export const useBeastLineupStats = (
+  tokenIds: (string | number | bigint)[],
+  options?: {
+    toriiUrl?: string;
+    enabled?: boolean;
+  },
+) => {
+  return useQuery({
+    queryKey: ["beastLineupStats", tokenIds.join(","), options?.toriiUrl],
+    queryFn: () => getBeastLineupStats(tokenIds, options?.toriiUrl),
+    enabled: options?.enabled ?? tokenIds.length > 0,
+    staleTime: 100000,
+  });
+};
+
+/**
+ * Get weapon type icon from beast type
+ * Brute -> Metal/Bludgeon (2)
+ * Magic -> Magic/Cloth (3)
+ * Hunter -> Hide/Blade (1)
+ */
+export const getBeastWeaponType = (beastType: string): number => {
+  const typeMap: Record<string, number> = {
+    "Brute": 2,    // Bludgeon_or_Metal
+    "Magic": 3,    // Magic_or_Cloth
+    "Hunter": 1,   // Blade_or_Hide
+  };
+  return typeMap[beastType] || 0;
+};
