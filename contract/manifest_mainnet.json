@@ -1491,7 +1491,7 @@
   "contracts": [
     {
       "address": "0x62017dad4ca883ecef6180eefcb1929272fc3c31d11a7bc9d7df31602d30897",
-      "class_hash": "0x1c66c9dd7e72c542c0ede10472c8048654562536a363faa6b86589ae621899a",
+      "class_hash": "0x53589778180fc31d3b644f046a75ef6007bbd59452954f17e6cf2b881eb515d",
       "abi": [
         {
           "type": "impl",
@@ -2173,6 +2173,12 @@
   "models": [
     {
       "members": [],
+      "class_hash": "0x1ed6f6c1ce2e686737cde7780121551a61c770232bfa735e0aee7ebaa0870b3",
+      "tag": "survivor_valhalla-AdventurerWeapon",
+      "selector": "0x14d73c80f284d82ef8b2d060e24286fa2057a0d3adcf99fbce46ed58b88451f"
+    },
+    {
+      "members": [],
       "class_hash": "0x300faff6f27d485481e3e20f3a7570c7914bdec7e7b87a96a4e1b1e41fc9267",
       "tag": "survivor_valhalla-AttackLineup",
       "selector": "0x655c894eee886ce69954e3720c75e9603234a07d4782c576ad71daaa8b8b21"
@@ -2182,6 +2188,12 @@
       "class_hash": "0x4b91e8655c800b5089727f2551c9ca0aad8dbe6e13949cbf9ed63b1b6afcfa9",
       "tag": "survivor_valhalla-Battle",
       "selector": "0x70efea6812ebf6db52fbe72cdc585d647e92fb320d73c370c4d4e6cbc501a71"
+    },
+    {
+      "members": [],
+      "class_hash": "0x598a7bcef01f7215ae0b08c45d7d61e0e8573ea972f0d2499f0974ce74527ae",
+      "tag": "survivor_valhalla-BattleState",
+      "selector": "0x2e2b7d9d527a757f16763d0009961bcb963a499840a85e5e3097c5075213f50"
     },
     {
       "members": [],
@@ -2200,6 +2212,12 @@
       "class_hash": "0x608023e8c12ab19aeb69734c344e1ddb8179583682f3eb70bbc933f351bd00",
       "tag": "survivor_valhalla-CachedAdventurer",
       "selector": "0x4aa85ee515e8dae00b62d7ca73fa6db68790d9c3b4e329bddeba69da716f616"
+    },
+    {
+      "members": [],
+      "class_hash": "0x62fda98c5c5926e873aee9a95a6be6f6fdeb91c5b00d44bf174ff0a8b6b915",
+      "tag": "survivor_valhalla-CombatUnit",
+      "selector": "0x1d73326d5cd54ca073180142bf2f4e1bfd85b0712814bc0bc424211d51e1161"
     },
     {
       "members": [],
@@ -2229,9 +2247,27 @@
     },
     {
       "members": [],
+      "class_hash": "0x5935cc5073c954511b45e151c869ea0465974bdfe1f2e6fad66d7e8543d50b4",
+      "tag": "survivor_valhalla-DamageDealt",
+      "selector": "0x10a2265ea8cabad799e0e88323ba9a22fef429b4dd2b1e3c6d5ca5cfd225bae"
+    },
+    {
+      "members": [],
       "class_hash": "0x2f3a8a0c3e8aef700d99864d1ba47302022c96563bbf1614609858a4edf37e0",
       "tag": "survivor_valhalla-EnergyConsumed",
       "selector": "0xa0a7b2a7954d9406d6afabbe414ec201bc079b1e820890d3f1dcec4a293ddb"
+    },
+    {
+      "members": [],
+      "class_hash": "0x60996007e719b471954b153ee51e426b8b37b915626aae3d1c30fd4af8644b2",
+      "tag": "survivor_valhalla-RoundCompleted",
+      "selector": "0x62bdc1884bb1a85b3e7b0fb0e7ecccaf8d0a79442cf33c190978654217e9387"
+    },
+    {
+      "members": [],
+      "class_hash": "0x1be662a07d6c38914ba097eb50ecdd02f11cc653347c5db15d122e3150744b2",
+      "tag": "survivor_valhalla-UnitDefeated",
+      "selector": "0x28b133b0e1125287fa86467013486102a54c019b46f3844f6917ad92c9cf0a1"
     }
   ],
   "external_contracts": []
