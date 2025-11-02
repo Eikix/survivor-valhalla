@@ -17,5 +17,5 @@ pub const TIER_3: u8 = 3;
 pub const TIER_4: u8 = 4;
 pub const TIER_5: u8 = 5;
 
-// Death Mountain contracts
-pub const BEASTMODE_CONTRACT: felt252 = 0x00a67ef20b61a9846e1c82b411175e6ab167ea9f8632bd6c2091823c3629ec42;
+// Loot Survivor contract (mainnet)
+pub const BEASTMODE_CONTRACT: felt252 = 0x036017E69D21D6D8c13E266EaBB73ef1f1D02722D86BDcAbe5f168f8e549d3cD;
