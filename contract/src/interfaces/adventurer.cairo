@@ -90,5 +90,5 @@ pub struct Loot {
 // Death Mountain loot systems interface  
 #[starknet::interface]
 pub trait ILootSystems<TState> {
-    fn get_item(self: @TState, item: Item) -> Loot;
+    fn get_item(self: @TState, item: u8) -> Loot;
 }
