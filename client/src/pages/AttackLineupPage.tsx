@@ -1,14 +1,14 @@
 // src/pages/AttackLineupPage.tsx
 import { motion } from "framer-motion";
-import { Swords, Trophy, Skull } from "lucide-react";
+import { Swords } from "lucide-react";
 import { useState, useEffect, useMemo, useRef } from "react";
 import { useConnect, useAccount } from "@starknet-react/core";
 import { useDojoSDK, useEntityQuery, useModels } from "@dojoengine/sdk/react";
 import { ToriiQueryBuilder } from "@dojoengine/sdk";
 import { Navbar } from "../components/navbar";
 import { WorldBeastLineups } from "../components/WorldBeastLineups";
-import { useAdventurers, useAdventurerLineupImages } from "../hooks/useAdventurers";
-import { useBeasts, useBeastLineupImages } from "../hooks/useBeasts";
+import { useAdventurers } from "../hooks/useAdventurers";
+import { useBeastLineupImages } from "../hooks/useBeasts";
 import { useBattleEvents } from "../hooks/useBattleEvents";
 import type { Adventurer } from "../hooks/useAdventurers";
 import {
@@ -37,7 +37,6 @@ export function AttackLineupPage() {
     battleInProgress,
     battleLog,
     battleResult,
-    currentBattleId,
     startBattle,
     clearBattleState,
   } = useBattleEvents();
@@ -185,30 +184,6 @@ export function AttackLineupPage() {
     };
   }, [allLineups, address]);
 
-  const worldLineups = useMemo((): AttackLineupWithId[] => {
-    if (!Array.isArray(allLineups)) return [];
-
-    return allLineups
-      .map((lineupObj: LineupObj) => {
-        // Get the first (and only) key from the object
-        const entityId = Object.keys(lineupObj)[0];
-        const lineup = lineupObj[entityId];
-
-        if (!lineup) return null;
-
-        return {
-          entityId,
-          player: lineup.player,
-          adventurer1_id: lineup.adventurer1_id,
-          adventurer2_id: lineup.adventurer2_id,
-          adventurer3_id: lineup.adventurer3_id,
-          adventurer4_id: lineup.adventurer4_id,
-          adventurer5_id: lineup.adventurer5_id,
-        };
-      })
-      .filter((lineup): lineup is AttackLineupWithId => lineup !== null);
-  }, [allLineups]);
-
   // Beast lineups for enemy selection
   const worldBeastLineups = useMemo((): BeastLineupWithId[] => {
     if (!Array.isArray(allBeastLineups)) return [];
@@ -233,24 +208,7 @@ export function AttackLineupPage() {
       .filter((lineup): lineup is BeastLineupWithId => lineup !== null);
   }, [allBeastLineups]);
 
-  // Extract all unique adventurer IDs from world lineups for fetching images
-  const allLineupAdventurerIds = useMemo(() => {
-    const adventurerIds: (string | number | bigint)[] = [];
-    worldLineups.forEach((lineup) => {
-      [
-        lineup.adventurer1_id,
-        lineup.adventurer2_id,
-        lineup.adventurer3_id,
-        lineup.adventurer4_id,
-        lineup.adventurer5_id,
-      ].forEach((id) => {
-        if (id && Number(id) > 0) {
-          adventurerIds.push(id);
-        }
-      });
-    });
-    return adventurerIds;
-  }, [worldLineups]);
+ 
 
   // Extract all unique token IDs from beast lineups for fetching images
   const allBeastLineupTokenIds = useMemo(() => {
@@ -271,10 +229,6 @@ export function AttackLineupPage() {
     return tokenIds;
   }, [worldBeastLineups]);
 
-  // Fetch images for all lineup adventurers
-  const { data: lineupImages = {} } = useAdventurerLineupImages(allLineupAdventurerIds, {
-    enabled: allLineupAdventurerIds.length > 0,
-  });
 
   // Fetch images for all beast lineup beasts
   const { data: beastLineupImages = {} } = useBeastLineupImages(allBeastLineupTokenIds, {
@@ -413,12 +367,6 @@ export function AttackLineupPage() {
       </div>
     );
   }
-
-  // Mock stats (only shown when wallet is connected)
-  const stats = {
-    kills: 0,
-    defeats: 0,
-  };
 
   useEffect(() => {
     if (!inspectedAdventurer) return;
@@ -895,7 +843,6 @@ export function AttackLineupPage() {
                         <div className="mb-6 flex flex-wrap justify-center gap-4">
                           {[
                             { key: "level" as keyof Adventurer, label: "Level" },
-                            { key: "health" as keyof Adventurer, label: "Health" },
                             { key: "strength" as keyof Adventurer, label: "Strength" },
                             { key: "dexterity" as keyof Adventurer, label: "Dexterity" },
                             { key: "vitality" as keyof Adventurer, label: "Vitality" },
@@ -961,7 +908,6 @@ export function AttackLineupPage() {
                                 />
                               )}
                               <div className="text-red-300 text-xs">Lvl {adventurer.level}</div>
-                              <div className="text-red-200/50 text-xs">HP {adventurer.health}</div>
                             </motion.div>
                           ))}
                         </div>

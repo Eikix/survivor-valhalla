@@ -14,8 +14,6 @@ export function WorldBeastLineups(props: {
   const lineupsArray = props.lineups.filter((lineup) => lineup !== undefined);
   const { beastImages, onSelectLineup, selectedLineup, isSelectionMode = false } = props;
 
-  console.log("[WorldBeastLineups] Lineups:", lineupsArray);
-  console.log("[WorldBeastLineups] Beast images map:", beastImages);
 
   return (
     <motion.div
