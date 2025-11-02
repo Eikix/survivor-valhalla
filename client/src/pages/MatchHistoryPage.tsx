@@ -338,15 +338,15 @@ export function MatchHistoryPage() {
       <Navbar />
 
       {/* Main content */}
-      <div className="relative z-10 container mx-auto px-4 py-12 max-w-4xl">
+      <div className="relative z-10 container mx-auto px-3 sm:px-4 py-6 sm:py-8 md:py-12 max-w-4xl">
         {/* Title */}
         <motion.div
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="text-center mb-16"
+          className="text-center mb-8 sm:mb-12 md:mb-16"
         >
           <h1
-            className="text-5xl md:text-6xl font-bold mb-2 text-emerald-500"
+            className="text-3xl sm:text-5xl md:text-6xl font-bold mb-2 text-emerald-500"
             style={{
               textShadow: "0 0 30px rgba(16, 185, 129, 0.3)",
               fontFamily: "serif",
@@ -354,7 +354,7 @@ export function MatchHistoryPage() {
           >
             MATCH HISTORY
           </h1>
-          <p className="text-emerald-200/40 text-sm tracking-widest uppercase">
+          <p className="text-emerald-200/40 text-xs sm:text-sm tracking-widest uppercase">
             Review your past battles
           </p>
         </motion.div>
@@ -429,15 +429,15 @@ export function MatchHistoryPage() {
                   className="border border-emerald-500/30 bg-emerald-950/20"
                 >
                   {/* Battle Summary - Clickable */}
-                  <div className="p-6">
-                    <div className="flex items-center justify-between">
-                      <div className="flex-1">
-                        <div className="flex items-center gap-4 mb-2">
-                          <h3 className="text-xl font-bold text-emerald-400">
+                  <div className="p-4 sm:p-6">
+                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex flex-wrap items-center gap-2 mb-2">
+                          <h3 className="text-lg sm:text-xl font-bold text-emerald-400">
                             Battle #{battleLog.battleId}
                           </h3>
                           <span
-                            className={`px-3 py-1 text-xs font-bold uppercase tracking-wider ${
+                            className={`px-2 sm:px-3 py-1 text-xs font-bold uppercase tracking-wider whitespace-nowrap ${
                               battleLog.result === "Victory"
                                 ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/50"
                                 : "bg-red-500/20 text-red-400 border border-red-500/50"
@@ -445,23 +445,26 @@ export function MatchHistoryPage() {
                           >
                             {battleLog.result}
                           </span>
-                          <span className="px-3 py-1 text-xs font-bold uppercase tracking-wider bg-emerald-500/10 text-emerald-300/70 border border-emerald-500/30">
+                          <span className="px-2 sm:px-3 py-1 text-xs font-bold uppercase tracking-wider bg-emerald-500/10 text-emerald-300/70 border border-emerald-500/30 whitespace-nowrap">
                             {battleLog.isAttacker ? "Attacker" : "Defender"}
                           </span>
                         </div>
-                        <p className="text-emerald-200/60 text-sm">
+                        <p className="text-emerald-200/60 text-xs sm:text-sm truncate">
                           vs <AddressDisplay address={battleLog.opponent} />
                         </p>
                       </div>
-                      <div className="flex items-center gap-3">
+                      <div className="flex items-center gap-2 sm:gap-3 flex-shrink-0">
                         <motion.button
-                          onClick={() => navigate(`/battle/${battleLog.battleId}`)}
+                          onClick={() =>
+                            navigate(`/battle/${battleLog.battleId}`)
+                          }
                           whileHover={{ scale: 1.05 }}
                           whileTap={{ scale: 0.95 }}
-                          className="flex items-center gap-2 px-4 py-2 text-sm font-bold tracking-wider uppercase border border-emerald-500/50 hover:border-emerald-500 transition-all cursor-pointer text-emerald-400 bg-emerald-500/10 hover:bg-emerald-500/20"
+                          className="flex items-center gap-1 sm:gap-2 px-3 sm:px-4 py-2 text-xs sm:text-sm font-bold tracking-wider uppercase border border-emerald-500/50 hover:border-emerald-500 transition-all cursor-pointer text-emerald-400 bg-emerald-500/10 hover:bg-emerald-500/20"
                         >
-                          <ExternalLink className="w-4 h-4" />
-                          View Details
+                          <ExternalLink className="w-3 h-3 sm:w-4 sm:h-4" />
+                          <span className="hidden sm:inline">View Details</span>
+                          <span className="sm:hidden">View</span>
                         </motion.button>
                         <button
                           onClick={() =>
@@ -469,12 +472,12 @@ export function MatchHistoryPage() {
                               isExpanded ? null : battleLog.battleId,
                             )
                           }
-                          className="text-emerald-400 hover:text-emerald-300 transition-colors"
+                          className="text-emerald-400 hover:text-emerald-300 transition-colors p-1"
                         >
                           {isExpanded ? (
-                            <ChevronUp className="w-6 h-6" />
+                            <ChevronUp className="w-5 h-5 sm:w-6 sm:h-6" />
                           ) : (
-                            <ChevronDown className="w-6 h-6" />
+                            <ChevronDown className="w-5 h-5 sm:w-6 sm:h-6" />
                           )}
                         </button>
                       </div>
@@ -491,8 +494,8 @@ export function MatchHistoryPage() {
                         transition={{ duration: 0.3 }}
                         className="overflow-hidden"
                       >
-                        <div className="border-t border-emerald-500/20 p-6 bg-black/40">
-                          <div className="space-y-1">
+                        <div className="border-t border-emerald-500/20 p-4 sm:p-6 bg-black/40">
+                          <div className="space-y-1 overflow-x-auto">
                             {battleLog.entries.map((logEntry, index) => {
                               const isSeparator =
                                 logEntry.includes("---") ||
@@ -502,12 +505,13 @@ export function MatchHistoryPage() {
                                 <div
                                   key={index}
                                   className={`
-                                    font-mono text-sm
-                                    ${isSeparator ? "text-emerald-500/40 text-center my-1" : "text-emerald-200/70 pl-2"}
+                                    font-mono text-xs sm:text-sm
+                                    ${isSeparator ? "text-emerald-500/40 text-center my-1" : "text-emerald-200/70 pl-1 sm:pl-2"}
                                   `}
                                   style={{
                                     whiteSpace: "pre-line",
                                     lineHeight: isSeparator ? "1.2" : "1.6",
+                                    wordBreak: "break-word",
                                   }}
                                 >
                                   {logEntry}

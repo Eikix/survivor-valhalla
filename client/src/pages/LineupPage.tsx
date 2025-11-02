@@ -383,7 +383,7 @@ export function LineupPage() {
               fontFamily: "serif",
             }}
           >
-            THE ARENA
+            VALHALLA
           </h1>
           <p className="text-emerald-200/40 text-sm tracking-widest uppercase">
             Prepare for battle
