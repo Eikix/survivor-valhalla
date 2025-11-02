@@ -10,6 +10,7 @@ import { ModelsMapping } from "../bindings/typescript/models.gen";
 import type { BattleCompleted } from "../bindings/typescript/models.gen";
 import { addAddressPadding } from "starknet";
 import { ChevronDown, ChevronUp, Swords, ExternalLink } from "lucide-react";
+import { AddressDisplay } from "../components/AddressDisplay";
 
 type BattleWithId = BattleCompleted & { entityId: string };
 
@@ -448,9 +449,8 @@ export function MatchHistoryPage() {
                             {battleLog.isAttacker ? "Attacker" : "Defender"}
                           </span>
                         </div>
-                        <p className="text-emerald-200/60 text-sm font-mono">
-                          vs {battleLog.opponent.slice(0, 6)}...
-                          {battleLog.opponent.slice(-4)}
+                        <p className="text-emerald-200/60 text-sm">
+                          vs <AddressDisplay address={battleLog.opponent} />
                         </p>
                       </div>
                       <div className="flex items-center gap-3">

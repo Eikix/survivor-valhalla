@@ -18,6 +18,7 @@ import {
   getWeaponTypeIcon,
   getArmorTypeIcon,
 } from "../hooks/useAdventurerWeapons";
+import { AddressDisplay } from "../components/AddressDisplay";
 
 export function BattlePage() {
   const { battleId } = useParams<{ battleId: string }>();

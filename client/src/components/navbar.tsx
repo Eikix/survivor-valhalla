@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useConnect, useAccount, useDisconnect } from "@starknet-react/core";
 import { useLocation, Link } from "react-router-dom";
 import type { ControllerConnector } from "@cartridge/connector";
+import { AddressDisplay } from "./AddressDisplay";
 
 export function Navbar() {
   const [copied, setCopied] = useState(false);
@@ -92,9 +93,10 @@ export function Navbar() {
                 title="View profile"
               >
                 <div className="w-2 h-2 bg-emerald-500 rounded-full" />
-                <span className="text-emerald-400 text-sm font-mono group-hover:text-emerald-300 transition-colors">
-                  {address?.slice(0, 6)}...{address?.slice(-4)}
-                </span>
+                <AddressDisplay
+                  address={address}
+                  className="text-sm group-hover:text-emerald-300 transition-colors"
+                />
               </motion.button>
 
               {/* Copy Button */}
