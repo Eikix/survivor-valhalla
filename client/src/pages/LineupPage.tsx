@@ -14,6 +14,7 @@ import {
   type BeastLineup,
 } from "../bindings/typescript/models.gen";
 import { addAddressPadding } from "starknet";
+import { useTransactionToast } from "../hooks/useTransactionToast";
 
 export function LineupPage() {
   const [inspectedBeast, setInspectedBeast] = useState<Beast | null>(null);
@@ -36,17 +37,27 @@ export function LineupPage() {
   });
 
   const { client } = useDojoSDK();
+  const { showTransaction } = useTransactionToast();
 
   const createLineup = async () => {
     if (!client || !account) return;
-    await client.beast_actions.register(
-      account,
-      baseBeasts[0]?.token_id || 0,
-      baseBeasts[1]?.token_id || 0,
-      baseBeasts[2]?.token_id || 0,
-      baseBeasts[3]?.token_id || 0,
-      baseBeasts[4]?.token_id || 0,
-    );
+    
+    const tx = showTransaction(undefined, "Creating beast lineup...");
+    
+    try {
+      await client.beast_actions.register(
+        account,
+        baseBeasts[0]?.token_id || 0,
+        baseBeasts[1]?.token_id || 0,
+        baseBeasts[2]?.token_id || 0,
+        baseBeasts[3]?.token_id || 0,
+        baseBeasts[4]?.token_id || 0,
+      );
+      tx.success("Beast lineup created successfully!");
+    } catch (error) {
+      console.error("Failed to create lineup:", error);
+      tx.error("Failed to create beast lineup");
+    }
   };
 
   const swapBeast = async () => {
@@ -54,12 +65,20 @@ export function LineupPage() {
     const newBeast = baseBeasts[swappedPosition];
     if (!newBeast) return;
 
-    await client.beast_actions.swap(
-      account,
-      swappedPosition,
-      newBeast.token_id,
-    );
-    setSwappedPosition(null);
+    const tx = showTransaction(undefined, `Swapping beast at position ${swappedPosition + 1}...`);
+    
+    try {
+      await client.beast_actions.swap(
+        account,
+        swappedPosition,
+        newBeast.token_id,
+      );
+      setSwappedPosition(null);
+      tx.success("Beast swapped successfully!");
+    } catch (error) {
+      console.error("Failed to swap beast:", error);
+      tx.error("Failed to swap beast");
+    }
   };
 
   const handleRandomFill = () => {
