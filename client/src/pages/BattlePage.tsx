@@ -1,13 +1,46 @@
 import { motion } from "framer-motion";
 import { useParams } from "react-router-dom";
 import { Swords } from "lucide-react";
+import { useMemo } from "react";
 import { Navbar } from "../components/navbar";
 import { useBattleDetails } from "../hooks/useBattleDetails";
+import { useAdventurers } from "../hooks/useAdventurers";
+import { useBeastLineupImages } from "../hooks/useBeasts";
+import { useAccount } from "@starknet-react/core";
 
 export function BattlePage() {
   const { battleId } = useParams<{ battleId: string }>();
   const numericBattleId = battleId ? parseInt(battleId, 10) : 0;
+  const { address, status } = useAccount();
   const { battleDetails } = useBattleDetails(numericBattleId);
+  
+  // Load adventurers for attacker images
+  const { data: adventurers = [] } = useAdventurers(battleDetails?.attacker, {
+    enabled: !!battleDetails?.attacker,
+  });
+
+  // Extract beast IDs from defender lineup for image loading
+  const beastTokenIds = useMemo(() => {
+    if (!battleDetails?.defenderLineup) return [];
+    const tokenIds: (string | number | bigint)[] = [];
+    [
+      battleDetails.defenderLineup.beast1_id,
+      battleDetails.defenderLineup.beast2_id,
+      battleDetails.defenderLineup.beast3_id,
+      battleDetails.defenderLineup.beast4_id,
+      battleDetails.defenderLineup.beast5_id,
+    ].forEach((id) => {
+      if (id && Number(id) > 0) {
+        tokenIds.push(id);
+      }
+    });
+    return tokenIds;
+  }, [battleDetails?.defenderLineup]);
+
+  // Fetch beast images
+  const { data: beastImages = {} } = useBeastLineupImages(beastTokenIds, {
+    enabled: beastTokenIds.length > 0,
+  });
 
   if (!battleDetails) {
     return (
@@ -64,6 +97,108 @@ export function BattlePage() {
             <span className={`font-bold ${battleDetails.isVictory ? 'text-green-400' : 'text-red-400'}`}>
               {battleDetails.isVictory ? 'VICTORY' : 'DEFEAT'}
             </span>
+          </div>
+        </motion.div>
+
+        {/* Fight Board */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.3 }}
+          className="mb-8"
+        >
+          <div className="border-2 border-red-500/30 bg-red-950/20 p-8 relative overflow-hidden">
+            {/* Defense Symbol - Top Left */}
+            <div className="absolute top-4 left-4 z-20">
+              <div className="bg-amber-900/80 border border-amber-600/50 rounded-full p-2">
+                <Swords className="w-6 h-6 text-amber-300 rotate-180" />
+              </div>
+            </div>
+            
+            {/* Attack Symbol - Bottom Right */}
+            <div className="absolute bottom-4 right-4 z-20">
+              <div className="bg-red-900/80 border border-red-500/50 rounded-full p-2">
+                <Swords className="w-6 h-6 text-red-300" />
+              </div>
+            </div>
+
+            <div className="space-y-12">
+              {/* Defense Lineup - Top Row */}
+              <div className="grid grid-cols-5 gap-4">
+                {[1, 2, 3, 4, 5].map((pos) => {
+                  const beastId = battleDetails.defenderLineup?.[`beast${pos}_id`];
+                  const hasBeast = beastId && Number(beastId) > 0;
+                  const lookupKey = hasBeast ? String(Number(beastId)) : "";
+                  const imageUrl = hasBeast ? beastImages[lookupKey] : null;
+                  
+                  return (
+                    <div
+                      key={pos}
+                      className="aspect-square flex items-center justify-center relative rounded-lg bg-amber-950/30 border border-amber-600/20"
+                    >
+                      {hasBeast && imageUrl ? (
+                        <motion.img
+                          initial={{ opacity: 0, scale: 0.9 }}
+                          animate={{ opacity: 1, scale: 1 }}
+                          src={imageUrl}
+                          alt={`Beast ${beastId}`}
+                          className="w-full h-full object-contain rounded-lg"
+                        />
+                      ) : hasBeast ? (
+                        <div className="text-center">
+                          <div className="text-amber-300 text-xs font-bold">B{beastId}</div>
+                        </div>
+                      ) : (
+                        <div className="text-amber-200/20 text-xs text-center">
+                          Empty
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* VS Divider */}
+              <div className="text-center">
+                <div className="text-3xl font-bold text-red-500">
+                  VS
+                </div>
+              </div>
+
+              {/* Attack Lineup - Bottom Row */}
+              <div className="grid grid-cols-5 gap-4">
+                {[1, 2, 3, 4, 5].map((pos) => {
+                  const adventurerId = battleDetails.attackerLineup?.[`adventurer${pos}_id`];
+                  const hasAdventurer = adventurerId && Number(adventurerId) > 0;
+                  const adventurer = hasAdventurer ? adventurers.find(a => a.adventurer_id === Number(adventurerId)) : null;
+                  
+                  return (
+                    <div
+                      key={pos}
+                      className="aspect-square flex items-center justify-center relative rounded-lg bg-red-950/30 border border-red-500/20"
+                    >
+                      {adventurer?.image ? (
+                        <motion.img
+                          initial={{ opacity: 0, scale: 0.9 }}
+                          animate={{ opacity: 1, scale: 1 }}
+                          src={adventurer.image}
+                          alt={`${adventurer.name}`}
+                          className="w-full h-full object-contain rounded-lg"
+                        />
+                      ) : hasAdventurer ? (
+                        <div className="text-center">
+                          <div className="text-red-300 text-xs font-bold">A{adventurerId}</div>
+                        </div>
+                      ) : (
+                        <div className="text-red-200/20 text-xs text-center">
+                          Empty
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
           </div>
         </motion.div>
 
