@@ -25,6 +25,19 @@ export function LineupPage() {
   const [sortBy, setSortBy] = useState<keyof Beast | "">("");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
   const [swappedPosition, setSwappedPosition] = useState<number | null>(null);
+  const [selectedBeastForMobile, setSelectedBeastForMobile] =
+    useState<Beast | null>(null);
+  const [selectedLineupIndex, setSelectedLineupIndex] = useState<number | null>(
+    null,
+  );
+  const [longPressTimer, setLongPressTimer] = useState<ReturnType<
+    typeof setTimeout
+  > | null>(null);
+  const [touchStartPos, setTouchStartPos] = useState<{
+    x: number;
+    y: number;
+  } | null>(null);
+  const [isTouchInteraction, setIsTouchInteraction] = useState(false);
 
   const { connect, connectors } = useConnect();
   const { status, address, account } = useAccount();
@@ -455,73 +468,225 @@ export function LineupPage() {
                   <h2 className="text-2xl font-bold text-emerald-400 mb-4 tracking-wider uppercase">
                     {hasBase ? "Your Lineup" : "Create Your Lineup"}
                   </h2>
-                  <div className="grid grid-cols-5 gap-4 p-4">
-                    {baseBeasts.map((beast, index) => (
-                      <div
-                        key={index}
-                        className={`min-h-[150px] border-2 border-dashed rounded-lg flex items-center justify-center transition-colors ${
-                          isDraggingOver === index
-                            ? "border-emerald-500 bg-emerald-950/30"
-                            : "border-emerald-500/30"
-                        }`}
-                        onDragOver={(e: React.DragEvent) => {
-                          e.preventDefault();
-                          setIsDraggingOver(index);
-                        }}
-                        onDragLeave={() => {
-                          setIsDraggingOver(-1);
-                        }}
-                        onDrop={(e: React.DragEvent) => {
-                          e.preventDefault();
-                          setIsDraggingOver(-1);
-                          const beastId = parseInt(
-                            e.dataTransfer.getData("beastId"),
-                          );
-                          const beastToAdd = beasts.find(
-                            (b) => b.id === beastId,
-                          );
-                          // Check if beast is already in lineup
-                          const isAlreadyInBase = baseBeasts.some(
-                            (b) => b?.id === beastId,
-                          );
-                          if (beastToAdd && !isAlreadyInBase) {
-                            const newBaseBeasts = [...baseBeasts];
-                            const originalBeast = newBaseBeasts[index];
-                            newBaseBeasts[index] = beastToAdd;
-                            setBaseBeasts(newBaseBeasts);
+                  <div className="overflow-x-auto pb-4 -mx-4 px-4">
+                    <div className="flex gap-4 min-w-max md:grid md:grid-cols-5 md:min-w-0 md:gap-4 md:p-4">
+                      {baseBeasts.map((beast, index) => (
+                        <div
+                          key={index}
+                          className={`min-w-[140px] md:min-w-0 min-h-[180px] md:min-h-[150px] border-2 border-dashed rounded-lg flex items-center justify-center transition-colors flex-shrink-0 cursor-pointer ${
+                            selectedLineupIndex === index
+                              ? "border-blue-500 bg-blue-950/30 border-solid"
+                              : isDraggingOver === index
+                                ? "border-emerald-500 bg-emerald-950/30"
+                                : "border-emerald-500/30"
+                          }`}
+                          onClick={() => {
+                            // Handle swapping from lineup
+                            if (selectedLineupIndex !== null) {
+                              if (selectedLineupIndex !== index) {
+                                // Swap the beasts
+                                const newBaseBeasts = [...baseBeasts];
+                                const temp = newBaseBeasts[index];
+                                newBaseBeasts[index] =
+                                  newBaseBeasts[selectedLineupIndex];
+                                newBaseBeasts[selectedLineupIndex] = temp;
+                                setBaseBeasts(newBaseBeasts);
 
-                            // If lineup is registered and we're swapping a beast, track it
-                            if (hasBase && originalBeast) {
-                              setSwappedPosition(index);
+                                // Track swap for on-chain update if needed
+                                if (hasBase) {
+                                  setSwappedPosition(index);
+                                }
+                              }
+                              setSelectedLineupIndex(null);
+                              return;
                             }
-                          }
-                        }}
-                      >
-                        {beast ? (
-                          <motion.div
-                            initial={{ opacity: 0, scale: 0.9 }}
-                            animate={{ opacity: 1, scale: 1 }}
-                            className="cursor-pointer"
-                          >
-                            {beast.image && (
-                              <img
-                                src={beast.image}
-                                alt={`${beast.name} - Level: ${beast.level}, Health: ${beast.health}, Power: ${beast.power}, Tier: ${beast.tier}, Type: ${beast.type}, Prefix: ${beast.prefix}, Suffix: ${beast.suffix}, Shiny: ${beast.shiny}, Animated: ${beast.animated}`}
-                                className="w-32 h-auto"
-                                onClick={(e) => {
+
+                            // Mobile tap: add selected beast from collection to this slot
+                            if (selectedBeastForMobile) {
+                              const isAlreadyInBase = baseBeasts.some(
+                                (b) => b?.id === selectedBeastForMobile.id,
+                              );
+                              if (!isAlreadyInBase) {
+                                const newBaseBeasts = [...baseBeasts];
+                                const originalBeast = newBaseBeasts[index];
+                                newBaseBeasts[index] = selectedBeastForMobile;
+                                setBaseBeasts(newBaseBeasts);
+
+                                if (hasBase && originalBeast) {
+                                  setSwappedPosition(index);
+                                }
+                              }
+                              setSelectedBeastForMobile(null);
+                            }
+                          }}
+                          onDragOver={(e: React.DragEvent) => {
+                            e.preventDefault();
+                            setIsDraggingOver(index);
+                          }}
+                          onDragLeave={() => {
+                            setIsDraggingOver(-1);
+                          }}
+                          onDrop={(e: React.DragEvent) => {
+                            e.preventDefault();
+                            setIsDraggingOver(-1);
+                            const beastId = parseInt(
+                              e.dataTransfer.getData("beastId"),
+                            );
+                            const beastToAdd = beasts.find(
+                              (b) => b.id === beastId,
+                            );
+                            // Check if beast is already in lineup
+                            const isAlreadyInBase = baseBeasts.some(
+                              (b) => b?.id === beastId,
+                            );
+                            if (beastToAdd && !isAlreadyInBase) {
+                              const newBaseBeasts = [...baseBeasts];
+                              const originalBeast = newBaseBeasts[index];
+                              newBaseBeasts[index] = beastToAdd;
+                              setBaseBeasts(newBaseBeasts);
+
+                              // If lineup is registered and we're swapping a beast, track it
+                              if (hasBase && originalBeast) {
+                                setSwappedPosition(index);
+                              }
+                            }
+                          }}
+                        >
+                          {beast ? (
+                            <motion.div
+                              initial={{ opacity: 0, scale: 0.9 }}
+                              animate={{ opacity: 1, scale: 1 }}
+                              className={`cursor-pointer w-full h-full flex items-center justify-center p-2 transition-all ${
+                                selectedLineupIndex === index
+                                  ? "ring-4 ring-blue-500 scale-110"
+                                  : ""
+                              }`}
+                              onClick={(e) => {
+                                // Only stop propagation if we're not trying to place/swap a beast
+                                if (
+                                  !selectedBeastForMobile &&
+                                  (selectedLineupIndex === null ||
+                                    selectedLineupIndex === index)
+                                ) {
                                   e.stopPropagation();
-                                  setInspectedBeast(beast);
-                                }}
-                              />
-                            )}
-                          </motion.div>
-                        ) : (
-                          <div className="text-emerald-200/20 text-xs text-center">
-                            Slot {index + 1}
-                          </div>
-                        )}
-                      </div>
-                    ))}
+                                }
+                              }}
+                            >
+                              {beast.image && (
+                                <img
+                                  src={beast.image}
+                                  alt={`${beast.name} - Level: ${beast.level}, Health: ${beast.health}, Power: ${beast.power}, Tier: ${beast.tier}, Type: ${beast.type}, Prefix: ${beast.prefix}, Suffix: ${beast.suffix}, Shiny: ${beast.shiny}, Animated: ${beast.animated}`}
+                                  className="w-full h-auto max-w-[120px] md:max-w-[128px] object-contain"
+                                  onClick={(e) => {
+                                    // Skip if this was a touch interaction
+                                    if (isTouchInteraction) {
+                                      setIsTouchInteraction(false);
+                                      // If collection beast or lineup beast selected, let it bubble to slot
+                                      if (
+                                        !selectedBeastForMobile &&
+                                        selectedLineupIndex === null
+                                      ) {
+                                        e.stopPropagation();
+                                      }
+                                      return;
+                                    }
+                                    // If a collection beast is selected, don't stop propagation
+                                    // Let the slot onClick handle placing the collection beast
+                                    if (selectedBeastForMobile) {
+                                      // Don't stop propagation - let it bubble to slot handler
+                                      return;
+                                    }
+                                    // If a different lineup beast is already selected, let it bubble to slot handler for swap
+                                    if (
+                                      selectedLineupIndex !== null &&
+                                      selectedLineupIndex !== index
+                                    ) {
+                                      // Don't stop propagation - let it bubble to slot handler
+                                      return;
+                                    }
+                                    e.stopPropagation();
+                                    // Toggle selection of lineup beast
+                                    if (selectedLineupIndex === index) {
+                                      setSelectedLineupIndex(null);
+                                    } else {
+                                      setSelectedLineupIndex(index);
+                                      setSelectedBeastForMobile(null); // Clear collection selection
+                                    }
+                                  }}
+                                  onDoubleClick={(e) => {
+                                    e.stopPropagation();
+                                    setInspectedBeast(beast);
+                                  }}
+                                  onTouchStart={(e) => {
+                                    const touch = e.touches[0];
+                                    setTouchStartPos({
+                                      x: touch.clientX,
+                                      y: touch.clientY,
+                                    });
+                                    const timer = setTimeout(() => {
+                                      setInspectedBeast(beast);
+                                      setLongPressTimer(null);
+                                      setTouchStartPos(null);
+                                    }, 500);
+                                    setLongPressTimer(timer);
+                                  }}
+                                  onTouchEnd={(e) => {
+                                    setIsTouchInteraction(true);
+                                    if (longPressTimer) {
+                                      clearTimeout(longPressTimer);
+                                      setLongPressTimer(null);
+                                      setTouchStartPos(null);
+                                      // If a collection beast is selected, don't prevent default
+                                      // Let the click event fire to trigger slot onClick
+                                      if (selectedBeastForMobile) {
+                                        return;
+                                      }
+                                      // If a different lineup beast is selected, don't prevent default
+                                      // Let the click event fire to trigger slot onClick for swap
+                                      if (
+                                        selectedLineupIndex !== null &&
+                                        selectedLineupIndex !== index
+                                      ) {
+                                        return;
+                                      }
+                                      e.preventDefault();
+                                      // Toggle selection of lineup beast
+                                      if (selectedLineupIndex === index) {
+                                        setSelectedLineupIndex(null);
+                                      } else {
+                                        setSelectedLineupIndex(index);
+                                        setSelectedBeastForMobile(null); // Clear collection selection
+                                      }
+                                    }
+                                  }}
+                                  onTouchMove={(e) => {
+                                    // Only cancel if user moves more than 10px (scrolling)
+                                    if (longPressTimer && touchStartPos) {
+                                      const touch = e.touches[0];
+                                      const dx = Math.abs(
+                                        touch.clientX - touchStartPos.x,
+                                      );
+                                      const dy = Math.abs(
+                                        touch.clientY - touchStartPos.y,
+                                      );
+                                      if (dx > 10 || dy > 10) {
+                                        clearTimeout(longPressTimer);
+                                        setLongPressTimer(null);
+                                        setTouchStartPos(null);
+                                      }
+                                    }
+                                  }}
+                                />
+                              )}
+                            </motion.div>
+                          ) : (
+                            <div className="text-emerald-200/20 text-xs text-center">
+                              Slot {index + 1}
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
                   </div>
                   {!hasBase ? (
                     <motion.button
@@ -663,7 +828,11 @@ export function LineupPage() {
                             <img
                               src={beast.image}
                               alt={`${beast.name} - Level: ${beast.level}, Health: ${beast.health}, Power: ${beast.power}, Tier: ${beast.tier}, Type: ${beast.type}, Prefix: ${beast.prefix}, Suffix: ${beast.suffix}, Shiny: ${beast.shiny}, Animated: ${beast.animated}`}
-                              className="w-32 h-auto cursor-pointer"
+                              className={`w-32 h-auto cursor-pointer transition-all ${
+                                selectedBeastForMobile?.id === beast.id
+                                  ? "ring-4 ring-emerald-500 scale-110"
+                                  : ""
+                              }`}
                               draggable
                               onDragStart={(e: React.DragEvent) => {
                                 e.dataTransfer.setData(
@@ -673,7 +842,69 @@ export function LineupPage() {
                               }}
                               onClick={(e) => {
                                 e.stopPropagation();
+                                // Skip if this was a touch interaction
+                                if (isTouchInteraction) {
+                                  setIsTouchInteraction(false);
+                                  return;
+                                }
+                                // Toggle selection
+                                if (selectedBeastForMobile?.id === beast.id) {
+                                  setSelectedBeastForMobile(null);
+                                } else {
+                                  setSelectedBeastForMobile(beast);
+                                  setSelectedLineupIndex(null); // Clear lineup selection
+                                }
+                              }}
+                              onDoubleClick={(e) => {
+                                e.stopPropagation();
                                 setInspectedBeast(beast);
+                              }}
+                              onTouchStart={(e) => {
+                                const touch = e.touches[0];
+                                setTouchStartPos({
+                                  x: touch.clientX,
+                                  y: touch.clientY,
+                                });
+                                const timer = setTimeout(() => {
+                                  // Long press = inspect
+                                  setInspectedBeast(beast);
+                                  setLongPressTimer(null);
+                                  setTouchStartPos(null);
+                                }, 500);
+                                setLongPressTimer(timer);
+                              }}
+                              onTouchEnd={(e) => {
+                                e.preventDefault();
+                                setIsTouchInteraction(true);
+                                if (longPressTimer) {
+                                  // Short tap = select
+                                  clearTimeout(longPressTimer);
+                                  setLongPressTimer(null);
+                                  setTouchStartPos(null);
+                                  if (selectedBeastForMobile?.id === beast.id) {
+                                    setSelectedBeastForMobile(null);
+                                  } else {
+                                    setSelectedBeastForMobile(beast);
+                                    setSelectedLineupIndex(null); // Clear lineup selection
+                                  }
+                                }
+                              }}
+                              onTouchMove={(e) => {
+                                // Only cancel if user moves more than 10px (scrolling)
+                                if (longPressTimer && touchStartPos) {
+                                  const touch = e.touches[0];
+                                  const dx = Math.abs(
+                                    touch.clientX - touchStartPos.x,
+                                  );
+                                  const dy = Math.abs(
+                                    touch.clientY - touchStartPos.y,
+                                  );
+                                  if (dx > 10 || dy > 10) {
+                                    clearTimeout(longPressTimer);
+                                    setLongPressTimer(null);
+                                    setTouchStartPos(null);
+                                  }
+                                }
                               }}
                             />
                           )}
@@ -699,6 +930,74 @@ export function LineupPage() {
           </>
         )}
       </div>
+
+      {/* Beast Selection Indicator */}
+      {(selectedBeastForMobile || selectedLineupIndex !== null) && (
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: 20 }}
+          className={`fixed bottom-4 left-1/2 -translate-x-1/2 z-40 border-2 p-4 rounded-lg shadow-lg max-w-xs w-full mx-4 ${
+            selectedLineupIndex !== null
+              ? "bg-blue-950 border-blue-500"
+              : "bg-emerald-950 border-emerald-500"
+          }`}
+        >
+          <div className="flex items-center gap-3">
+            {selectedBeastForMobile?.image && (
+              <img
+                src={selectedBeastForMobile.image}
+                alt={selectedBeastForMobile.name}
+                className="w-16 h-16 object-contain"
+              />
+            )}
+            {selectedLineupIndex !== null &&
+              baseBeasts[selectedLineupIndex]?.image && (
+                <img
+                  src={baseBeasts[selectedLineupIndex]!.image}
+                  alt={baseBeasts[selectedLineupIndex]!.name}
+                  className="w-16 h-16 object-contain"
+                />
+              )}
+            <div className="flex-1">
+              <p
+                className={`text-sm font-bold mb-1 ${
+                  selectedLineupIndex !== null
+                    ? "text-blue-400"
+                    : "text-emerald-400"
+                }`}
+              >
+                {selectedBeastForMobile?.name ||
+                  baseBeasts[selectedLineupIndex!]?.name}
+              </p>
+              <p
+                className={`text-xs ${
+                  selectedLineupIndex !== null
+                    ? "text-blue-200/60"
+                    : "text-emerald-200/60"
+                }`}
+              >
+                {selectedLineupIndex !== null
+                  ? "Tap another slot to swap"
+                  : "Tap a slot to place"}
+              </p>
+            </div>
+            <button
+              onClick={() => {
+                setSelectedBeastForMobile(null);
+                setSelectedLineupIndex(null);
+              }}
+              className="px-3 py-2 text-xs font-bold tracking-wider uppercase border border-red-500/50 hover:border-red-500 transition-all text-red-400"
+              style={{
+                background:
+                  "linear-gradient(to bottom, rgba(239, 68, 68, 0.1), rgba(0, 0, 0, 0.4))",
+              }}
+            >
+              Cancel
+            </button>
+          </div>
+        </motion.div>
+      )}
 
       {/* Beast Inspection Modal */}
       {inspectedBeast && (
