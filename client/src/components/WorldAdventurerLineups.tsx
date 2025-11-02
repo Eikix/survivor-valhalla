@@ -21,7 +21,7 @@ export function WorldAdventurerLineups(props: {
       transition={{ delay: 0.5 }}
       className="mb-16"
     >
-      <h2 className="text-center text-xl font-bold text-red-400 mb-6 tracking-wider uppercase">
+      <h2 className="text-center text-xl font-bold text-emerald-400 mb-6 tracking-wider uppercase">
         World's Attack Forces
       </h2>
       {lineupsArray.length > 0 ? (
@@ -31,10 +31,10 @@ export function WorldAdventurerLineups(props: {
               key={lineup.entityId}
               initial={{ opacity: 0, scale: 0.9 }}
               animate={{ opacity: 1, scale: 1 }}
-              className="border border-red-500/20 bg-red-950/10 p-6"
+              className="border border-emerald-500/20 bg-emerald-950/10 p-6"
             >
               <div className="space-y-4">
-                <div className="text-red-300/70 font-mono text-xs text-center">
+                <div className="text-emerald-300/70 font-mono text-xs text-center">
                   {lineup.player?.slice(0, 6)}...{lineup.player?.slice(-4)}
                 </div>
                 <div className="grid grid-cols-5 gap-2">
@@ -55,8 +55,8 @@ export function WorldAdventurerLineups(props: {
                           key={pos}
                           className={`aspect-square border-2 rounded flex items-center justify-center text-xs overflow-hidden ${
                             hasAdventurer
-                              ? "border-red-500/50 bg-red-500/10"
-                              : "border-red-500/20 bg-red-950/20"
+                              ? "border-emerald-500/50 bg-emerald-500/10"
+                              : "border-emerald-500/20 bg-emerald-950/20"
                           }`}
                         >
                           {hasAdventurer && imageUrl ? (
@@ -68,13 +68,13 @@ export function WorldAdventurerLineups(props: {
                             />
                           ) : hasAdventurer ? (
                             <span
-                              className="text-red-400 text-[8px]"
+                              className="text-emerald-400 text-[8px]"
                               title={`Adventurer ID: ${adventurerId} (image not available)`}
                             >
                               #{String(adventurerId).slice(-4)}
                             </span>
                           ) : (
-                            <span className="text-red-200/30">—</span>
+                            <span className="text-emerald-200/30">—</span>
                           )}
                         </div>
                       );
@@ -85,8 +85,8 @@ export function WorldAdventurerLineups(props: {
           ))}
         </div>
       ) : (
-        <div className="border border-red-500/30 bg-red-950/20 p-8 text-center">
-          <p className="text-red-200/60 text-sm tracking-wide uppercase">
+        <div className="border border-emerald-500/30 bg-emerald-950/20 p-8 text-center">
+          <p className="text-emerald-200/60 text-sm tracking-wide uppercase">
             No attack forces found in the world
           </p>
         </div>
