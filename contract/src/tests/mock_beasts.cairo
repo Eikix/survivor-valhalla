@@ -2,8 +2,9 @@
 #[starknet::contract]
 pub mod MockBeasts {
     use starknet::ContractAddress;
-    use starknet::storage::{StoragePointerWriteAccess, StoragePointerReadAccess};
-    use starknet::storage::{Map, StoragePathEntry};
+    use starknet::storage::{
+        Map, StoragePathEntry, StoragePointerReadAccess, StoragePointerWriteAccess,
+    };
 
     #[storage]
     struct Storage {
@@ -18,7 +19,7 @@ pub mod MockBeasts {
             let current_balance = self.balances.entry(to).read();
             self.balances.entry(to).write(current_balance + 1);
         }
-        
+
         fn get_owner(self: @ContractState, token_id: u256) -> ContractAddress {
             self.owners.entry(token_id).read()
         }

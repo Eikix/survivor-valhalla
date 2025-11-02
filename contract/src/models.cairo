@@ -95,10 +95,10 @@ pub struct BattleState {
     pub battle_id: u32,
     pub attacker: ContractAddress,
     pub defender: ContractAddress,
-    pub round: u8,              // Current round (1-3)
-    pub turn: u8,               // Current turn in round
-    pub attacker_wins: u8,      // Rounds won by attacker
-    pub defender_wins: u8,      // Rounds won by defender
+    pub round: u8, // Current round (1-3)
+    pub turn: u8, // Current turn in round
+    pub attacker_wins: u8, // Rounds won by attacker
+    pub defender_wins: u8, // Rounds won by defender
     pub is_complete: bool,
 }
 
@@ -108,14 +108,14 @@ pub struct CombatUnit {
     #[key]
     pub battle_id: u32,
     #[key]
-    pub unit_id: u64,           // adventurer_id or beast_id
-    pub position: u8,           // 1-5 lineup position
+    pub unit_id: u64, // adventurer_id or beast_id
+    pub position: u8, // 1-5 lineup position
     pub is_adventurer: bool,
     pub current_hp: u16,
     pub max_hp: u16,
     pub damage: u16,
     pub initiative: u8,
-    pub weapon_type: u8,        // For adventurers (1=Magic, 2=Blade, 3=Bludgeon)
-    pub beast_type: u8,         // For beasts (1=Magic_or_Cloth, 2=Blade_or_Hide, 3=Bludgeon_or_Metal)
+    pub weapon_type: u8, // For adventurers (1=Magic, 2=Blade, 3=Bludgeon)
+    pub beast_type: u8, // For beasts (1=Magic_or_Cloth, 2=Blade_or_Hide, 3=Bludgeon_or_Metal)
     pub is_alive: bool,
 }

@@ -6,8 +6,8 @@ pub trait IEnergyActions<T> {
 #[dojo::contract]
 pub mod energy_actions {
     use dojo::model::ModelStorage;
-    use survivor_valhalla::models::PlayerEnergy;
     use starknet::{ContractAddress, get_block_timestamp};
+    use survivor_valhalla::models::PlayerEnergy;
     use super::IEnergyActions;
 
     const MAX_ENERGY: u8 = 5;
@@ -18,16 +18,16 @@ pub mod energy_actions {
         fn get_energy(self: @ContractState, player: ContractAddress) -> u8 {
             let world = self.world_default();
             let mut energy: PlayerEnergy = world.read_model(player);
-            
+
             // If player has no energy record, return max energy
             if energy.last_refill_time == 0 {
                 return MAX_ENERGY;
             }
-            
+
             // Check if energy should be refilled
             let current_time = get_block_timestamp();
             let time_since_refill = current_time - energy.last_refill_time;
-            
+
             if time_since_refill >= ENERGY_REFILL_SECONDS {
                 MAX_ENERGY
             } else {
