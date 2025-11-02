@@ -770,9 +770,9 @@ export function AttackLineupPage() {
                         {attackLineup.map((adventurer, index) => (
                           <div
                             key={index}
-                            className={`min-h-[150px] border-2 border-dashed rounded-lg flex items-center justify-center transition-colors ${
+                            className={`min-h-[200px] border-2 border-dashed rounded-lg flex items-center justify-center transition-all ${
                               isDraggingOver === index
-                                ? "border-emerald-500 bg-emerald-950/30"
+                                ? "border-emerald-500 bg-emerald-950/30 scale-105"
                                 : "border-emerald-500/30"
                             }`}
                             onDragOver={(e: React.DragEvent) => {
@@ -806,49 +806,60 @@ export function AttackLineupPage() {
                               <motion.div
                                 initial={{ opacity: 0, scale: 0.9 }}
                                 animate={{ opacity: 1, scale: 1 }}
-                                className="cursor-pointer text-center w-full"
+                                className="cursor-pointer w-full h-full relative overflow-hidden rounded-lg"
+                                style={{
+                                  background: "linear-gradient(135deg, rgba(16, 185, 129, 0.1) 0%, rgba(0, 0, 0, 0.4) 100%)",
+                                }}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setInspectedAdventurer(adventurer);
+                                }}
                               >
+                                {/* Background Character Image */}
                                 {adventurer.image && (
-                                  <img
-                                    src={adventurer.image}
-                                    alt={`${adventurer.name} - Level: ${adventurer.level}, Health: ${adventurer.health}`}
-                                    className="w-20 h-20 mx-auto mb-1"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      setInspectedAdventurer(adventurer);
+                                  <div
+                                    className="absolute inset-0 flex items-center justify-center"
+                                    style={{
+                                      opacity: 0.15,
                                     }}
-                                  />
+                                  >
+                                    <img
+                                      src={adventurer.image}
+                                      alt={`${adventurer.name}`}
+                                      className="w-32 h-32 object-contain"
+                                    />
+                                  </div>
                                 )}
 
-                                <div className="text-emerald-200/80 text-[9px] space-y-0.5">
-                                  <div className="flex items-center justify-center gap-1">
-                                    <span className="text-emerald-400/60">
-                                      HP:
-                                    </span>
-                                    <span className="font-bold">
-                                      {adventurer.combatHealth || 0}
-                                    </span>
+                                {/* Level Badge - Top Center */}
+                                <div className="absolute top-2 left-1/2 -translate-x-1/2 bg-emerald-900/90 border border-emerald-500/60 rounded px-3 py-1 shadow-lg">
+                                  <span className="text-emerald-300 text-[10px] font-bold tracking-wider">LVL {adventurer.level}</span>
+                                </div>
+
+                                {/* Weapon Type Icon - Top Center Below Level */}
+                                <div className="absolute top-9 left-1/2 -translate-x-1/2 bg-emerald-900/90 border border-emerald-500/60 rounded-full w-8 h-8 flex items-center justify-center shadow-lg">
+                                  <span className="text-lg">{getWeaponTypeIcon(adventurer.weaponType || 0)}</span>
+                                </div>
+
+                                {/* Stats on Sides - Bottom */}
+                                <div className="absolute bottom-2 left-2 right-2 flex justify-between items-stretch gap-2">
+                                  {/* HP - Left Side */}
+                                  <div className="bg-emerald-900/90 border-2 border-emerald-500/60 rounded px-3 py-2 shadow-lg flex-1 flex flex-col items-center justify-center">
+                                    <div className="text-emerald-400/80 text-[9px] font-bold uppercase tracking-wider text-center mb-0.5">HP</div>
+                                    <div className="text-emerald-300 text-lg font-bold text-center leading-none">{adventurer.combatHealth || 0}</div>
                                   </div>
-                                  <div className="flex items-center justify-center gap-1">
-                                    <span className="text-emerald-400/60">
-                                      PWR:
-                                    </span>
-                                    <span className="font-bold">
-                                      {adventurer.weaponPower || 0}
-                                    </span>
-                                  </div>
-                                  <div className="flex items-center justify-center gap-1">
-                                    <span className="text-[8px]">
-                                      {getWeaponTypeIcon(
-                                        adventurer.weaponType || 0,
-                                      )}
-                                    </span>
+
+                                  {/* Power - Right Side */}
+                                  <div className="bg-amber-900/90 border-2 border-amber-500/60 rounded px-3 py-2 shadow-lg flex-1 flex flex-col items-center justify-center">
+                                    <div className="text-amber-400/80 text-[9px] font-bold uppercase tracking-wider text-center mb-0.5">ATK</div>
+                                    <div className="text-amber-300 text-lg font-bold text-center leading-none">{adventurer.weaponPower || 0}</div>
                                   </div>
                                 </div>
                               </motion.div>
                             ) : (
                               <div className="text-emerald-200/20 text-xs text-center">
-                                Slot {index + 1}
+                                <div className="mb-2 text-emerald-500/20 text-2xl">⬚</div>
+                                <div className="text-[10px]">SLOT {index + 1}</div>
                               </div>
                             )}
                           </div>
