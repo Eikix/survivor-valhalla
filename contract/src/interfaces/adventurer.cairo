@@ -12,17 +12,24 @@ pub struct Stats {
     pub luck: u8,
 }
 
-// Simplified Equipment for our needs
+// Item structure matching Death Mountain
+#[derive(Copy, Drop, Serde)]
+pub struct Item {
+    pub id: u8,
+    pub xp: u16,
+}
+
+// Equipment structure matching Death Mountain
 #[derive(Copy, Drop, Serde)]
 pub struct Equipment {
-    pub weapon: u8,
-    pub chest: u8,
-    pub head: u8,
-    pub waist: u8,
-    pub foot: u8,
-    pub hand: u8,
-    pub neck: u8,
-    pub ring: u8,
+    pub weapon: Item,
+    pub chest: Item,
+    pub head: Item,
+    pub waist: Item,
+    pub foot: Item,
+    pub hand: Item,
+    pub neck: Item,
+    pub ring: Item,
 }
 
 // Adventurer structure matching Death Mountain
