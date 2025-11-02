@@ -16,6 +16,14 @@ export function useBattleEvents() {
   const [battleLog, setBattleLog] = useState<string[]>([]);
   const [battleResult, setBattleResult] = useState<string | null>(null);
   const [currentBattleId, setCurrentBattleId] = useState<number | null>(null);
+  const [battleSummary, setBattleSummary] = useState<{
+    battleId: number;
+    winner: string;
+    damageEvents: any[];
+    defeatEvents: any[];
+    roundEvents: any[];
+    battleEvents: any[];
+  } | null>(null);
   
   const timeoutRef = useRef< ReturnType<typeof setTimeout> | null>(null);
   const startTimeRef = useRef<number | null>(null);
@@ -46,6 +54,7 @@ export function useBattleEvents() {
     setBattleLog([]);
     setBattleInProgress(false);
     setCurrentBattleId(null);
+    setBattleSummary(null);
     startTimeRef.current = null;
     processedEventsRef.current.clear();
     
@@ -174,6 +183,57 @@ export function useBattleEvents() {
             `⚔️ Battle ${event.battle_id} completed! Winner: ${event.data.winner.slice(0, 6)}...${event.data.winner.slice(-4)}`
           );
           
+          // Log all events for this battle when it completes
+          console.log('=== BATTLE COMPLETED ===');
+          console.log(`Battle ID: ${event.battle_id}`);
+          console.log(`Winner: ${event.data.winner}`);
+          console.log('All events for this battle:');
+          
+          // Filter and log all events for this specific battle
+          const battleDamageEvents = Array.isArray(damageEvents) ? 
+            damageEvents.filter((eventObj: any) => {
+              const entityId = Object.keys(eventObj)[0];
+              const eventData = eventObj[entityId];
+              return eventData && Number(eventData.battle_id) === event.battle_id;
+            }) : [];
+            
+          const battleDefeatEvents = Array.isArray(defeatEvents) ? 
+            defeatEvents.filter((eventObj: any) => {
+              const entityId = Object.keys(eventObj)[0];
+              const eventData = eventObj[entityId];
+              return eventData && Number(eventData.battle_id) === event.battle_id;
+            }) : [];
+            
+          const battleRoundEvents = Array.isArray(roundEvents) ? 
+            roundEvents.filter((eventObj: any) => {
+              const entityId = Object.keys(eventObj)[0];
+              const eventData = eventObj[entityId];
+              return eventData && Number(eventData.battle_id) === event.battle_id;
+            }) : [];
+            
+          const battleCompletionEvents = Array.isArray(battleEvents) ? 
+            battleEvents.filter((eventObj: any) => {
+              const entityId = Object.keys(eventObj)[0];
+              const eventData = eventObj[entityId];
+              return eventData && Number(eventData.battle_id) === event.battle_id;
+            }) : [];
+          
+          console.log('Damage Events:', battleDamageEvents);
+          console.log('Defeat Events:', battleDefeatEvents);
+          console.log('Round Events:', battleRoundEvents);
+          console.log('Battle Completion Events:', battleCompletionEvents);
+          console.log('========================');
+          
+          // Store battle summary for UI display
+          setBattleSummary({
+            battleId: event.battle_id,
+            winner: event.data.winner,
+            damageEvents: battleDamageEvents,
+            defeatEvents: battleDefeatEvents,
+            roundEvents: battleRoundEvents,
+            battleEvents: battleCompletionEvents
+          });
+          
           // Clear timeout when battle completes
           if (timeoutRef.current) {
             clearTimeout(timeoutRef.current);
@@ -190,10 +250,20 @@ export function useBattleEvents() {
 
   // Process new events when model data changes
   useEffect(() => {
+    console.log('Battle events effect called:', {
+      damageEvents,
+      defeatEvents, 
+      roundEvents,
+      battleEvents,
+      currentBattleEvents,
+      battleInProgress,
+      currentBattleId
+    });
+    
     if (currentBattleEvents.length > 0) {
       processEvents(currentBattleEvents);
     }
-  }, [currentBattleEvents, processEvents]);
+  }, [currentBattleEvents, processEvents, damageEvents, defeatEvents, roundEvents, battleEvents, battleInProgress, currentBattleId]);
 
   // Auto-detect battle ID from any new events
   useEffect(() => {
@@ -240,6 +310,7 @@ export function useBattleEvents() {
     battleLog,
     battleResult,
     currentBattleId,
+    battleSummary,
     // Actions
     startBattle,
     clearBattleState,
