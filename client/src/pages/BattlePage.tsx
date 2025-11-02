@@ -1,5 +1,5 @@
 import { motion } from "framer-motion";
-import { useParams } from "react-router-dom";
+import { useParams, useNavigate } from "react-router-dom";
 import { Swords, Play, Pause, RotateCcw, Shield, Zap, Heart } from "lucide-react";
 import { useMemo, useState, useCallback, useEffect, useRef } from "react";
 import { Navbar } from "../components/navbar";
@@ -18,16 +18,29 @@ import {
   getWeaponTypeIcon,
   getArmorTypeIcon,
 } from "../hooks/useAdventurerWeapons";
-import { AddressDisplay } from "../components/AddressDisplay";
 
 export function BattlePage() {
   const { battleId } = useParams<{ battleId: string }>();
+  const navigate = useNavigate();
   const numericBattleId = battleId ? parseInt(battleId, 10) : 0;
   const { battleDetails } = useBattleDetails(numericBattleId);
+
+  // Determine if this is a fresh battle (from URL params or recent timestamp)
+  // Fresh battles should have mystery elements, historical battles should not
+  const isNewBattle = useMemo(() => {
+    if (!battleDetails) return true; // Default to new battle until loaded
+    
+    // Consider it a new battle if it's less than 5 minutes old
+    const fiveMinutesAgo = Date.now() - (5 * 60 * 1000);
+    const battleTime = battleDetails.timestamp * 1000; // Convert to milliseconds
+    
+    return battleTime > fiveMinutesAgo;
+  }, [battleDetails]);
   
   // Battle simulation state
   const [isSimulating, setIsSimulating] = useState(false);
   const [simulationStep, setSimulationStep] = useState(0);
+  const [simulationComplete, setSimulationComplete] = useState(false);
   const [unitHealths, setUnitHealths] = useState<Record<string, number>>({});
   const [highlightedAttacker, setHighlightedAttacker] = useState<string | null>(null);
   const [damagedUnit, setDamagedUnit] = useState<string | null>(null);
@@ -35,6 +48,7 @@ export function BattlePage() {
   const [simulationSpeed, setSimulationSpeed] = useState(1000); // ms between events
   const [isPaused, setIsPaused] = useState(false);
   const [currentEventDescription, setCurrentEventDescription] = useState<string>("");
+  const [showResultBanner, setShowResultBanner] = useState(false);
   
   const simulationIntervalRef = useRef<number | null>(null);
 
@@ -144,6 +158,8 @@ export function BattlePage() {
   const resetSimulation = useCallback(() => {
     setIsSimulating(false);
     setSimulationStep(0);
+    setSimulationComplete(false);
+    setShowResultBanner(false);
     setUnitHealths(initialHealths);
     setHighlightedAttacker(null);
     setDamagedUnit(null);
@@ -167,7 +183,13 @@ export function BattlePage() {
   const processSimulationStep = useCallback(() => {
     if (simulationStep >= simulationEvents.length) {
       setIsSimulating(false);
-      setCurrentEventDescription("Battle simulation complete!");
+      setSimulationComplete(true);
+      setCurrentEventDescription("The fate of the battle is revealed...");
+      
+      // Show result banner after a brief delay
+      setTimeout(() => {
+        setShowResultBanner(true);
+      }, 1000);
       
       // Play victory sound if user won the battle
       if (battleDetails?.isVictory) {
@@ -196,11 +218,19 @@ export function BattlePage() {
       const attackerKey = attackerIsAdventurer ? `adventurer_${attackerId}` : `beast_${attackerId}`;
       const targetKey = targetIsAdventurer ? `adventurer_${targetId}` : `beast_${targetId}`;
       
-      const attackerType = attackerIsAdventurer ? 'Adventurer' : 'Beast';
-      const targetType = targetIsAdventurer ? 'Adventurer' : 'Beast';
-      
-      // Update description
-      setCurrentEventDescription(`${attackerType} #${attackerId} attacks ${targetType} #${targetId} for ${damage} damage`);
+      // Create mysterious battle description instead of specific details
+      const mysteriousDescriptions = [
+        "Steel clashes against steel in the arena...",
+        "A mighty blow echoes through the battlefield...",
+        "The sound of combat fills the air...",
+        "Warriors clash in a dance of death...",
+        "Blood and sweat mark the arena floor...",
+        "The tension rises as weapons meet...",
+        "A fierce exchange shakes the very ground...",
+        "Combat rages with primal intensity..."
+      ];
+      const randomDescription = mysteriousDescriptions[Math.floor(Math.random() * mysteriousDescriptions.length)];
+      setCurrentEventDescription(randomDescription);
       
       // Play attack sound effect
       playAttackSound();
@@ -229,7 +259,19 @@ export function BattlePage() {
       const isAdventurer = event.data.is_adventurer;
       const unitKey = isAdventurer ? `adventurer_${unitId}` : `beast_${unitId}`;
       
-      setCurrentEventDescription(`${isAdventurer ? 'Adventurer' : 'Beast'} #${unitId} is defeated!`);
+      // Create mysterious defeat description instead of specific details
+      const defeatDescriptions = [
+        "A warrior falls to the arena floor...",
+        "The clash of steel suddenly falls silent...",
+        "Victory and defeat hang in the balance...",
+        "Another combatant's fate is sealed...",
+        "The arena claims another soul...",
+        "A final gasp echoes through the battlefield...",
+        "The tide of battle shifts dramatically...",
+        "One fighter's journey comes to an end..."
+      ];
+      const randomDefeatDesc = defeatDescriptions[Math.floor(Math.random() * defeatDescriptions.length)];
+      setCurrentEventDescription(randomDefeatDesc);
       
       // Play death sound effect
       playSound('/sfx/inventory-change.mp3', 0.5);
@@ -404,24 +446,39 @@ export function BattlePage() {
               </div>
             </div>
             
-            {/* Battle Outcome Banner */}
-            <motion.div
-              initial={{ scale: 0.9, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              transition={{ delay: 0.3 }}
-              className={`inline-block px-6 py-3 rounded-lg font-bold text-lg tracking-wider border-2 ${
-                battleDetails.isVictory 
-                  ? 'bg-green-950/50 border-green-500/50 text-green-300 shadow-lg shadow-green-500/20' 
-                  : 'bg-red-950/50 border-red-500/50 text-red-300 shadow-lg shadow-red-500/20'
-              }`}
-              style={{
-                textShadow: battleDetails.isVictory 
-                  ? '0 0 10px rgba(34, 197, 94, 0.5)' 
-                  : '0 0 10px rgba(239, 68, 68, 0.5)',
-              }}
-            >
-              {battleDetails.isVictory ? '⚔️ VICTORIOUS ⚔️' : '💀 DEFEATED 💀'}
-            </motion.div>
+            {/* Battle Outcome Banner - Hidden until simulation completes (for new battles only) */}
+            {(!isNewBattle || simulationComplete) ? (
+              <motion.div
+                initial={{ scale: 0.5, opacity: 0, y: 20 }}
+                animate={{ scale: 1, opacity: 1, y: 0 }}
+                transition={{ 
+                  delay: 0.5,
+                  type: "spring",
+                  stiffness: 100,
+                  damping: 10
+                }}
+                className={`inline-block px-6 py-3 rounded-lg font-bold text-lg tracking-wider border-2 ${
+                  battleDetails.isVictory 
+                    ? 'bg-green-950/50 border-green-500/50 text-green-300 shadow-lg shadow-green-500/20' 
+                    : 'bg-red-950/50 border-red-500/50 text-red-300 shadow-lg shadow-red-500/20'
+                }`}
+                style={{
+                  textShadow: battleDetails.isVictory 
+                    ? '0 0 10px rgba(34, 197, 94, 0.5)' 
+                    : '0 0 10px rgba(239, 68, 68, 0.5)',
+                }}
+              >
+                {battleDetails.isVictory ? '⚔️ VICTORIOUS ⚔️' : '💀 DEFEATED 💀'}
+              </motion.div>
+            ) : (
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                className="inline-block px-6 py-3 rounded-lg font-bold text-lg tracking-wider border-2 bg-gray-950/50 border-gray-500/50 text-gray-400 shadow-lg shadow-gray-500/20"
+              >
+                ❓ BATTLE OUTCOME UNKNOWN ❓
+              </motion.div>
+            )}
           </div>
         </motion.div>
 
@@ -583,34 +640,48 @@ export function BattlePage() {
                   className="bg-red-950/40 border border-red-500/30 rounded-lg p-6 mb-6"
                 >
                   <h3 className="text-lg font-bold text-red-400 mb-4 tracking-wider uppercase">
-                    Battle Simulation
+                    {simulationComplete ? "Battle Complete" : "Battle Simulation"}
                   </h3>
                   
-                  {/* Event Description */}
+                  {/* Event Description - Mysterious for new battles only */}
                   <div className="mb-4 h-6">
                     <p className="text-red-200/80 text-sm font-mono">
-                      {currentEventDescription || "Ready to simulate battle"}
+                      {isNewBattle 
+                        ? (!isSimulating && !simulationComplete 
+                            ? "Battle outcome unknown... Begin simulation to witness the clash!"
+                            : isSimulating && !simulationComplete
+                              ? currentEventDescription || "Steel clashes in the arena..."
+                              : currentEventDescription || "The dust settles...")
+                        : (currentEventDescription || "Ready to simulate battle")
+                      }
                     </p>
                   </div>
                   
-                  {/* Progress Bar */}
-                  <div className="w-full bg-red-950/60 rounded-full h-2 mb-4">
-                    <motion.div
-                      className="bg-red-500 h-2 rounded-full"
-                      initial={{ width: 0 }}
-                      animate={{ 
-                        width: simulationEvents.length > 0 
-                          ? `${(simulationStep / simulationEvents.length) * 100}%` 
-                          : "0%" 
-                      }}
-                      transition={{ duration: 0.3 }}
-                    />
-                  </div>
+                  {/* Progress Bar - Hidden for new battles until simulation starts */}
+                  {(!isNewBattle || isSimulating || simulationComplete) && (
+                    <div className="w-full bg-red-950/60 rounded-full h-2 mb-4">
+                      <motion.div
+                        className="bg-red-500 h-2 rounded-full"
+                        initial={{ width: 0 }}
+                        animate={{ 
+                          width: simulationEvents.length > 0 
+                            ? `${(simulationStep / simulationEvents.length) * 100}%` 
+                            : "0%" 
+                        }}
+                        transition={{ duration: 0.3 }}
+                      />
+                    </div>
+                  )}
                   
-                  {/* Progress Text */}
-                  <div className="text-red-300/60 text-xs mb-4">
-                    Step {simulationStep} of {simulationEvents.length}
-                  </div>
+                  {/* Progress Text - Hidden for new battles initially to maintain mystery */}
+                  {(!isNewBattle || isSimulating || simulationComplete) && (
+                    <div className="text-red-300/60 text-xs mb-4">
+                      {simulationComplete 
+                        ? `Battle concluded after ${simulationEvents.length} events`
+                        : `Event ${simulationStep} of ${simulationEvents.length}`
+                      }
+                    </div>
+                  )}
                   
                   {/* Control Buttons */}
                   <div className="flex items-center justify-center gap-3">
@@ -622,19 +693,26 @@ export function BattlePage() {
                     >
                       {isSimulating && !isPaused ? (
                         <><Pause className="w-4 h-4" /> Pause</>
+                      ) : simulationComplete ? (
+                        <><Play className="w-4 h-4" /> View Again</>
                       ) : (
-                        <><Play className="w-4 h-4" /> {simulationStep > 0 ? 'Resume' : 'Start'}</>
+                        <><Play className="w-4 h-4" /> {simulationStep > 0 ? 'Resume' : 'Begin Battle'}</>
                       )}
                     </motion.button>
                     
-                    <motion.button
-                      onClick={resetSimulation}
-                      whileHover={{ scale: 1.05 }}
-                      whileTap={{ scale: 0.95 }}
-                      className="flex items-center gap-2 px-4 py-2 bg-orange-600/20 border border-orange-500/50 rounded-lg hover:bg-orange-600/30 transition-colors text-orange-300"
-                    >
-                      <RotateCcw className="w-4 h-4" /> Reset
-                    </motion.button>
+                    {/* Reset button - Only show after simulation starts, or always for historical battles */}
+                    {(!isNewBattle || simulationStep > 0 || simulationComplete) && (
+                      <motion.button
+                        initial={{ opacity: 0, scale: 0.8 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        onClick={resetSimulation}
+                        whileHover={{ scale: 1.05 }}
+                        whileTap={{ scale: 0.95 }}
+                        className="flex items-center gap-2 px-4 py-2 bg-orange-600/20 border border-orange-500/50 rounded-lg hover:bg-orange-600/30 transition-colors text-orange-300"
+                      >
+                        <RotateCcw className="w-4 h-4" /> Reset
+                      </motion.button>
+                    )}
                     
                     {/* Speed Controls */}
                     <div className="flex items-center gap-1">
@@ -793,12 +871,18 @@ export function BattlePage() {
         </motion.div>
 
         {/* Battle Chronicle - Enhanced Dungeon Style */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.2 }}
-          className="mb-16 relative"
-        >
+        {(!isNewBattle || simulationComplete) && (
+          <motion.div
+            initial={{ opacity: 0, y: 30, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            transition={{ 
+              delay: 1,
+              type: "spring",
+              stiffness: 80,
+              damping: 12
+            }}
+            className="mb-16 relative"
+          >
           <div className="relative border-2 border-red-500/40 bg-gradient-to-b from-red-950/30 via-red-950/20 to-black/40 p-8 overflow-hidden">
             {/* Decorative Corner Elements */}
             <div className="absolute top-0 left-0 w-8 h-8 border-l-4 border-t-4 border-amber-500/50"></div>
@@ -881,14 +965,21 @@ export function BattlePage() {
             </div>
           </div>
         </motion.div>
+        )}
 
         {/* Battle Statistics - Dungeon Style */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.4 }}
-          className="grid grid-cols-1 md:grid-cols-3 gap-6"
-        >
+        {(!isNewBattle || simulationComplete) && (
+          <motion.div
+            initial={{ opacity: 0, y: 30, scale: 0.9 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            transition={{ 
+              delay: 1.5,
+              type: "spring",
+              stiffness: 100,
+              damping: 15
+            }}
+            className="grid grid-cols-1 md:grid-cols-3 gap-6"
+          >
           {/* Total Events Stat */}
           <motion.div
             whileHover={{ scale: 1.02 }}
@@ -997,6 +1088,182 @@ export function BattlePage() {
             </div>
           </motion.div>
         </motion.div>
+        )}
+
+        {/* League of Legends Style Result Banner - Only for new battles */}
+        {showResultBanner && isNewBattle && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center"
+            onClick={() => setShowResultBanner(false)}
+          >
+            <motion.div
+              initial={{ scale: 0.3, opacity: 0, y: 100 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              transition={{
+                type: "spring",
+                stiffness: 150,
+                damping: 20,
+                delay: 0.2
+              }}
+              className="relative"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* Victory Banner */}
+              {battleDetails.isVictory ? (
+                <div className="text-center">
+                  {/* Main Victory Text */}
+                  <motion.div
+                    initial={{ scale: 0.5, opacity: 0 }}
+                    animate={{ scale: 1, opacity: 1 }}
+                    transition={{ delay: 0.4, duration: 0.8, type: "spring" }}
+                    className="relative"
+                  >
+                    <h1 
+                      className="text-8xl md:text-9xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-yellow-400 via-yellow-300 to-yellow-500 mb-4"
+                      style={{
+                        textShadow: '0 0 60px rgba(255, 215, 0, 0.8), 0 0 120px rgba(255, 215, 0, 0.4)',
+                        fontFamily: 'serif'
+                      }}
+                    >
+                      VICTORY
+                    </h1>
+                    
+                    {/* Victory Effects */}
+                    <div className="absolute inset-0 -z-10">
+                      {[...Array(12)].map((_, i) => (
+                        <motion.div
+                          key={i}
+                          className="absolute w-2 h-2 bg-yellow-400 rounded-full"
+                          style={{
+                            left: `${50 + Math.cos(i * 30 * Math.PI / 180) * 200}px`,
+                            top: `${50 + Math.sin(i * 30 * Math.PI / 180) * 200}px`,
+                          }}
+                          animate={{
+                            scale: [0, 1, 0],
+                            opacity: [0, 1, 0],
+                          }}
+                          transition={{
+                            duration: 2,
+                            repeat: Infinity,
+                            delay: i * 0.1
+                          }}
+                        />
+                      ))}
+                    </div>
+                  </motion.div>
+
+                  {/* Victory Subtitle */}
+                  <motion.p
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.8 }}
+                    className="text-2xl text-yellow-200 mb-8 font-bold tracking-wider"
+                  >
+                    🏆 BATTLE WON! YOUR WARRIORS EMERGE TRIUMPHANT! 🏆
+                  </motion.p>
+
+                  {/* Try Again Button */}
+                  <motion.button
+                    initial={{ opacity: 0, y: 30 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 1.2 }}
+                    onClick={resetSimulation}
+                    whileHover={{ scale: 1.05, boxShadow: "0 0 30px rgba(255, 215, 0, 0.5)" }}
+                    whileTap={{ scale: 0.95 }}
+                    className="px-12 py-4 bg-gradient-to-r from-yellow-600 to-yellow-500 hover:from-yellow-500 hover:to-yellow-400 text-black font-bold text-xl rounded-lg shadow-lg transition-all duration-300 border-2 border-yellow-400"
+                    style={{
+                      textShadow: '0 1px 2px rgba(0,0,0,0.3)'
+                    }}
+                  >
+                    ⚔️ WITNESS AGAIN ⚔️
+                  </motion.button>
+                </div>
+              ) : (
+                /* Defeat Banner */
+                <div className="text-center">
+                  {/* Main Defeat Text */}
+                  <motion.div
+                    initial={{ scale: 0.5, opacity: 0 }}
+                    animate={{ scale: 1, opacity: 1 }}
+                    transition={{ delay: 0.4, duration: 0.8, type: "spring" }}
+                    className="relative"
+                  >
+                    <h1 
+                      className="text-8xl md:text-9xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-red-500 via-red-400 to-red-600 mb-4"
+                      style={{
+                        textShadow: '0 0 60px rgba(239, 68, 68, 0.8), 0 0 120px rgba(239, 68, 68, 0.4)',
+                        fontFamily: 'serif'
+                      }}
+                    >
+                      DEFEAT
+                    </h1>
+                    
+                    {/* Defeat Effects */}
+                    <div className="absolute inset-0 -z-10">
+                      {[...Array(8)].map((_, i) => (
+                        <motion.div
+                          key={i}
+                          className="absolute w-3 h-3 bg-red-500 rounded-full opacity-60"
+                          style={{
+                            left: `${50 + Math.cos(i * 45 * Math.PI / 180) * 150}px`,
+                            top: `${50 + Math.sin(i * 45 * Math.PI / 180) * 150}px`,
+                          }}
+                          animate={{
+                            y: [0, -30, 0],
+                            opacity: [0.6, 0.2, 0.6],
+                          }}
+                          transition={{
+                            duration: 3,
+                            repeat: Infinity,
+                            delay: i * 0.2
+                          }}
+                        />
+                      ))}
+                    </div>
+                  </motion.div>
+
+                  {/* Defeat Subtitle */}
+                  <motion.p
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.8 }}
+                    className="text-2xl text-red-200 mb-8 font-bold tracking-wider"
+                  >
+                    💀 YOUR WARRIORS HAVE FALLEN IN BATTLE 💀
+                  </motion.p>
+
+                  {/* Seek Redemption Button */}
+                  <motion.button
+                    initial={{ opacity: 0, y: 30 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 1.2 }}
+                    onClick={() => navigate('/attack')}
+                    whileHover={{ scale: 1.05, boxShadow: "0 0 30px rgba(239, 68, 68, 0.5)" }}
+                    whileTap={{ scale: 0.95 }}
+                    className="px-12 py-4 bg-gradient-to-r from-red-600 to-red-500 hover:from-red-500 hover:to-red-400 text-white font-bold text-xl rounded-lg shadow-lg transition-all duration-300 border-2 border-red-400"
+                    style={{
+                      textShadow: '0 1px 2px rgba(0,0,0,0.3)'
+                    }}
+                  >
+                    ⚔️ SEEK REDEMPTION ⚔️
+                  </motion.button>
+                </div>
+              )}
+
+              {/* Close hint */}
+              <motion.p
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 0.6 }}
+                transition={{ delay: 2 }}
+                className="absolute -bottom-12 left-1/2 transform -translate-x-1/2 text-gray-400 text-sm"
+              >
+                Click anywhere to continue
+              </motion.p>
+            </motion.div>
+          </motion.div>
+        )}
       </div>
     </div>
   );
