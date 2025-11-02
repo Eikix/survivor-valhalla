@@ -623,7 +623,7 @@ export function AttackLineupPage() {
                       <div className="text-amber-700/70 text-xs mb-4">
                         <AddressDisplay address={selectedEnemy.player} />
                       </div>
-                      <div className="grid grid-cols-5 gap-4 p-4">
+                      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2 sm:gap-3 md:gap-4 p-2 sm:p-3 md:p-4">
                         {[1, 2, 3, 4, 5].map((pos) => {
                           const beastId =
                             selectedEnemy[
@@ -642,7 +642,7 @@ export function AttackLineupPage() {
                           return (
                             <div
                               key={pos}
-                              className="min-h-[200px] border-2 border-dashed rounded-lg flex items-center justify-center transition-colors border-amber-900/50"
+                              className="min-h-[160px] sm:min-h-[180px] md:min-h-[200px] border-2 border-dashed rounded-lg flex items-center justify-center transition-colors border-amber-900/50"
                             >
                               {hasBeast && imageUrl ? (
                                 <motion.div
@@ -667,15 +667,15 @@ export function AttackLineupPage() {
                                   </div>
 
                                   {/* Level - Top Left Corner */}
-                                  <div className="absolute top-1 left-1 bg-amber-900/95 border-2 border-amber-500/70 rounded-md w-10 h-10 flex items-center justify-center shadow-lg">
-                                    <span className="text-amber-300 text-sm font-bold">
+                                  <div className="absolute top-0.5 left-0.5 sm:top-1 sm:left-1 bg-amber-900/95 border border-amber-500/70 sm:border-2 rounded-md w-8 h-8 sm:w-10 sm:h-10 flex items-center justify-center shadow-lg">
+                                    <span className="text-amber-300 text-xs sm:text-sm font-bold">
                                       {beastStats?.level || 0}
                                     </span>
                                   </div>
 
                                   {/* Beast Armor Type Icon - Top Right Corner */}
-                                  <div className="absolute top-1 right-1 bg-amber-900/95 border-2 border-amber-500/70 rounded-md w-10 h-10 flex items-center justify-center shadow-lg">
-                                    <span className="text-xl">
+                                  <div className="absolute top-0.5 right-0.5 sm:top-1 sm:right-1 bg-amber-900/95 border border-amber-500/70 sm:border-2 rounded-md w-8 h-8 sm:w-10 sm:h-10 flex items-center justify-center shadow-lg">
+                                    <span className="text-base sm:text-xl">
                                       {getArmorTypeIcon(
                                         getBeastWeaponType(
                                           beastStats?.type || "",
@@ -685,15 +685,15 @@ export function AttackLineupPage() {
                                   </div>
 
                                   {/* HP - Bottom Left Corner (Half Circle) */}
-                                  <div className="absolute bottom-0 left-0 bg-emerald-900/95 border-2 border-emerald-500/70 rounded-tr-full w-11 h-11 flex items-end justify-start shadow-lg pl-1 pb-1">
-                                    <span className="text-emerald-300 text-xs font-bold leading-none">
+                                  <div className="absolute bottom-0 left-0 bg-emerald-900/95 border border-emerald-500/70 sm:border-2 rounded-tr-full w-9 h-9 sm:w-11 sm:h-11 flex items-end justify-start shadow-lg pl-0.5 pb-0.5 sm:pl-1 sm:pb-1">
+                                    <span className="text-emerald-300 text-[10px] sm:text-xs font-bold leading-none">
                                       {beastStats?.health || 0}
                                     </span>
                                   </div>
 
                                   {/* ATK - Bottom Right Corner (Half Circle) */}
-                                  <div className="absolute bottom-0 right-0 bg-amber-900/95 border-2 border-amber-500/70 rounded-tl-full w-11 h-11 flex items-end justify-end shadow-lg pr-1 pb-1">
-                                    <span className="text-amber-300 text-xs font-bold leading-none">
+                                  <div className="absolute bottom-0 right-0 bg-amber-900/95 border border-amber-500/70 sm:border-2 rounded-tl-full w-9 h-9 sm:w-11 sm:h-11 flex items-end justify-end shadow-lg pr-0.5 pb-0.5 sm:pr-1 sm:pb-1">
+                                    <span className="text-amber-300 text-[10px] sm:text-xs font-bold leading-none">
                                       {beastStats?.power || 0}
                                     </span>
                                   </div>
@@ -825,11 +825,11 @@ export function AttackLineupPage() {
                       <h2 className="text-2xl font-bold text-emerald-400 mb-4 tracking-wider uppercase">
                         Your Attack Force
                       </h2>
-                      <div className="grid grid-cols-5 gap-4 p-4">
+                      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2 sm:gap-3 md:gap-4 p-2 sm:p-3 md:p-4">
                         {attackLineup.map((adventurer, index) => (
                           <div
                             key={index}
-                            className={`min-h-[200px] border-2 border-dashed rounded-lg flex items-center justify-center transition-all ${
+                            className={`min-h-[160px] sm:min-h-[180px] md:min-h-[200px] border-2 border-dashed rounded-lg flex items-center justify-center transition-all ${
                               isDraggingOver === index
                                 ? "border-emerald-500 bg-emerald-950/30 scale-105"
                                 : "border-emerald-500/30"
@@ -887,15 +887,15 @@ export function AttackLineupPage() {
                                 )}
 
                                 {/* Level - Top Left Corner */}
-                                <div className="absolute top-1 left-1 bg-emerald-900/95 border-2 border-emerald-500/70 rounded-md w-10 h-10 flex items-center justify-center shadow-lg">
-                                  <span className="text-emerald-300 text-sm font-bold">
+                                <div className="absolute top-0.5 left-0.5 sm:top-1 sm:left-1 bg-emerald-900/95 border border-emerald-500/70 sm:border-2 rounded-md w-8 h-8 sm:w-10 sm:h-10 flex items-center justify-center shadow-lg">
+                                  <span className="text-emerald-300 text-xs sm:text-sm font-bold">
                                     {adventurer.level}
                                   </span>
                                 </div>
 
                                 {/* Weapon Type Icon - Top Right Corner */}
-                                <div className="absolute top-1 right-1 bg-emerald-900/95 border-2 border-emerald-500/70 rounded-md w-10 h-10 flex items-center justify-center shadow-lg">
-                                  <span className="text-xl">
+                                <div className="absolute top-0.5 right-0.5 sm:top-1 sm:right-1 bg-emerald-900/95 border border-emerald-500/70 sm:border-2 rounded-md w-8 h-8 sm:w-10 sm:h-10 flex items-center justify-center shadow-lg">
+                                  <span className="text-base sm:text-xl">
                                     {getWeaponTypeIcon(
                                       adventurer.weaponType || 0,
                                     )}
@@ -903,15 +903,15 @@ export function AttackLineupPage() {
                                 </div>
 
                                 {/* HP - Bottom Left Corner (Half Circle) */}
-                                <div className="absolute bottom-0 left-0 bg-emerald-900/95 border-2 border-emerald-500/70 rounded-tr-full w-11 h-11 flex items-end justify-start shadow-lg pl-1 pb-1">
-                                  <span className="text-emerald-300 text-xs font-bold leading-none">
+                                <div className="absolute bottom-0 left-0 bg-emerald-900/95 border border-emerald-500/70 sm:border-2 rounded-tr-full w-9 h-9 sm:w-11 sm:h-11 flex items-end justify-start shadow-lg pl-0.5 pb-0.5 sm:pl-1 sm:pb-1">
+                                  <span className="text-emerald-300 text-[10px] sm:text-xs font-bold leading-none">
                                     {adventurer.combatHealth || 0}
                                   </span>
                                 </div>
 
                                 {/* ATK - Bottom Right Corner (Half Circle) */}
-                                <div className="absolute bottom-0 right-0 bg-amber-900/95 border-2 border-amber-500/70 rounded-tl-full w-11 h-11 flex items-end justify-end shadow-lg pr-1 pb-1">
-                                  <span className="text-amber-300 text-xs font-bold leading-none">
+                                <div className="absolute bottom-0 right-0 bg-amber-900/95 border border-amber-500/70 sm:border-2 rounded-tl-full w-9 h-9 sm:w-11 sm:h-11 flex items-end justify-end shadow-lg pr-0.5 pb-0.5 sm:pr-1 sm:pb-1">
+                                  <span className="text-amber-300 text-[10px] sm:text-xs font-bold leading-none">
                                     {adventurer.weaponPower || 0}
                                   </span>
                                 </div>

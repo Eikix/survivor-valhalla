@@ -115,7 +115,7 @@ export function LandingPage() {
               textShadow: "0 0 10px rgba(16, 185, 129, 0.5)",
             }}
           >
-            <span className="relative z-10 text-emerald-500">ENTER ARENA</span>
+            <span className="relative z-10 text-emerald-500">ENTER VALHALLA</span>
 
             {/* Hover glow effect */}
             <motion.div
