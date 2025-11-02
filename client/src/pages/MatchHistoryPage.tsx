@@ -4,11 +4,12 @@ import { useState } from "react";
 import { useAccount } from "@starknet-react/core";
 import { useEntityQuery, useModels } from "@dojoengine/sdk/react";
 import { ToriiQueryBuilder } from "@dojoengine/sdk";
+import { useNavigate } from "react-router-dom";
 import { Navbar } from "../components/navbar";
 import { ModelsMapping } from "../bindings/typescript/models.gen";
 import type { BattleCompleted } from "../bindings/typescript/models.gen";
 import { addAddressPadding } from "starknet";
-import { ChevronDown, ChevronUp, Swords } from "lucide-react";
+import { ChevronDown, ChevronUp, Swords, ExternalLink } from "lucide-react";
 
 type BattleWithId = BattleCompleted & { entityId: string };
 
@@ -23,6 +24,7 @@ interface BattleLog {
 
 export function MatchHistoryPage() {
   const { address } = useAccount();
+  const navigate = useNavigate();
   const [expandedBattleId, setExpandedBattleId] = useState<number | null>(null);
 
   // Query all battle completed events
@@ -426,14 +428,7 @@ export function MatchHistoryPage() {
                   className="border border-emerald-500/30 bg-emerald-950/20"
                 >
                   {/* Battle Summary - Clickable */}
-                  <button
-                    onClick={() =>
-                      setExpandedBattleId(
-                        isExpanded ? null : battleLog.battleId,
-                      )
-                    }
-                    className="w-full p-6 text-left hover:bg-emerald-950/30 transition-colors"
-                  >
+                  <div className="p-6">
                     <div className="flex items-center justify-between">
                       <div className="flex-1">
                         <div className="flex items-center gap-4 mb-2">
@@ -458,15 +453,33 @@ export function MatchHistoryPage() {
                           {battleLog.opponent.slice(-4)}
                         </p>
                       </div>
-                      <div className="text-emerald-400">
-                        {isExpanded ? (
-                          <ChevronUp className="w-6 h-6" />
-                        ) : (
-                          <ChevronDown className="w-6 h-6" />
-                        )}
+                      <div className="flex items-center gap-3">
+                        <motion.button
+                          onClick={() => navigate(`/battle/${battleLog.battleId}`)}
+                          whileHover={{ scale: 1.05 }}
+                          whileTap={{ scale: 0.95 }}
+                          className="flex items-center gap-2 px-4 py-2 text-sm font-bold tracking-wider uppercase border border-emerald-500/50 hover:border-emerald-500 transition-all cursor-pointer text-emerald-400 bg-emerald-500/10 hover:bg-emerald-500/20"
+                        >
+                          <ExternalLink className="w-4 h-4" />
+                          View Details
+                        </motion.button>
+                        <button
+                          onClick={() =>
+                            setExpandedBattleId(
+                              isExpanded ? null : battleLog.battleId,
+                            )
+                          }
+                          className="text-emerald-400 hover:text-emerald-300 transition-colors"
+                        >
+                          {isExpanded ? (
+                            <ChevronUp className="w-6 h-6" />
+                          ) : (
+                            <ChevronDown className="w-6 h-6" />
+                          )}
+                        </button>
                       </div>
                     </div>
-                  </button>
+                  </div>
 
                   {/* Battle Log - Expandable */}
                   <AnimatePresence>

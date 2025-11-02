@@ -5,6 +5,8 @@ import { LandingPage } from "./pages/LandingPage";
 import { LineupPage } from "./pages/LineupPage";
 import { AttackLineupPage } from "./pages/AttackLineupPage";
 import { MatchHistoryPage } from "./pages/MatchHistoryPage";
+import { BattlePage } from "./pages/BattlePage";
+import { BattleLoadingPage } from "./pages/BattleLoadingPage";
 import { StarknetProvider } from "./components/starknet-provider";
 import { DojoSdkProvider } from "@dojoengine/sdk/react";
 import { init } from "@dojoengine/sdk";
@@ -51,6 +53,8 @@ function App() {
               <Route path="/home" element={<LineupPage />} />
               <Route path="/attack" element={<AttackLineupPage />} />
               <Route path="/history" element={<MatchHistoryPage />} />
+              <Route path="/battle/loading" element={<BattleLoadingPage />} />
+              <Route path="/battle/:battleId" element={<BattlePage />} />
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
           </BrowserRouter>

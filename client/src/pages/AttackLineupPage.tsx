@@ -106,17 +106,15 @@ export function AttackLineupPage() {
   const executeBattle = async () => {
     if (!client || !account || !selectedEnemy || !hasLineup) return;
 
-    // Prepare for battle: capture the current battle_id before we start
-    prepareForBattle();
-
     const tx = showTransaction(undefined, "Initiating battle...");
 
     try {
       // Execute battle transaction (synchronous on-chain)
-      // The useBattleEvents hook will automatically detect the new BattleCompleted event
-      // and load the battle log when it's indexed by Torii
       await client.battle_actions.battle(account, selectedEnemy.player);
-      tx.success("Battle complete! Loading results...");
+      tx.success("Battle initiated! Loading results...");
+      
+      // After successful transaction, prepare for battle and navigate to loading
+      prepareForBattle();
     } catch (error) {
       console.error("Failed to execute battle:", error);
       tx.error("Failed to execute battle");
