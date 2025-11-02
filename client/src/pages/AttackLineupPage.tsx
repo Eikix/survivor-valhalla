@@ -45,12 +45,15 @@ export function AttackLineupPage() {
     const tx = showTransaction(undefined, "Creating adventurer lineup...");
     
     try {
-      // TODO: Implement adventurer lineup registration when contract supports it
-      console.log("Creating adventurer lineup:", attackLineup);
-      
-      // Simulate transaction for now
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      
+      // Convert to numbers to ensure u64 compatibility
+      await client.battle_actions.setAttackLineup(
+        account,
+        Number(attackLineup[0]?.adventurer_id || 0),
+        Number(attackLineup[1]?.adventurer_id || 0),
+        Number(attackLineup[2]?.adventurer_id || 0),
+        Number(attackLineup[3]?.adventurer_id || 0),
+        Number(attackLineup[4]?.adventurer_id || 0),
+      );
       tx.success("Adventurer lineup created successfully!");
     } catch (error) {
       console.error("Failed to create lineup:", error);
@@ -63,20 +66,24 @@ export function AttackLineupPage() {
     const newAdventurer = attackLineup[swappedPosition];
     if (!newAdventurer) return;
 
-    const tx = showTransaction(undefined, `Swapping adventurer at position ${swappedPosition + 1}...`);
+    const tx = showTransaction(undefined, `Updating adventurer lineup...`);
     
     try {
-      // TODO: Implement adventurer swap when contract supports it
-      console.log("Swapping adventurer:", newAdventurer);
-      
-      // Simulate transaction for now
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      
+      // Since there's no swap function, we need to set the entire lineup again
+      // Convert to numbers to ensure u64 compatibility
+      await client.battle_actions.setAttackLineup(
+        account,
+        Number(attackLineup[0]?.adventurer_id || 0),
+        Number(attackLineup[1]?.adventurer_id || 0),
+        Number(attackLineup[2]?.adventurer_id || 0),
+        Number(attackLineup[3]?.adventurer_id || 0),
+        Number(attackLineup[4]?.adventurer_id || 0),
+      );
       setSwappedPosition(null);
-      tx.success("Adventurer swapped successfully!");
+      tx.success("Adventurer lineup updated successfully!");
     } catch (error) {
-      console.error("Failed to swap adventurer:", error);
-      tx.error("Failed to swap adventurer");
+      console.error("Failed to update lineup:", error);
+      tx.error("Failed to update adventurer lineup");
     }
   };
 
