@@ -1,6 +1,6 @@
 import { motion } from "framer-motion";
 import { useParams } from "react-router-dom";
-import { Swords, Play, Pause, RotateCcw, FastForward } from "lucide-react";
+import { Swords, Play, Pause, RotateCcw } from "lucide-react";
 import { useMemo, useState, useCallback, useEffect, useRef } from "react";
 import { Navbar } from "../components/navbar";
 import { useBattleDetails } from "../hooks/useBattleDetails";
@@ -35,7 +35,7 @@ export function BattlePage() {
   const [isPaused, setIsPaused] = useState(false);
   const [currentEventDescription, setCurrentEventDescription] = useState<string>("");
   
-  const simulationIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const simulationIntervalRef = useRef<number | null>(null);
 
   // Query adventurer weapons for stat enrichment
   useEntityQuery(
