@@ -477,12 +477,14 @@ export function LineupPage() {
                       {baseBeasts.map((beast, index) => (
                         <div
                           key={index}
-                          className={`min-w-[140px] md:min-w-0 min-h-[180px] md:min-h-[150px] border-2 border-dashed rounded-lg flex items-center justify-center transition-colors flex-shrink-0 cursor-pointer ${
+                          className={`min-w-[140px] md:min-w-0 min-h-[180px] md:min-h-[150px] border-2 border-dashed rounded-lg flex items-center justify-center transition-all duration-200 flex-shrink-0 cursor-pointer relative ${
                             selectedLineupIndex === index
                               ? "border-blue-500 bg-blue-950/30 border-solid"
                               : isDraggingOver === index
-                                ? "border-emerald-500 bg-emerald-950/30"
-                                : "border-emerald-500/30"
+                                ? "border-emerald-500 bg-emerald-950/30 scale-105"
+                                : selectedBeastForMobile && !beast
+                                  ? "border-emerald-400/70 bg-emerald-950/10 animate-pulse shadow-[0_0_15px_rgba(16,185,129,0.2)]"
+                                  : "border-emerald-500/30 hover:border-emerald-500/50 hover:scale-[1.02]"
                           }`}
                           onClick={() => {
                             // Handle swapping from lineup
@@ -684,8 +686,18 @@ export function LineupPage() {
                               )}
                             </motion.div>
                           ) : (
-                            <div className="text-emerald-200/20 text-xs text-center">
-                              Slot {index + 1}
+                            <div className="text-emerald-200/20 text-xs text-center relative">
+                              {selectedBeastForMobile ? (
+                                <>
+                                  <div className="text-emerald-400/70 text-3xl mb-2">⊕</div>
+                                  <div className="text-emerald-400/70 font-medium">Tap to place</div>
+                                </>
+                              ) : (
+                                <>
+                                  <div className="text-emerald-500/20 text-2xl mb-2">⬚</div>
+                                  <div>Slot {index + 1}</div>
+                                </>
+                              )}
                             </div>
                           )}
                         </div>

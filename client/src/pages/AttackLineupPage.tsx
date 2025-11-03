@@ -829,10 +829,10 @@ export function AttackLineupPage() {
                         {attackLineup.map((adventurer, index) => (
                           <div
                             key={index}
-                            className={`min-h-[160px] sm:min-h-[180px] md:min-h-[200px] border-2 border-dashed rounded-lg flex items-center justify-center transition-all ${
+                            className={`min-h-[160px] sm:min-h-[180px] md:min-h-[200px] border-2 border-dashed rounded-lg flex items-center justify-center transition-all duration-200 relative ${
                               isDraggingOver === index
                                 ? "border-emerald-500 bg-emerald-950/30 scale-105"
-                                : "border-emerald-500/30"
+                                : "border-emerald-500/30 hover:border-emerald-500/50 hover:scale-[1.02]"
                             }`}
                             onDragOver={(e: React.DragEvent) => {
                               e.preventDefault();
@@ -918,10 +918,10 @@ export function AttackLineupPage() {
                               </motion.div>
                             ) : (
                               <div className="text-emerald-200/20 text-xs text-center">
-                                <div className="mb-2 text-emerald-500/20 text-2xl">
+                                <div className="mb-2 text-emerald-500/20 text-3xl">
                                   ⬚
                                 </div>
-                                <div className="text-[10px]">
+                                <div className="text-[11px] font-medium">
                                   SLOT {index + 1}
                                 </div>
                               </div>
