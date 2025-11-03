@@ -576,8 +576,8 @@ export function BattlePage() {
                   const isDamaged = damagedUnit === beastKey;
                   const isDefeated = defeatedUnits.has(beastKey);
                   const currentHealth =
-                    unitHealths[beastKey] || beastStat?.health || 0;
-                  const maxHealth = beastStat?.health || 0;
+                    unitHealths[beastKey] ?? beastStat?.health ?? 0;
+                  const maxHealth = beastStat?.health ?? 0;
 
                   return (
                     <div
@@ -618,7 +618,7 @@ export function BattlePage() {
                           {/* Level - Top Left Corner */}
                           <div className="absolute top-1 left-1 bg-amber-900/95 border-2 border-amber-500/70 rounded-md w-10 h-10 flex items-center justify-center shadow-lg">
                             <span className="text-amber-300 text-sm font-bold">
-                              {beastStat?.level || 0}
+                              {beastStat?.level ?? 0}
                             </span>
                           </div>
 
@@ -661,7 +661,7 @@ export function BattlePage() {
                           {/* ATK - Bottom Right Corner (Half Circle) */}
                           <div className="absolute bottom-0 right-0 bg-amber-900/95 border-2 border-amber-500/70 rounded-tl-full w-11 h-11 flex items-end justify-end shadow-lg pr-1 pb-1">
                             <span className="text-amber-300 text-xs font-bold leading-none">
-                              {beastStat?.power || 0}
+                              {beastStat?.power ?? 0}
                             </span>
                           </div>
                           {/* Death Overlay */}
@@ -847,8 +847,8 @@ export function BattlePage() {
                   const isDamaged = damagedUnit === adventurerKey;
                   const isDefeated = defeatedUnits.has(adventurerKey);
                   const currentHealth =
-                    unitHealths[adventurerKey] || adventurer?.combatHealth || 0;
-                  const maxHealth = adventurer?.combatHealth || 0;
+                    unitHealths[adventurerKey] ?? adventurer?.combatHealth ?? 0;
+                  const maxHealth = adventurer?.combatHealth ?? 0;
 
                   return (
                     <div
