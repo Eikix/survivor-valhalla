@@ -89,7 +89,7 @@ const getAdventurerCollection = async (
       FROM tokens
       WHERE id IN (${tokenIds})
         AND metadata IS NOT NULL
-      LIMIT 100
+      LIMIT 1000
     `;
 
     const tokensUrl = `${toriiUrl}/sql?query=${encodeURIComponent(tokensQuery)}`;
@@ -182,9 +182,10 @@ const getAdventurerCollection = async (
 
         // Create name from player name or adventurer ID
         // Avoid redundant names like "Adventurer's Adventurer"
-        const name = playerName && playerName.toLowerCase() !== "adventurer"
-          ? `${playerName}'s Adventurer`
-          : `Adventurer #${adventurerId}`;
+        const name =
+          playerName && playerName.toLowerCase() !== "adventurer"
+            ? `${playerName}'s Adventurer`
+            : `Adventurer #${adventurerId}`;
 
         // Extract image from metadata
         const image = metadata?.image || generateAdventurerImage(adventurerId);
