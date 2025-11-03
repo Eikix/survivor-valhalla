@@ -1296,24 +1296,43 @@ export function BattlePage() {
                     🏆 BATTLE WON! YOUR WARRIORS EMERGE TRIUMPHANT! 🏆
                   </motion.p>
 
-                  {/* Try Again Button */}
-                  <motion.button
-                    initial={{ opacity: 0, y: 30 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 1.2 }}
-                    onClick={resetSimulation}
-                    whileHover={{
-                      scale: 1.05,
-                      boxShadow: "0 0 30px rgba(255, 215, 0, 0.5)",
-                    }}
-                    whileTap={{ scale: 0.95 }}
-                    className="px-12 py-4 bg-gradient-to-r from-yellow-600 to-yellow-500 hover:from-yellow-500 hover:to-yellow-400 text-black font-bold text-xl rounded-lg shadow-lg transition-all duration-300 border-2 border-yellow-400"
-                    style={{
-                      textShadow: "0 1px 2px rgba(0,0,0,0.3)",
-                    }}
-                  >
-                    ⚔️ WITNESS AGAIN ⚔️
-                  </motion.button>
+                  {/* Button Container */}
+                  <div className="flex flex-col gap-4 items-center">
+                    {/* Primary Button - Continue */}
+                    <motion.button
+                      initial={{ opacity: 0, y: 30 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: 1.2 }}
+                      onClick={() => navigate("/attack")}
+                      whileHover={{
+                        scale: 1.05,
+                        boxShadow: "0 0 30px rgba(255, 215, 0, 0.5)",
+                      }}
+                      whileTap={{ scale: 0.95 }}
+                      className="px-12 py-4 bg-gradient-to-r from-yellow-600 to-yellow-500 hover:from-yellow-500 hover:to-yellow-400 text-black font-bold text-xl rounded-lg shadow-lg transition-all duration-300 border-2 border-yellow-400"
+                      style={{
+                        textShadow: "0 1px 2px rgba(0,0,0,0.3)",
+                      }}
+                    >
+                      Continue →
+                    </motion.button>
+
+                    {/* Secondary Button - Replay */}
+                    <motion.button
+                      initial={{ opacity: 0, y: 30 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: 1.3 }}
+                      onClick={resetSimulation}
+                      whileHover={{
+                        scale: 1.02,
+                        borderColor: "rgba(255, 215, 0, 1)",
+                      }}
+                      whileTap={{ scale: 0.98 }}
+                      className="px-8 py-3 border-2 border-yellow-500/50 text-yellow-400 hover:bg-yellow-500/10 font-semibold text-base rounded-lg transition-all duration-300"
+                    >
+                      ⚔️ Replay Battle
+                    </motion.button>
+                  </div>
                 </div>
               ) : (
                 /* Defeat Banner */
@@ -1370,24 +1389,43 @@ export function BattlePage() {
                     💀 YOUR WARRIORS HAVE FALLEN IN BATTLE 💀
                   </motion.p>
 
-                  {/* Seek Redemption Button */}
-                  <motion.button
-                    initial={{ opacity: 0, y: 30 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 1.2 }}
-                    onClick={() => navigate("/attack")}
-                    whileHover={{
-                      scale: 1.05,
-                      boxShadow: "0 0 30px rgba(239, 68, 68, 0.5)",
-                    }}
-                    whileTap={{ scale: 0.95 }}
-                    className="px-12 py-4 bg-gradient-to-r from-red-600 to-red-500 hover:from-red-500 hover:to-red-400 text-white font-bold text-xl rounded-lg shadow-lg transition-all duration-300 border-2 border-red-400"
-                    style={{
-                      textShadow: "0 1px 2px rgba(0,0,0,0.3)",
-                    }}
-                  >
-                    ⚔️ SEEK REDEMPTION ⚔️
-                  </motion.button>
+                  {/* Button Container */}
+                  <div className="flex flex-col gap-4 items-center">
+                    {/* Primary Button - Find New Opponent */}
+                    <motion.button
+                      initial={{ opacity: 0, y: 30 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: 1.2 }}
+                      onClick={() => navigate("/attack")}
+                      whileHover={{
+                        scale: 1.05,
+                        boxShadow: "0 0 30px rgba(239, 68, 68, 0.5)",
+                      }}
+                      whileTap={{ scale: 0.95 }}
+                      className="px-12 py-4 bg-gradient-to-r from-red-600 to-red-500 hover:from-red-500 hover:to-red-400 text-white font-bold text-xl rounded-lg shadow-lg transition-all duration-300 border-2 border-red-400"
+                      style={{
+                        textShadow: "0 1px 2px rgba(0,0,0,0.3)",
+                      }}
+                    >
+                      Find New Opponent →
+                    </motion.button>
+
+                    {/* Secondary Button - Replay */}
+                    <motion.button
+                      initial={{ opacity: 0, y: 30 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: 1.3 }}
+                      onClick={resetSimulation}
+                      whileHover={{
+                        scale: 1.02,
+                        borderColor: "rgba(239, 68, 68, 1)",
+                      }}
+                      whileTap={{ scale: 0.98 }}
+                      className="px-8 py-3 border-2 border-red-500/50 text-red-400 hover:bg-red-500/10 font-semibold text-base rounded-lg transition-all duration-300"
+                    >
+                      ⚔️ Replay Battle
+                    </motion.button>
+                  </div>
                 </div>
               )}
 
