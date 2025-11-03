@@ -46,6 +46,9 @@ export function AttackLineupPage() {
   const [isDraggingOver, setIsDraggingOver] = useState<number>(-1);
   const [sortBy, setSortBy] = useState<keyof Adventurer | "">("");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
+  const [showDeployModal, setShowDeployModal] = useState(false);
+  const [isWaitingForLineupConfirmation, setIsWaitingForLineupConfirmation] =
+    useState(false);
 
   // Use battle events hook
   const {
@@ -85,6 +88,10 @@ export function AttackLineupPage() {
         Number(attackLineup[4]?.adventurer_id || 0),
       );
       tx.success("Adventurer lineup created successfully!");
+
+      // Show modal in "waiting for confirmation" state
+      setShowDeployModal(true);
+      setIsWaitingForLineupConfirmation(true);
     } catch (error) {
       console.error("Failed to create lineup:", error);
       tx.error("Failed to create adventurer lineup");
@@ -107,6 +114,10 @@ export function AttackLineupPage() {
         Number(attackLineup[4]?.adventurer_id || 0),
       );
       tx.success("Adventurer lineup updated successfully!");
+
+      // Show modal in "waiting for confirmation" state
+      setShowDeployModal(true);
+      setIsWaitingForLineupConfirmation(true);
     } catch (error) {
       console.error("Failed to update lineup:", error);
       tx.error("Failed to update adventurer lineup");
@@ -129,6 +140,13 @@ export function AttackLineupPage() {
       console.error("Failed to execute battle:", error);
       tx.error("Failed to execute battle");
     }
+  };
+
+  const handleBattleFromModal = async () => {
+    // Close modal
+    setShowDeployModal(false);
+    // Execute battle
+    await executeBattle();
   };
 
   const handleRandomFill = () => {
@@ -356,6 +374,18 @@ export function AttackLineupPage() {
 
     return currentIds.some((id, index) => id !== onChainIds[index]);
   }, [hasLineup, userLineup, attackLineup]);
+
+  // Detect when lineup is confirmed on-chain after deployment
+  useEffect(() => {
+    if (isWaitingForLineupConfirmation) {
+      // For new lineups: wait for hasLineup to become true
+      // For updates: wait for hasLineupChanges to become false (on-chain caught up)
+      if (hasLineup && !hasLineupChanges) {
+        // Lineup confirmed! Transition modal to "ready to battle" state
+        setIsWaitingForLineupConfirmation(false);
+      }
+    }
+  }, [isWaitingForLineupConfirmation, hasLineup, hasLineupChanges]);
 
   // Sort adventurers based on sortBy and sortDirection
   const sortedAdventurers = useMemo(() => {
@@ -1369,6 +1399,85 @@ export function AttackLineupPage() {
                 Close (ESC)
               </button>
             </div>
+          </motion.div>
+        </div>
+      )}
+
+      {/* Deploy Success Modal */}
+      {showDeployModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
+          <motion.div
+            initial={{ scale: 0.8, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            className="bg-gradient-to-br from-emerald-900 to-emerald-800 p-8 rounded-lg border-2 border-emerald-500 max-w-md text-center shadow-2xl"
+          >
+            {isWaitingForLineupConfirmation ? (
+              // Loading state - waiting for on-chain confirmation
+              <>
+                <motion.div
+                  animate={{
+                    rotate: 360,
+                  }}
+                  transition={{
+                    duration: 2,
+                    repeat: Infinity,
+                    ease: "linear",
+                  }}
+                  className="text-6xl mb-4 inline-block"
+                >
+                  ⚔️
+                </motion.div>
+                <h2 className="text-3xl font-bold text-emerald-300 mb-4">
+                  Deploying Attack Force
+                </h2>
+                <p className="text-emerald-100 mb-2">
+                  Waiting for blockchain confirmation...
+                </p>
+                <p className="text-emerald-400 text-sm">
+                  This usually takes 3-5 seconds
+                </p>
+              </>
+            ) : (
+              // Confirmed state - ready to battle
+              <>
+                <motion.div
+                  initial={{ scale: 0 }}
+                  animate={{ scale: 1 }}
+                  transition={{ delay: 0.2, type: "spring", stiffness: 200 }}
+                  className="text-6xl mb-4"
+                >
+                  ⚔️
+                </motion.div>
+                <h2 className="text-3xl font-bold text-emerald-300 mb-4">
+                  Attack Force Deployed!
+                </h2>
+                <p className="text-emerald-100 mb-6">
+                  Your adventurers are ready for battle.
+                  {selectedEnemy && (
+                    <span className="block mt-2 font-semibold">
+                      Ready to attack{" "}
+                      <AddressDisplay address={selectedEnemy.player} />?
+                    </span>
+                  )}
+                </p>
+                <motion.button
+                  onClick={handleBattleFromModal}
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  className="w-full bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-500 hover:to-emerald-400 text-white font-bold py-3 px-6 rounded-lg mb-3 transition-all"
+                >
+                  BATTLE NOW! ⚔️
+                </motion.button>
+                <motion.button
+                  onClick={() => setShowDeployModal(false)}
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                  className="text-emerald-300 hover:text-emerald-200 text-sm transition-colors"
+                >
+                  Cancel Attack
+                </motion.button>
+              </>
+            )}
           </motion.div>
         </div>
       )}

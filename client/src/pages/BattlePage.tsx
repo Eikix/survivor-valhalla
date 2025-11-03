@@ -351,6 +351,18 @@ export function BattlePage() {
     };
   }, [isSimulating, isPaused, processSimulationStep, simulationSpeed]);
 
+  // Auto-start simulation when battle loads
+  useEffect(() => {
+    if (
+      battleDetails &&
+      !isSimulating &&
+      simulationStep === 0 &&
+      !simulationComplete
+    ) {
+      setIsSimulating(true);
+    }
+  }, [battleDetails, isSimulating, simulationStep, simulationComplete]);
+
   if (!battleDetails) {
     return (
       <div className="min-h-screen bg-black text-white relative overflow-hidden">
@@ -1436,7 +1448,7 @@ export function BattlePage() {
                 transition={{ delay: 2 }}
                 className="absolute -bottom-12 left-1/2 transform -translate-x-1/2 text-gray-400 text-sm"
               >
-                Click anywhere to continue
+                Click anywhere to close this modal
               </motion.p>
             </motion.div>
           </motion.div>
