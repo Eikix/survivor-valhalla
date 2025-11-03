@@ -2,6 +2,7 @@
 import { motion } from "framer-motion";
 import { Shield } from "lucide-react";
 import { useState, useEffect, useMemo, useRef } from "react";
+import { useNavigate } from "react-router-dom";
 import { useConnect, useAccount } from "@starknet-react/core";
 import { useDojoSDK, useEntityQuery, useModels } from "@dojoengine/sdk/react";
 import { ToriiQueryBuilder } from "@dojoengine/sdk";
@@ -22,8 +23,8 @@ export function LineupPage() {
     Array(5).fill(null),
   );
   const [isDraggingOver, setIsDraggingOver] = useState<number>(-1);
-  const [sortBy, setSortBy] = useState<keyof Beast | "">("");
-  const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
+  const [sortBy, setSortBy] = useState<keyof Beast | "">("power");
+  const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
   const [swappedPosition, setSwappedPosition] = useState<number | null>(null);
   const [selectedBeastForMobile, setSelectedBeastForMobile] =
     useState<Beast | null>(null);
@@ -38,7 +39,9 @@ export function LineupPage() {
     y: number;
   } | null>(null);
   const [isTouchInteraction, setIsTouchInteraction] = useState(false);
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
 
+  const navigate = useNavigate();
   const { connect, connectors } = useConnect();
   const { status, address, account } = useAccount();
   const {
@@ -67,6 +70,7 @@ export function LineupPage() {
         baseBeasts[4]?.token_id || 0,
       );
       tx.success("Beast lineup created successfully!");
+      setShowSuccessModal(true);
     } catch (error) {
       console.error("Failed to create lineup:", error);
       tx.error("Failed to create beast lineup");
@@ -776,10 +780,10 @@ export function LineupPage() {
                   <>
                     <div className="mb-6 flex flex-wrap justify-center gap-4">
                       {[
+                        { key: "power" as keyof Beast, label: "Power" },
                         { key: "name" as keyof Beast, label: "Name" },
                         { key: "level" as keyof Beast, label: "Level" },
                         { key: "health" as keyof Beast, label: "Health" },
-                        { key: "power" as keyof Beast, label: "Power" },
                         { key: "tier" as keyof Beast, label: "Tier" },
                         { key: "type" as keyof Beast, label: "Type" },
                       ].map(({ key, label }) => (
@@ -792,7 +796,10 @@ export function LineupPage() {
                               );
                             } else {
                               setSortBy(key);
-                              setSortDirection("asc");
+                              // Default to desc for power, asc for others
+                              setSortDirection(
+                                key === "power" ? "desc" : "asc",
+                              );
                             }
                           }}
                           className={`px-4 py-2 text-sm font-bold tracking-wider uppercase transition-all cursor-pointer flex items-center gap-2 ${
@@ -822,91 +829,115 @@ export function LineupPage() {
                           key={`beast-${beast.id}-${beast.token_id}`}
                           initial={{ opacity: 0, scale: 0.9 }}
                           animate={{ opacity: 1, scale: 1 }}
-                          className="cursor-move"
+                          className="relative group cursor-pointer"
                         >
                           {beast.image && (
-                            <img
-                              src={beast.image}
-                              alt={`${beast.name} - Level: ${beast.level}, Health: ${beast.health}, Power: ${beast.power}, Tier: ${beast.tier}, Type: ${beast.type}, Prefix: ${beast.prefix}, Suffix: ${beast.suffix}, Shiny: ${beast.shiny}, Animated: ${beast.animated}`}
-                              className={`w-32 h-auto cursor-pointer transition-all ${
-                                selectedBeastForMobile?.id === beast.id
-                                  ? "ring-4 ring-emerald-500 scale-110"
-                                  : ""
-                              }`}
-                              draggable
-                              onDragStart={(e: React.DragEvent) => {
-                                e.dataTransfer.setData(
-                                  "beastId",
-                                  beast.id.toString(),
-                                );
-                              }}
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                // Skip if this was a touch interaction
-                                if (isTouchInteraction) {
-                                  setIsTouchInteraction(false);
-                                  return;
-                                }
-                                // Toggle selection
-                                if (selectedBeastForMobile?.id === beast.id) {
-                                  setSelectedBeastForMobile(null);
-                                } else {
-                                  setSelectedBeastForMobile(beast);
-                                  setSelectedLineupIndex(null); // Clear lineup selection
-                                }
-                              }}
-                              onDoubleClick={(e) => {
-                                e.stopPropagation();
-                                setInspectedBeast(beast);
-                              }}
-                              onTouchStart={(e) => {
-                                const touch = e.touches[0];
-                                setTouchStartPos({
-                                  x: touch.clientX,
-                                  y: touch.clientY,
-                                });
-                                const timer = setTimeout(() => {
-                                  // Long press = inspect
-                                  setInspectedBeast(beast);
-                                  setLongPressTimer(null);
-                                  setTouchStartPos(null);
-                                }, 500);
-                                setLongPressTimer(timer);
-                              }}
-                              onTouchEnd={(e) => {
-                                e.preventDefault();
-                                setIsTouchInteraction(true);
-                                if (longPressTimer) {
-                                  // Short tap = select
-                                  clearTimeout(longPressTimer);
-                                  setLongPressTimer(null);
-                                  setTouchStartPos(null);
+                            <>
+                              <img
+                                src={beast.image}
+                                alt={`${beast.name} - Level: ${beast.level}, Health: ${beast.health}, Power: ${beast.power}, Tier: ${beast.tier}, Type: ${beast.type}, Prefix: ${beast.prefix}, Suffix: ${beast.suffix}, Shiny: ${beast.shiny}, Animated: ${beast.animated}`}
+                                className={`w-32 h-auto cursor-pointer transition-all ${
+                                  selectedBeastForMobile?.id === beast.id
+                                    ? "ring-4 ring-emerald-500 scale-110"
+                                    : "group-hover:scale-105"
+                                }`}
+                                draggable
+                                onDragStart={(e: React.DragEvent) => {
+                                  e.dataTransfer.setData(
+                                    "beastId",
+                                    beast.id.toString(),
+                                  );
+                                }}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  // Skip if this was a touch interaction
+                                  if (isTouchInteraction) {
+                                    setIsTouchInteraction(false);
+                                    return;
+                                  }
+                                  // Toggle selection
                                   if (selectedBeastForMobile?.id === beast.id) {
                                     setSelectedBeastForMobile(null);
                                   } else {
                                     setSelectedBeastForMobile(beast);
                                     setSelectedLineupIndex(null); // Clear lineup selection
                                   }
-                                }
-                              }}
-                              onTouchMove={(e) => {
-                                // Only cancel if user moves more than 10px (scrolling)
-                                if (longPressTimer && touchStartPos) {
+                                }}
+                                onDoubleClick={(e) => {
+                                  e.stopPropagation();
+                                  setInspectedBeast(beast);
+                                }}
+                                onTouchStart={(e) => {
                                   const touch = e.touches[0];
-                                  const dx = Math.abs(
-                                    touch.clientX - touchStartPos.x,
-                                  );
-                                  const dy = Math.abs(
-                                    touch.clientY - touchStartPos.y,
-                                  );
-                                  if (dx > 10 || dy > 10) {
+                                  setTouchStartPos({
+                                    x: touch.clientX,
+                                    y: touch.clientY,
+                                  });
+                                  const timer = setTimeout(() => {
+                                    // Long press = inspect
+                                    setInspectedBeast(beast);
+                                    setLongPressTimer(null);
+                                    setTouchStartPos(null);
+                                  }, 500);
+                                  setLongPressTimer(timer);
+                                }}
+                                onTouchEnd={(e) => {
+                                  e.preventDefault();
+                                  setIsTouchInteraction(true);
+                                  if (longPressTimer) {
+                                    // Short tap = select
                                     clearTimeout(longPressTimer);
                                     setLongPressTimer(null);
                                     setTouchStartPos(null);
+                                    if (
+                                      selectedBeastForMobile?.id === beast.id
+                                    ) {
+                                      setSelectedBeastForMobile(null);
+                                    } else {
+                                      setSelectedBeastForMobile(beast);
+                                      setSelectedLineupIndex(null); // Clear lineup selection
+                                    }
                                   }
-                                }
-                              }}
-                            />
+                                }}
+                                onTouchMove={(e) => {
+                                  // Only cancel if user moves more than 10px (scrolling)
+                                  if (longPressTimer && touchStartPos) {
+                                    const touch = e.touches[0];
+                                    const dx = Math.abs(
+                                      touch.clientX - touchStartPos.x,
+                                    );
+                                    const dy = Math.abs(
+                                      touch.clientY - touchStartPos.y,
+                                    );
+                                    if (dx > 10 || dy > 10) {
+                                      clearTimeout(longPressTimer);
+                                      setLongPressTimer(null);
+                                      setTouchStartPos(null);
+                                    }
+                                  }
+                                }}
+                              />
+
+                              {/* Hover overlay with + button */}
+                              <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center pointer-events-none">
+                                <div className="bg-emerald-500 rounded-full w-10 h-10 flex items-center justify-center shadow-lg">
+                                  <span className="text-white text-2xl font-bold leading-none">
+                                    +
+                                  </span>
+                                </div>
+                              </div>
+
+                              {/* "Click a slot" instruction when selected */}
+                              {selectedBeastForMobile?.id === beast.id && (
+                                <motion.div
+                                  initial={{ opacity: 0, y: 5 }}
+                                  animate={{ opacity: 1, y: 0 }}
+                                  className="absolute -top-8 left-1/2 -translate-x-1/2 bg-emerald-500 text-white text-xs px-2 py-1 rounded whitespace-nowrap shadow-lg"
+                                >
+                                  Click a slot ↑
+                                </motion.div>
+                              )}
+                            </>
                           )}
                         </motion.div>
                       ))}
@@ -1018,6 +1049,52 @@ export function LineupPage() {
                 className="w-full h-auto object-contain"
               />
             )}
+          </motion.div>
+        </div>
+      )}
+
+      {/* Success Modal */}
+      {showSuccessModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
+          <motion.div
+            initial={{ scale: 0.8, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            className="bg-gradient-to-br from-emerald-900 to-emerald-800 p-8 rounded-lg border-2 border-emerald-500 max-w-md text-center shadow-2xl"
+          >
+            <motion.div
+              initial={{ scale: 0 }}
+              animate={{ scale: 1 }}
+              transition={{ delay: 0.2, type: "spring", stiffness: 200 }}
+              className="text-6xl mb-4"
+            >
+              ⚔️
+            </motion.div>
+            <h2 className="text-3xl font-bold text-emerald-300 mb-4">
+              Lineup Created!
+            </h2>
+            <p className="text-emerald-100 mb-6">
+              Your beast team is ready for battle. Choose an opponent and
+              unleash your warriors!
+            </p>
+            <motion.button
+              onClick={() => {
+                setShowSuccessModal(false);
+                navigate("/attack");
+              }}
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              className="w-full bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-500 hover:to-emerald-400 text-white font-bold py-3 px-6 rounded-lg mb-3 transition-all"
+            >
+              Find Opponent →
+            </motion.button>
+            <motion.button
+              onClick={() => setShowSuccessModal(false)}
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+              className="text-emerald-300 hover:text-emerald-200 text-sm transition-colors"
+            >
+              Stay on lineup page
+            </motion.button>
           </motion.div>
         </div>
       )}
