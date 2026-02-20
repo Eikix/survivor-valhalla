@@ -5485,5 +5485,215 @@ pub mod run_actions {
             assert(band_strong == 5, 'Strong defender');
             assert(band_weak != band_strong, 'Asymmetric');
         }
+
+        // ── Initiative ordering tests ──────────────────────────────
+
+        #[test]
+        fn test_build_initiative_order_empty() {
+            let advs: Array<CombatUnit> = array![];
+            let beasts: Array<CombatUnit> = array![];
+            let order = build_initiative_order(@advs, @beasts);
+            assert(order.len() == 0, 'Empty order');
+        }
+
+        #[test]
+        fn test_build_initiative_order_single_adventurer() {
+            let advs = array![
+                CombatUnit {
+                    battle_id: 1,
+                    unit_id: 100,
+                    position: 1,
+                    is_adventurer: true,
+                    current_hp: 100,
+                    max_hp: 100,
+                    damage: 10,
+                    initiative: 8,
+                    weapon_type: 1,
+                    beast_type: 0,
+                    is_alive: true,
+                },
+            ];
+            let beasts: Array<CombatUnit> = array![];
+            let order = build_initiative_order(@advs, @beasts);
+            assert(order.len() == 1, 'One entry');
+            let (init, is_adv, idx) = *order.at(0);
+            assert(init == 8, 'Init 8');
+            assert(is_adv, 'Is adventurer');
+            assert(idx == 0, 'Index 0');
+        }
+
+        #[test]
+        fn test_build_initiative_order_descending() {
+            // Adventurer init=5, Beast init=12 → beast should come first
+            let advs = array![
+                CombatUnit {
+                    battle_id: 1,
+                    unit_id: 100,
+                    position: 1,
+                    is_adventurer: true,
+                    current_hp: 100,
+                    max_hp: 100,
+                    damage: 10,
+                    initiative: 5,
+                    weapon_type: 1,
+                    beast_type: 0,
+                    is_alive: true,
+                },
+            ];
+            let beasts = array![
+                CombatUnit {
+                    battle_id: 1,
+                    unit_id: 200,
+                    position: 1,
+                    is_adventurer: false,
+                    current_hp: 80,
+                    max_hp: 80,
+                    damage: 15,
+                    initiative: 12,
+                    weapon_type: 0,
+                    beast_type: 1,
+                    is_alive: true,
+                },
+            ];
+            let order = build_initiative_order(@advs, @beasts);
+            assert(order.len() == 2, 'Two entries');
+            // Beast (init 12) should be first
+            let (init0, is_adv0, _) = *order.at(0);
+            assert(init0 == 12, 'Beast first init');
+            assert(!is_adv0, 'Beast first');
+            // Adventurer (init 5) second
+            let (init1, is_adv1, _) = *order.at(1);
+            assert(init1 == 5, 'Adv second init');
+            assert(is_adv1, 'Adv second');
+        }
+
+        #[test]
+        fn test_build_initiative_order_tie_breaking() {
+            // Both have init=10 → adventurer should come first (tie-breaking)
+            let advs = array![
+                CombatUnit {
+                    battle_id: 1,
+                    unit_id: 100,
+                    position: 1,
+                    is_adventurer: true,
+                    current_hp: 100,
+                    max_hp: 100,
+                    damage: 10,
+                    initiative: 10,
+                    weapon_type: 1,
+                    beast_type: 0,
+                    is_alive: true,
+                },
+            ];
+            let beasts = array![
+                CombatUnit {
+                    battle_id: 1,
+                    unit_id: 200,
+                    position: 1,
+                    is_adventurer: false,
+                    current_hp: 80,
+                    max_hp: 80,
+                    damage: 15,
+                    initiative: 10,
+                    weapon_type: 0,
+                    beast_type: 1,
+                    is_alive: true,
+                },
+            ];
+            let order = build_initiative_order(@advs, @beasts);
+            assert(order.len() == 2, 'Two entries');
+            // Adventurer wins tie
+            let (_, is_adv0, _) = *order.at(0);
+            assert(is_adv0, 'Adv wins tie');
+            let (_, is_adv1, _) = *order.at(1);
+            assert(!is_adv1, 'Beast loses tie');
+        }
+
+        #[test]
+        fn test_build_initiative_order_multiple_units() {
+            // 2 adventurers (init 8, 3) and 2 beasts (init 6, 11)
+            // Expected order: beast(11), adv(8), beast(6), adv(3)
+            let advs = array![
+                CombatUnit {
+                    battle_id: 1,
+                    unit_id: 100,
+                    position: 1,
+                    is_adventurer: true,
+                    current_hp: 100,
+                    max_hp: 100,
+                    damage: 10,
+                    initiative: 8,
+                    weapon_type: 1,
+                    beast_type: 0,
+                    is_alive: true,
+                },
+                CombatUnit {
+                    battle_id: 1,
+                    unit_id: 101,
+                    position: 2,
+                    is_adventurer: true,
+                    current_hp: 90,
+                    max_hp: 90,
+                    damage: 12,
+                    initiative: 3,
+                    weapon_type: 2,
+                    beast_type: 0,
+                    is_alive: true,
+                },
+            ];
+            let beasts = array![
+                CombatUnit {
+                    battle_id: 1,
+                    unit_id: 200,
+                    position: 1,
+                    is_adventurer: false,
+                    current_hp: 80,
+                    max_hp: 80,
+                    damage: 15,
+                    initiative: 6,
+                    weapon_type: 0,
+                    beast_type: 1,
+                    is_alive: true,
+                },
+                CombatUnit {
+                    battle_id: 1,
+                    unit_id: 201,
+                    position: 2,
+                    is_adventurer: false,
+                    current_hp: 70,
+                    max_hp: 70,
+                    damage: 20,
+                    initiative: 11,
+                    weapon_type: 0,
+                    beast_type: 2,
+                    is_alive: true,
+                },
+            ];
+            let order = build_initiative_order(@advs, @beasts);
+            assert(order.len() == 4, 'Four entries');
+
+            let (init0, is_adv0, _) = *order.at(0);
+            assert(init0 == 11, '1st init 11');
+            assert(!is_adv0, '1st is beast');
+
+            let (init1, is_adv1, _) = *order.at(1);
+            assert(init1 == 8, '2nd init 8');
+            assert(is_adv1, '2nd is adv');
+
+            let (init2, is_adv2, _) = *order.at(2);
+            assert(init2 == 6, '3rd init 6');
+            assert(!is_adv2, '3rd is beast');
+
+            let (init3, is_adv3, _) = *order.at(3);
+            assert(init3 == 3, '4th init 3');
+            assert(is_adv3, '4th is adv');
+        }
+
+        #[test]
+        fn test_control_initiative_threshold_constant() {
+            // Verify the constant is correctly defined and used
+            use survivor_valhalla::constants::CONTROL_INITIATIVE_THRESHOLD;
+            assert(CONTROL_INITIATIVE_THRESHOLD == 15, 'Threshold is 15');
+        }
     }
 }
