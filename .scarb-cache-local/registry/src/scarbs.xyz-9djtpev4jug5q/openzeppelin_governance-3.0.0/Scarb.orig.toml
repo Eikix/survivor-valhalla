@@ -1,0 +1,58 @@
+[package]
+name = "openzeppelin_governance"
+readme = "README.md"
+keywords = [
+    "openzeppelin",
+    "starknet",
+    "contracts",
+    "standards",
+    "governance"
+]
+version.workspace = true
+edition.workspace = true
+cairo-version.workspace = true
+scarb-version.workspace = true
+authors.workspace = true
+description.workspace = true
+documentation.workspace = true
+repository.workspace = true
+license-file.workspace = true
+
+[tool]
+fmt.workspace = true
+scarb.workspace = true
+
+[dependencies]
+starknet.workspace = true
+openzeppelin_access = "3.0.0"
+openzeppelin_interfaces = "2.1.0"
+openzeppelin_introspection = "3.0.0"
+openzeppelin_token = "3.0.0"
+openzeppelin_utils = "2.1.0"
+
+[features]
+fuzzing = []
+
+[lib]
+
+[[target.starknet-contract]]
+allowed-libfuncs-list.name = "experimental"
+sierra = true
+casm = false
+
+[[test]]
+name = "openzeppelin_governance_unittest"
+build-external-contracts = [
+    "openzeppelin_test_common::mocks::account::SnakeAccountMock",
+    "openzeppelin_test_common::mocks::governor::GovernorMock",
+    "openzeppelin_test_common::mocks::governor::GovernorTimelockedMock",
+    "openzeppelin_test_common::mocks::timelock::TimelockControllerMock",
+    "openzeppelin_test_common::mocks::timelock::MockContract",
+    "openzeppelin_test_common::mocks::timelock::TimelockAttackerMock",
+    "openzeppelin_test_common::mocks::multisig::MultisigTargetMock",
+    "openzeppelin_test_common::mocks::votes::ERC721BlockNumberVotesMock",
+    "openzeppelin_test_common::mocks::votes::ERC721TimestampVotesMock",
+    "openzeppelin_test_common::mocks::votes::ERC20BlockNumberVotesMock",
+    "openzeppelin_test_common::mocks::votes::ERC20TimestampVotesMock",
+    "openzeppelin_test_common::mocks::votes::LegacyERC20VotesMock",
+]

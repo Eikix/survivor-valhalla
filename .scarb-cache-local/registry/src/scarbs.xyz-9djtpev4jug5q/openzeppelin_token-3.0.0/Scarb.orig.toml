@@ -1,0 +1,59 @@
+
+[package]
+name = "openzeppelin_token"
+readme = "README.md"
+keywords = [
+    "openzeppelin",
+    "starknet",
+    "contracts",
+    "standards",
+    "token"
+]
+version.workspace = true
+edition.workspace = true
+cairo-version.workspace = true
+scarb-version.workspace = true
+authors.workspace = true
+description.workspace = true
+documentation.workspace = true
+repository.workspace = true
+license-file.workspace = true
+
+[tool]
+fmt.workspace = true
+scarb.workspace = true
+
+[dependencies]
+starknet.workspace = true
+openzeppelin_access = "3.0.0"
+openzeppelin_interfaces = "2.1.0"
+openzeppelin_introspection = "3.0.0"
+openzeppelin_utils = "2.1.0"
+
+[features]
+fuzzing = []
+
+[lib]
+
+[[target.starknet-contract]]
+allowed-libfuncs-list.name = "experimental"
+sierra = true
+casm = false
+
+[[test]]
+name = "openzeppelin_token_unittest"
+build-external-contracts = [
+    "openzeppelin_test_common::mocks::account::DualCaseAccountMock",
+    "openzeppelin_test_common::mocks::erc20::ERC20ReentrantMock",
+    "openzeppelin_test_common::mocks::erc4626::ERC4626Mock",
+    "openzeppelin_test_common::mocks::erc4626::ERC4626OffsetMock",
+    "openzeppelin_test_common::mocks::erc4626::ERC4626AssetsFeesMock",
+    "openzeppelin_test_common::mocks::erc4626::ERC4626SharesFeesMock",
+    "openzeppelin_test_common::mocks::erc4626::ERC4626LimitsMock",
+    "openzeppelin_test_common::mocks::erc4626::ERC4626MockWithHooks",
+    "openzeppelin_test_common::mocks::erc4626::ERC4626ExternalVaultMock",
+    "openzeppelin_test_common::mocks::erc721::DualCaseERC721ReceiverMock",
+    "openzeppelin_test_common::mocks::erc1155::DualCaseERC1155ReceiverMock",
+    "openzeppelin_test_common::mocks::non_implementing::NonImplementingMock",
+    "openzeppelin_test_common::mocks::src5::SRC5Mock",
+]

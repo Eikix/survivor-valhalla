@@ -1,0 +1,10 @@
+[package]
+name = "stark-vrf"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+ark-ec = "0.5.0"
+ark-ff = "0.5.0"
+starknet-crypto = "0.8.1"
+thiserror = "2"
