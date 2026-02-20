@@ -18,4 +18,4 @@ default = "survivor_valhalla"
 world_address = "0x0506afd1468177a7d2de7a0d05f7675eea6cfdc081b41cb604f812ebb3cc4dc4"
 
 [writers]
-"survivor_valhalla" = ["survivor_valhalla-beast_actions", "survivor_valhalla-battle_actions", "survivor_valhalla-energy_actions"]
+"survivor_valhalla" = ["survivor_valhalla-beast_actions", "survivor_valhalla-battle_actions", "survivor_valhalla-energy_actions", "survivor_valhalla-run_actions"]

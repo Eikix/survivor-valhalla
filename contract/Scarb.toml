@@ -18,6 +18,9 @@ starknet = "2.12.2"
 beasts_nft = { git = "https://github.com/Provable-Games/beasts.git" }
 openzeppelin_token = "1.0.0"
 
+[patch."https://scarbs.xyz"]
+snforge_std = { path = "vendor/snforge_std" }
+
 [[target.starknet-contract]]
 build-external-contracts = [
     "dojo::world::world_contract::world",
