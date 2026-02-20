@@ -129,6 +129,8 @@ pub struct Run {
     pub floor: u8,
     pub max_floor: u8,
     pub is_active: bool,
+    pub score: u32,
+    pub seed: felt252,
     pub started_at: u64,
     pub ended_at: u64,
 }
@@ -144,16 +146,128 @@ pub struct FloorProgress {
     pub is_complete: bool,
 }
 
+/// Tracks which run a player currently has active (0 = no active run).
 #[derive(Copy, Drop, Serde, Debug)]
 #[dojo::model]
-pub struct OpponentCandidate {
+pub struct ActiveRun {
+    #[key]
+    pub player: ContractAddress,
+    pub run_id: u32,
+}
+
+/// Per-floor battle record within a run.
+#[derive(Copy, Drop, Serde, Debug)]
+#[dojo::model]
+pub struct RunBattle {
     #[key]
     pub run_id: u32,
     #[key]
+    pub floor: u8,
+    pub battle_id: u32,
     pub defender: ContractAddress,
-    pub lineup_hash: felt252,
-    pub unit_count: u8,
+    pub result: u8, // 0=loss, 1=win
+}
+
+/// Run-scoped stat boost applied to one adventurer.
+/// Keyed by (run_id, adventurer_position, floor) to allow multiple buffs per adventurer.
+#[derive(Copy, Drop, Serde, Debug)]
+#[dojo::model]
+pub struct RunBuff {
+    #[key]
+    pub run_id: u32,
+    #[key]
+    pub adventurer_position: u8,
+    #[key]
+    pub floor: u8,
+    pub stat: u8, // 1=str, 2=dex, 3=vit, 4=int, 5=wis, 6=cha, 7=luck
+    pub value: u8,
+}
+
+/// Lifetime player run statistics.
+#[derive(Copy, Drop, Serde, Debug)]
+#[dojo::model]
+pub struct PlayerRunStats {
+    #[key]
+    pub player: ContractAddress,
+    pub best_score: u32,
+    pub best_floor: u8,
+    pub total_runs: u32,
+}
+
+/// Snapshot of adventurer HP carried across floors within a run.
+#[derive(Copy, Drop, Serde, Debug)]
+#[dojo::model]
+pub struct RunAdventurer {
+    #[key]
+    pub run_id: u32,
+    #[key]
+    pub position: u8, // 1-5
+    pub adventurer_id: u64,
+    pub current_hp: u16,
+    pub max_hp: u16,
+}
+
+/// Snapshot of a defender lineup captured at run start for deterministic matchmaking.
+#[derive(Copy, Drop, Serde, Debug)]
+#[dojo::model]
+pub struct OpponentSnapshot {
+    #[key]
+    pub run_id: u32,
+    #[key]
+    pub snapshot_index: u16, // index within this run's snapshot pool
+    pub defender: ContractAddress,
     pub defender_power: u32,
-    pub band: u8,
-    pub ecology_class: u8,
+    pub band: u8, // power band relative to attacker (1-5)
+    pub ecology_class: u8, // lineup archetype (1-6)
+    pub lineup_hash: felt252, // deterministic hash of beast composition
+    pub unit_count: u8, // number of beasts in lineup
+}
+
+/// Per-run matchmaking state tracking anti-repeat and ecology counts.
+#[derive(Copy, Drop, Serde, Debug)]
+#[dojo::model]
+pub struct RunMatchState {
+    #[key]
+    pub run_id: u32,
+    pub snapshot_count: u16, // total snapshots in pool
+    pub attacker_power: u32,
+    pub encounters_played: u8,
+    // Recent defenders for cooldown (circular buffer of last 3)
+    pub recent_def_1: ContractAddress,
+    pub recent_def_2: ContractAddress,
+    pub recent_def_3: ContractAddress,
+    // Ecology class encounter counts
+    pub eco_count_1: u8, // mono_type
+    pub eco_count_2: u8, // dual_type
+    pub eco_count_3: u8, // balanced
+    pub eco_count_4: u8, // burst
+    pub eco_count_5: u8, // tank
+    pub eco_count_6: u8, // control
+    // Last ecology class selected (for consecutive avoidance, 0 = none)
+    pub last_ecology_class: u8,
+}
+
+/// Tracks which lineup hashes have been used in a run (one entry per used hash).
+#[derive(Copy, Drop, Serde, Debug)]
+#[dojo::model]
+pub struct UsedLineupHash {
+    #[key]
+    pub run_id: u32,
+    #[key]
+    pub lineup_hash: felt252,
+    pub used: bool,
+}
+
+/// Cross-run defender memory: stores the last 5 defenders faced across runs.
+/// Persists between runs to avoid facing the same opponents repeatedly.
+#[derive(Copy, Drop, Serde, Debug)]
+#[dojo::model]
+pub struct CrossRunMemory {
+    #[key]
+    pub player: ContractAddress,
+    pub def_1: ContractAddress,
+    pub def_2: ContractAddress,
+    pub def_3: ContractAddress,
+    pub def_4: ContractAddress,
+    pub def_5: ContractAddress,
 }
