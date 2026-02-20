@@ -59,12 +59,12 @@ mod tests {
         let player = contract_address_const::<0x1337>();
 
         let lineup = create_test_beast_lineup(player);
-        assert(lineup.beast1_id == 1, 'Beast 1 ID mismatch');
+        assert(lineup.beast1_id == 1, 'T_B1_ID');
 
         let attack_lineup = create_test_attack_lineup(player);
-        assert(attack_lineup.adventurer1_id == 1, 'Adventurer 1 ID mismatch');
+        assert(attack_lineup.adventurer1_id == 1, 'T_ADV1_ID');
 
         let energy = create_test_player_energy(player);
-        assert(energy.energy == 5, 'Energy mismatch');
+        assert(energy.energy == 5, 'T_ENERGY');
     }
 }

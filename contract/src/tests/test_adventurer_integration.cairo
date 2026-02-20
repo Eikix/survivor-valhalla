@@ -20,8 +20,8 @@ mod test_adventurer_integration {
             adventurer5_id: 105,
         };
 
-        assert(attack_lineup.adventurer1_id == 101, 'Adventurer 1 ID mismatch');
-        assert(attack_lineup.adventurer2_id == 102, 'Adventurer 2 ID mismatch');
+        assert(attack_lineup.adventurer1_id == 101, 'T_ADV1_ID');
+        assert(attack_lineup.adventurer2_id == 102, 'T_ADV2_ID');
     }
 
     #[test]
@@ -42,19 +42,19 @@ mod test_adventurer_integration {
             luck: 9,
         };
 
-        assert(cached_adventurer.health == 150, 'Health mismatch');
-        assert(cached_adventurer.level == 5, 'Level mismatch');
-        assert(cached_adventurer.strength == 12, 'Strength mismatch');
+        assert(cached_adventurer.health == 150, 'T_HEALTH');
+        assert(cached_adventurer.level == 5, 'T_LEVEL');
+        assert(cached_adventurer.strength == 12, 'T_STR');
     }
 
     #[test]
     fn test_beastmode_contract_address() {
         // Verify the Death Mountain contract address is set correctly
-        assert(BEASTMODE_CONTRACT != 0, 'Beastmode contract not set');
+        assert(BEASTMODE_CONTRACT != 0, 'T_BM_ADDR_SET');
 
         // In production, this would be the actual mainnet address
         let expected = 0x00a67ef20b61a9846e1c82b411175e6ab167ea9f8632bd6c2091823c3629ec42;
-        assert(BEASTMODE_CONTRACT == expected, 'Wrong beastmode address');
+        assert(BEASTMODE_CONTRACT == expected, 'T_BM_ADDR');
     }
 
     #[test]
@@ -78,8 +78,8 @@ mod test_adventurer_integration {
         };
 
         // Verify lineups are set correctly
-        assert(defense_lineup.beast1_id == 1, 'Defense lineup error');
-        assert(attack_lineup.adventurer1_id == 201, 'Attack lineup error');
+        assert(defense_lineup.beast1_id == 1, 'T_DEF_LINEUP');
+        assert(attack_lineup.adventurer1_id == 201, 'T_ATK_LINEUP');
         // In actual implementation:
     // 1. Validate adventurer ownership via Death Mountain
     // 2. Check adventurer is from correct dungeon

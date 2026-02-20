@@ -39,7 +39,7 @@ mod test_energy_actions {
 
         // New player should have max energy
         let energy = energy_actions.get_energy(player1);
-        assert(energy == 5, 'Should have 5 energy');
+        assert(energy == 5, 'T_ENERGY_5');
     }
 
     #[test]
@@ -53,7 +53,7 @@ mod test_energy_actions {
         // We'll use battle_actions in a real scenario, but for this test
         // we'll check that the initial energy is correct
         let energy = energy_actions.get_energy(player1);
-        assert(energy == 5, 'Should have max energy');
+        assert(energy == 5, 'T_ENERGY_MAX');
     }
 
     #[test]
@@ -88,7 +88,7 @@ mod test_energy_actions {
 
         // Should return max energy after refill
         let energy = energy_actions.get_energy(player1);
-        assert(energy == 5, 'Should have max energy');
+        assert(energy == 5, 'T_ENERGY_MAX');
     }
 
     #[test]
@@ -123,7 +123,7 @@ mod test_energy_actions {
 
         // Should still return stored energy
         let energy = energy_actions.get_energy(player1);
-        assert(energy == 2, 'Should have 2 energy');
+        assert(energy == 2, 'T_ENERGY_2');
     }
 
     #[test]
@@ -156,7 +156,7 @@ mod test_energy_actions {
         battle_actions.battle(player1);
 
         // Check each player has correct energy
-        assert(energy_actions.get_energy(player1) == 2, 'Player 1 energy mismatch');
-        assert(energy_actions.get_energy(player2) == 4, 'Player 2 energy mismatch');
+        assert(energy_actions.get_energy(player1) == 2, 'T_P1_ENERGY_2');
+        assert(energy_actions.get_energy(player2) == 4, 'T_P2_ENERGY_4');
     }
 }

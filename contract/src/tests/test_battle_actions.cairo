@@ -65,9 +65,9 @@ mod test_battle_actions {
 
         // Check energy was consumed
         // let energy: PlayerEnergy = world.read_model(player1);
-        // assert(energy.energy == 4, 'Energy should be 4 after battle');
+        // assert(energy.energy == 4, 'T_ENERGY_4');
 
-        assert(true, 'Test needs adventurer mocking');
+        assert(true, 'T_ADV_MOCK');
     }
 
     #[test]
@@ -77,7 +77,7 @@ mod test_battle_actions {
         // Try to battle without setting attack lineup - should fail
         // Note: In real tests, we'd use #[should_panic] but keeping simple for now
         let has_lineup = false; // Simulating check
-        assert(!has_lineup, 'Should not have attack lineup');
+        assert(!has_lineup, 'T_NO_ATK');
     }
 
     #[test]
@@ -91,7 +91,7 @@ mod test_battle_actions {
         world.write_model(@energy);
 
         let stored_energy: PlayerEnergy = world.read_model(player1);
-        assert(stored_energy.energy == 5, 'Should have 5 energy');
+        assert(stored_energy.energy == 5, 'T_ENERGY_5');
     }
 
     #[test]
@@ -108,6 +108,6 @@ mod test_battle_actions {
         // In real implementation, energy would auto-refill
         // For this test, we're just verifying the time logic
         let current_time = get_block_timestamp();
-        assert(current_time - 1000 >= 86400, 'Time should have passed');
+        assert(current_time - 1000 >= 86400, 'T_TIME_OK');
     }
 }

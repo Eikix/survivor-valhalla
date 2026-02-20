@@ -103,15 +103,15 @@ pub mod battle_actions {
             let attacker = get_caller_address();
             let current_time = get_block_timestamp();
 
-            assert(attacker != defender, 'Cannot battle yourself');
+            assert(attacker != defender, 'ERR_SELF_BATTLE');
 
             // Check attacker has an attack lineup (adventurers)
             let attack_lineup: AttackLineup = world.read_model(attacker);
-            assert(attack_lineup.adventurer1_id != 0, 'No attack lineup registered');
+            assert(attack_lineup.adventurer1_id != 0, 'ERR_NO_ATK_LINEUP');
 
             // Check defender has a defense lineup (beasts)
             let defender_lineup: BeastLineup = world.read_model(defender);
-            assert(defender_lineup.beast1_id != 0, 'Defender has no lineup');
+            assert(defender_lineup.beast1_id != 0, 'ERR_NO_DEF_LINEUP');
 
             // Check and update energy
             // @NOTICE: disabled for dev purposes
@@ -202,15 +202,15 @@ pub mod battle_actions {
                 if adventurer_id != 0 {
                     // Verify ownership
                     let owner = erc721_dispatcher.owner_of(adventurer_id.into());
-                    assert(owner == player, 'Not owner of adventurer');
+                    assert(owner == player, 'ERR_ADV_OWNER');
 
                     // Verify adventurer is from beastmode dungeon
                     let dungeon = adventurer_dispatcher.get_adventurer_dungeon(adventurer_id);
-                    assert(dungeon == beastmode_dungeon_address, 'Wrong dungeon');
+                    assert(dungeon == beastmode_dungeon_address, 'ERR_ADV_DUNGEON');
 
                     // Get adventurer data
                     let adventurer = adventurer_dispatcher.get_adventurer(adventurer_id);
-                    assert(adventurer.health == 0, 'Adventurer is not dead');
+                    assert(adventurer.health == 0, 'ERR_ADV_NOT_DEAD');
 
                     // Calculate level from XP (roughly following Death Mountain logic)
                     let level = if adventurer.xp == 0 {

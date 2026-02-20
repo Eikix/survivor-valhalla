@@ -71,8 +71,8 @@ mod test_integration {
 
         // Check battle was recorded
         let battle1: Battle = game.world.read_model(1_u32);
-        assert(battle1.attacker == game.player1, 'Wrong attacker');
-        assert(battle1.defender == game.player2, 'Wrong defender');
+        assert(battle1.attacker == game.player1, 'T_BTL_ATK');
+        assert(battle1.defender == game.player2, 'T_BTL_DEF');
 
         // Player 2 battles Player 3
         testing::set_contract_address(game.player2);
@@ -87,9 +87,9 @@ mod test_integration {
         let p2_energy = game.energy_actions.get_energy(game.player2);
         let p3_energy = game.energy_actions.get_energy(game.player3);
 
-        assert(p1_energy == 4, 'Player 1 should have 4 energy');
-        assert(p2_energy == 4, 'Player 2 should have 4 energy');
-        assert(p3_energy == 4, 'Player 3 should have 4 energy');
+        assert(p1_energy == 4, 'T_P1_ENERGY_4');
+        assert(p2_energy == 4, 'T_P2_ENERGY_4');
+        assert(p3_energy == 4, 'T_P3_ENERGY_4');
     }
 
     #[test]
@@ -120,13 +120,13 @@ mod test_integration {
 
         // Player 3 has used 1 energy
         let p3_energy = game.energy_actions.get_energy(game.player3);
-        assert(p3_energy == 4, 'P3 should have 4 energy');
+        assert(p3_energy == 4, 'T_P3_ENERGY_4');
 
         // Try one more battle - should fail due to lack of energy for player 2
         testing::set_contract_address(game.player2);
         game.battle_actions.battle(game.player1); // This is their 3rd battle
         let p2_energy = game.energy_actions.get_energy(game.player2);
-        assert(p2_energy == 2, 'P2 should have 2 energy');
+        assert(p2_energy == 2, 'T_P2_ENERGY_2');
     }
 
     #[test]
@@ -152,11 +152,11 @@ mod test_integration {
 
         // Verify swap
         let lineup: BeastLineup = game.world.read_model(game.player1);
-        assert(lineup.beast3_id == 20, 'Beast should be swapped');
+        assert(lineup.beast3_id == 20, 'T_B3_SWAPPED');
 
         // Check battles happened
         let battle1: Battle = game.world.read_model(1_u32);
-        assert(battle1.attacker == game.player1, 'First battle recorded');
+        assert(battle1.attacker == game.player1, 'T_BTL1_REC');
     }
 
     #[test]
@@ -182,17 +182,17 @@ mod test_integration {
         }
 
         // Check no energy left
-        assert(game.energy_actions.get_energy(game.player1) == 0, 'All energy used');
+        assert(game.energy_actions.get_energy(game.player1) == 0, 'T_EN_EMPTY');
 
         // Fast forward to next day
         let current_time = get_block_timestamp();
         testing::set_block_timestamp(current_time + 86400);
 
         // Day 2: Energy refilled
-        assert(game.energy_actions.get_energy(game.player1) == 5, 'Energy refilled');
+        assert(game.energy_actions.get_energy(game.player1) == 5, 'T_EN_REFILL');
 
         // Can battle again
         game.battle_actions.battle(game.player2);
-        assert(game.energy_actions.get_energy(game.player1) == 4, 'Energy consumed');
+        assert(game.energy_actions.get_energy(game.player1) == 4, 'T_EN_USED');
     }
 }

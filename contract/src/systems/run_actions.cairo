@@ -97,24 +97,24 @@ pub mod run_actions {
             let player = contract_address_const::<0x1337>();
             let run = create_run_defaults(9, player, 777);
 
-            assert(run.run_id == 9, 'Run id mismatch');
-            assert(run.player == player, 'Run player mismatch');
-            assert(run.floor == 1, 'Run floor mismatch');
-            assert(run.max_floor == 1, 'Run max floor mismatch');
-            assert(run.is_active, 'Run should be active');
-            assert(run.started_at == 777, 'Run started_at mismatch');
-            assert(run.ended_at == 0, 'Run ended_at mismatch');
+            assert(run.run_id == 9, 'T_RUN_ID');
+            assert(run.player == player, 'T_RUN_PLAYER');
+            assert(run.floor == 1, 'T_RUN_FLOOR');
+            assert(run.max_floor == 1, 'T_RUN_MAX');
+            assert(run.is_active, 'T_RUN_ACTIVE');
+            assert(run.started_at == 777, 'T_RUN_START');
+            assert(run.ended_at == 0, 'T_RUN_END');
         }
 
         #[test]
         fn test_create_floor_progress_defaults() {
             let floor_progress = create_floor_progress_defaults(13);
 
-            assert(floor_progress.run_id == 13, 'Run id mismatch');
-            assert(floor_progress.current_floor == 1, 'Current floor mismatch');
-            assert(floor_progress.encounters_cleared == 0, 'Cleared mismatch');
-            assert(floor_progress.last_battle_id == 0, 'Battle id mismatch');
-            assert(!floor_progress.is_complete, 'Floor should be incomplete');
+            assert(floor_progress.run_id == 13, 'T_FP_RUN');
+            assert(floor_progress.current_floor == 1, 'T_FP_CURR');
+            assert(floor_progress.encounters_cleared == 0, 'T_FP_CLEAR');
+            assert(floor_progress.last_battle_id == 0, 'T_FP_BATTLE');
+            assert(!floor_progress.is_complete, 'ERR_FLOOR_NOT_DONE');
         }
     }
 }

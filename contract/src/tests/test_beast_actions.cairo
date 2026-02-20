@@ -39,16 +39,16 @@ mod test_beast_actions {
 
         // Check lineup was saved
         let lineup: BeastLineup = world.read_model(player1);
-        assert(lineup.beast1_id == 0, 'Beast 1 should be 0');
-        assert(lineup.beast2_id == 0, 'Beast 2 should be 0');
-        assert(lineup.beast3_id == 0, 'Beast 3 should be 0');
-        assert(lineup.beast4_id == 0, 'Beast 4 should be 0');
-        assert(lineup.beast5_id == 0, 'Beast 5 should be 0');
+        assert(lineup.beast1_id == 0, 'T_B1_ZERO');
+        assert(lineup.beast2_id == 0, 'T_B2_ZERO');
+        assert(lineup.beast3_id == 0, 'T_B3_ZERO');
+        assert(lineup.beast4_id == 0, 'T_B4_ZERO');
+        assert(lineup.beast5_id == 0, 'T_B5_ZERO');
 
         // Check energy was initialized
         let energy: PlayerEnergy = world.read_model(player1);
-        assert(energy.energy == 5, 'Should have 5 energy');
-        assert(energy.last_refill_time > 0, 'Should have refill time set');
+        assert(energy.energy == 5, 'T_ENERGY_5');
+        assert(energy.last_refill_time > 0, 'T_REFILL_SET');
     }
 
     #[test]
@@ -60,9 +60,9 @@ mod test_beast_actions {
 
         // Check lineup
         let lineup: BeastLineup = world.read_model(player1);
-        assert(lineup.beast1_id == BEAST1_ID, 'Beast 1 mismatch');
-        assert(lineup.beast2_id == BEAST2_ID, 'Beast 2 mismatch');
-        assert(lineup.beast3_id == 0, 'Beast 3 should be 0');
+        assert(lineup.beast1_id == BEAST1_ID, 'T_B1_MATCH');
+        assert(lineup.beast2_id == BEAST2_ID, 'T_B2_MATCH');
+        assert(lineup.beast3_id == 0, 'T_B3_ZERO');
     }
 
     #[test]
@@ -74,11 +74,11 @@ mod test_beast_actions {
 
         // Check all beasts are registered
         let lineup: BeastLineup = world.read_model(player1);
-        assert(lineup.beast1_id == BEAST1_ID, 'Beast 1 mismatch');
-        assert(lineup.beast2_id == BEAST2_ID, 'Beast 2 mismatch');
-        assert(lineup.beast3_id == BEAST3_ID, 'Beast 3 mismatch');
-        assert(lineup.beast4_id == BEAST4_ID, 'Beast 4 mismatch');
-        assert(lineup.beast5_id == BEAST5_ID, 'Beast 5 mismatch');
+        assert(lineup.beast1_id == BEAST1_ID, 'T_B1_MATCH');
+        assert(lineup.beast2_id == BEAST2_ID, 'T_B2_MATCH');
+        assert(lineup.beast3_id == BEAST3_ID, 'T_B3_MATCH');
+        assert(lineup.beast4_id == BEAST4_ID, 'T_B4_MATCH');
+        assert(lineup.beast5_id == BEAST5_ID, 'T_B5_MATCH');
     }
 
     #[test]
@@ -94,15 +94,15 @@ mod test_beast_actions {
 
         // Check swap worked
         let lineup: BeastLineup = world.read_model(player1);
-        assert(lineup.beast1_id == BEAST1_ID, 'Beast 1 unchanged');
-        assert(lineup.beast2_id == BEAST2_ID, 'Beast 2 unchanged');
-        assert(lineup.beast3_id == new_beast_id, 'Beast 3 should be swapped');
-        assert(lineup.beast4_id == BEAST4_ID, 'Beast 4 unchanged');
-        assert(lineup.beast5_id == BEAST5_ID, 'Beast 5 unchanged');
+        assert(lineup.beast1_id == BEAST1_ID, 'T_B1_SAME');
+        assert(lineup.beast2_id == BEAST2_ID, 'T_B2_SAME');
+        assert(lineup.beast3_id == new_beast_id, 'T_B3_SWAP');
+        assert(lineup.beast4_id == BEAST4_ID, 'T_B4_SAME');
+        assert(lineup.beast5_id == BEAST5_ID, 'T_B5_SAME');
     }
 
     #[test]
-    #[should_panic(expected: ('Cannot swap to empty', 'ENTRYPOINT_FAILED'))]
+    #[should_panic(expected: ('ERR_SWAP_EMPTY', 'ENTRYPOINT_FAILED'))]
     fn test_swap_to_empty_fails() {
         let (_world, beast_actions, _player1) = setup_test();
 
@@ -114,7 +114,7 @@ mod test_beast_actions {
     }
 
     #[test]
-    #[should_panic(expected: ('Invalid position', 'ENTRYPOINT_FAILED'))]
+    #[should_panic(expected: ('ERR_SWAP_POS', 'ENTRYPOINT_FAILED'))]
     fn test_swap_invalid_position_fails() {
         let (_world, beast_actions, _player1) = setup_test();
 
@@ -133,7 +133,7 @@ mod test_beast_actions {
         beast_actions.register(BEAST1_ID, 0, 0, 0, 0);
 
         let energy: PlayerEnergy = world.read_model(player1);
-        assert(energy.energy == 5, 'Should have 5 energy');
+        assert(energy.energy == 5, 'T_ENERGY_5');
         let first_refill_time = energy.last_refill_time;
 
         // Second registration doesn't reset energy
@@ -141,7 +141,7 @@ mod test_beast_actions {
         beast_actions.register(BEAST1_ID, BEAST2_ID, 0, 0, 0);
 
         let energy_after: PlayerEnergy = world.read_model(player1);
-        assert(energy_after.energy == 5, 'Energy unchanged');
-        assert(energy_after.last_refill_time == first_refill_time, 'Refill time unchanged');
+        assert(energy_after.energy == 5, 'T_ENERGY_SAME');
+        assert(energy_after.last_refill_time == first_refill_time, 'T_REFILL_SAME');
     }
 }
