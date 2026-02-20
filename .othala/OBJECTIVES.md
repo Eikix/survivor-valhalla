@@ -6,7 +6,7 @@ Evolve Survivor Valhalla from async autobattler into an async roguelike autobatt
 ## Core constraints
 - Meta-progression source is Loot Survivor assets/ownership (no separate SV meta system initially).
 - Runs should feel variable even with same player lineup.
-- Fast iteration mode: merge workflow.
+- Execution mode: Graphite-first stack workflow.
 
 ## Milestones
 1. Define run lifecycle spec (start, floor, reward, death, reset).
