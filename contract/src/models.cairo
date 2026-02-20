@@ -232,10 +232,12 @@ pub struct RunMatchState {
     pub snapshot_count: u16, // total snapshots in pool
     pub attacker_power: u32,
     pub encounters_played: u8,
-    // Recent defenders for cooldown (circular buffer of last 3)
+    // Recent defenders: first 3 used for cooldown, all 5 saved to cross-run memory
     pub recent_def_1: ContractAddress,
     pub recent_def_2: ContractAddress,
     pub recent_def_3: ContractAddress,
+    pub recent_def_4: ContractAddress,
+    pub recent_def_5: ContractAddress,
     // Ecology class encounter counts
     pub eco_count_1: u8, // mono_type
     pub eco_count_2: u8, // dual_type

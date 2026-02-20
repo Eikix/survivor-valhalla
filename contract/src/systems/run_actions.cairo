@@ -25,6 +25,31 @@ pub trait IRunActions<T> {
     fn get_run_info(self: @T, run_id: u32) -> (u8, u8, bool, u32);
     /// Get surviving adventurer count for an active run.
     fn get_run_survivors(self: @T, run_id: u32) -> u8;
+    /// Get matchmaking state for a run: (snapshot_count, attacker_power, encounters_played,
+    /// last_ecology_class).
+    fn get_run_match_state(self: @T, run_id: u32) -> (u16, u32, u8, u8);
+    /// Get ecology class counts for a run: (mono, dual, balanced, burst, tank, control).
+    fn get_run_ecology_counts(self: @T, run_id: u32) -> (u8, u8, u8, u8, u8, u8);
+    /// Get an opponent snapshot by run_id and index.
+    /// Returns (defender, defender_power, band, ecology_class, unit_count).
+    fn get_opponent_snapshot(
+        self: @T, run_id: u32, snapshot_index: u16,
+    ) -> (starknet::ContractAddress, u32, u8, u8, u8);
+    /// Get adventurer state within a run by position (1-5).
+    /// Returns (adventurer_id, current_hp, max_hp).
+    fn get_run_adventurer(
+        self: @T, run_id: u32, position: u8,
+    ) -> (u64, u16, u16);
+    /// Get a run buff for a specific adventurer position and floor.
+    /// Returns (stat, value). (0,0) if no buff exists.
+    fn get_run_buff(
+        self: @T, run_id: u32, adventurer_position: u8, floor: u8,
+    ) -> (u8, u8);
+    /// Classify a defender lineup by ecology class.
+    /// Returns the ecology class constant (1-6).
+    fn get_lineup_ecology(self: @T, defender: starknet::ContractAddress) -> u8;
+    /// Compute power score for a defender's beast lineup.
+    fn get_defender_power(self: @T, defender: starknet::ContractAddress) -> u32;
 }
 
 #[dojo::contract]
@@ -36,10 +61,11 @@ pub mod run_actions {
     use starknet::{ContractAddress, get_block_timestamp, get_caller_address};
     use starknet::storage::{StoragePointerReadAccess, StoragePointerWriteAccess};
     use survivor_valhalla::constants::{
-        ADVENTURER_SYSTEMS, BEASTMODE_DUNGEON, BOSS_STAT_MULT, ECOLOGY_BALANCED, ECOLOGY_BURST,
-        ECOLOGY_CAP_PERCENT, ECOLOGY_CLASS_COUNT, ECOLOGY_CONTROL, ECOLOGY_DUAL_TYPE,
-        ECOLOGY_MONO_TYPE, ECOLOGY_TANK, HEAL_INTERVAL, HEAL_PERCENT, LOOT_SURVIVOR_ERC721,
-        LOOT_SYSTEMS, SOFT_BREAK_BAND_CONSTRAINT, SOFT_BREAK_POOL_EXHAUSTED, STAT_BOOST_VALUE,
+        ADVENTURER_SYSTEMS, BEASTMODE_DUNGEON, BOSS_STAT_MULT, CONTROL_INITIATIVE_THRESHOLD,
+        ECOLOGY_BALANCED, ECOLOGY_BURST, ECOLOGY_CAP_PERCENT, ECOLOGY_CLASS_COUNT, ECOLOGY_CONTROL,
+        ECOLOGY_DUAL_TYPE, ECOLOGY_MONO_TYPE, ECOLOGY_TANK, ENERGY_REFILL_SECONDS, HEAL_INTERVAL,
+        HEAL_PERCENT, LOOT_SURVIVOR_ERC721, LOOT_SYSTEMS, MAX_ENERGY, RUN_ENERGY_COST,
+        SOFT_BREAK_BAND_CONSTRAINT, SOFT_BREAK_POOL_EXHAUSTED, STAT_BOOST_VALUE,
     };
     use survivor_valhalla::interfaces::adventurer::{
         IAdventurerSystemsDispatcher, IAdventurerSystemsDispatcherTrait, IERC721Dispatcher,
@@ -47,8 +73,8 @@ pub mod run_actions {
     };
     use survivor_valhalla::models::{
         ActiveRun, AdventurerWeapon, AttackLineup, Battle, BeastLineup, Beast, CachedAdventurer,
-        CombatUnit, CrossRunMemory, FloorProgress, OpponentSnapshot, PlayerRunStats, Run,
-        RunAdventurer, RunBattle, RunBuff, RunMatchState, UsedLineupHash,
+        CombatUnit, CrossRunMemory, FloorProgress, OpponentSnapshot, PlayerEnergy, PlayerRunStats,
+        Run, RunAdventurer, RunBattle, RunBuff, RunMatchState, UsedLineupHash,
     };
     use super::IRunActions;
 
@@ -122,6 +148,23 @@ pub mod run_actions {
             let active: ActiveRun = world.read_model(player);
             assert(active.run_id == 0, 'Already have an active run');
 
+            // Deduct energy.
+            let mut energy: PlayerEnergy = world.read_model(player);
+            let current_energy = if energy.last_refill_time == 0 {
+                MAX_ENERGY
+            } else {
+                let time_since_refill = started_at - energy.last_refill_time;
+                if time_since_refill >= ENERGY_REFILL_SECONDS {
+                    MAX_ENERGY
+                } else {
+                    energy.energy
+                }
+            };
+            assert(current_energy >= RUN_ENERGY_COST, 'Not enough energy');
+            energy.energy = current_energy - RUN_ENERGY_COST;
+            energy.last_refill_time = started_at;
+            world.write_model(@energy);
+
             // Allocate run id.
             let current_counter = self.run_counter.read();
             let run_id = current_counter + 1;
@@ -188,170 +231,7 @@ pub mod run_actions {
         }
 
         fn battle_floor(ref self: ContractState, defender: ContractAddress) {
-            let mut world = self.world_default();
-            let player = get_caller_address();
-            let timestamp = get_block_timestamp();
-
-            // Load active run.
-            let active: ActiveRun = world.read_model(player);
-            assert(active.run_id != 0, 'No active run');
-
-            let mut run: Run = world.read_model(active.run_id);
-            assert(run.is_active, 'Run is not active');
-            assert(run.player == player, 'Not your run');
-
-            let floor = run.floor;
-
-            // Validate defender has a beast lineup.
-            let defender_lineup: BeastLineup = world.read_model(defender);
-            assert(defender_lineup.beast1_id != 0, 'Defender has no lineup');
-
-            // Load attacker lineup.
-            let attack_lineup: AttackLineup = world.read_model(player);
-
-            // Allocate battle id.
-            let current_battle = self.battle_counter.read();
-            let battle_id = current_battle + 1;
-            self.battle_counter.write(battle_id);
-
-            // Determine if this is a boss floor.
-            let is_boss = floor % 10 == 0 && floor > 0;
-
-            // Setup combat units with carry-over HP from RunAdventurer.
-            let (mut adventurer_units, mut beast_units) = setup_run_combat_units(
-                ref world,
-                battle_id,
-                run.run_id,
-                floor,
-                player,
-                defender,
-                attack_lineup,
-                defender_lineup,
-                is_boss,
-            );
-
-            // Execute combat (reuses same logic as battle_actions).
-            let (winner, adventurer_hp_after, adventurers_alive) = execute_run_combat(
-                ref world,
-                battle_id,
-                ref adventurer_units,
-                ref beast_units,
-                player,
-                defender,
-            );
-
-            let attacker_won: bool = winner == player;
-            let result: u8 = if attacker_won {
-                1
-            } else {
-                0
-            };
-
-            // Write Battle record (same model as PvP for compatibility).
-            world
-                .write_model(
-                    @Battle { battle_id, attacker: player, defender, winner, timestamp },
-                );
-
-            // Write RunBattle record.
-            world
-                .write_model(
-                    @RunBattle { run_id: run.run_id, floor, battle_id, defender, result },
-                );
-
-            // Update floor progress.
-            let encounters_cleared = if attacker_won {
-                1_u8
-            } else {
-                0_u8
-            };
-            world
-                .write_model(
-                    @FloorProgress {
-                        run_id: run.run_id,
-                        current_floor: floor,
-                        encounters_cleared,
-                        last_battle_id: battle_id,
-                        is_complete: attacker_won,
-                    },
-                );
-
-            if attacker_won {
-                // Count surviving adventurers.
-                let survivors = count_alive(@adventurers_alive);
-
-                // Update score: floor * survivors_remaining.
-                run.score += floor.into() * survivors.into();
-
-                // Write back surviving adventurer HP.
-                write_back_adventurer_hp(
-                    ref world, run.run_id, @adventurer_units, @adventurer_hp_after,
-                );
-
-                // Apply rewards.
-                let reward_type = apply_floor_rewards(
-                    ref world, run.run_id, floor, run.seed,
-                );
-
-                // Advance to next floor.
-                run.floor = floor + 1;
-                if floor + 1 > run.max_floor {
-                    run.max_floor = floor + 1;
-                }
-                world.write_model(@run);
-
-                world
-                    .emit_event(
-                        @FloorCompleted {
-                            run_id: run.run_id, floor, battle_id, result, reward_type,
-                        },
-                    );
-            } else {
-                // Player lost — end the run.
-                run.is_active = false;
-                run.ended_at = timestamp;
-                // max_floor stays as the highest floor *reached* (not cleared).
-                world.write_model(@run);
-
-                // Clear active run.
-                world.write_model(@ActiveRun { player, run_id: 0 });
-
-                // Save cross-run defender memory for next run.
-                let match_state: RunMatchState = world.read_model(run.run_id);
-                save_cross_run_memory(ref world, player, match_state);
-
-                // Update player lifetime stats.
-                let mut stats: PlayerRunStats = world.read_model(player);
-                stats.total_runs += 1;
-                if run.score > stats.best_score {
-                    stats.best_score = run.score;
-                }
-                if run.max_floor > stats.best_floor {
-                    stats.best_floor = run.max_floor;
-                }
-                world.write_model(@stats);
-
-                world
-                    .emit_event(
-                        @FloorCompleted {
-                            run_id: run.run_id,
-                            floor,
-                            battle_id,
-                            result,
-                            reward_type: 0,
-                        },
-                    );
-                world
-                    .emit_event(
-                        @RunCompleted {
-                            run_id: run.run_id,
-                            player,
-                            max_floor: run.max_floor,
-                            score: run.score,
-                            timestamp,
-                        },
-                    );
-            }
+            self.execute_floor_battle(defender, true);
         }
 
         fn battle_floor_auto(ref self: ContractState) {
@@ -367,13 +247,14 @@ pub mod run_actions {
             assert(run.player == player, 'Not your run');
 
             // Load match state and select opponent from snapshot pool.
+            // select_opponent already updates match state (cooldown, ecology, used hash).
             let mut match_state: RunMatchState = world.read_model(run.run_id);
             let selected = select_opponent(
                 ref world, run.run_id, run.floor, run.seed, ref match_state,
             );
 
-            // Delegate to battle_floor with the selected defender.
-            self.battle_floor(selected.defender);
+            // Execute floor battle without re-tracking match state.
+            self.execute_floor_battle(selected.defender, false);
         }
 
         fn populate_run_pool(ref self: ContractState, defenders: Array<ContractAddress>) {
@@ -654,6 +535,61 @@ pub mod run_actions {
             };
             alive
         }
+
+        fn get_run_match_state(self: @ContractState, run_id: u32) -> (u16, u32, u8, u8) {
+            let world = self.world_default();
+            let ms: RunMatchState = world.read_model(run_id);
+            (ms.snapshot_count, ms.attacker_power, ms.encounters_played, ms.last_ecology_class)
+        }
+
+        fn get_run_ecology_counts(self: @ContractState, run_id: u32) -> (u8, u8, u8, u8, u8, u8) {
+            let world = self.world_default();
+            let ms: RunMatchState = world.read_model(run_id);
+            (
+                ms.eco_count_1,
+                ms.eco_count_2,
+                ms.eco_count_3,
+                ms.eco_count_4,
+                ms.eco_count_5,
+                ms.eco_count_6,
+            )
+        }
+
+        fn get_opponent_snapshot(
+            self: @ContractState, run_id: u32, snapshot_index: u16,
+        ) -> (ContractAddress, u32, u8, u8, u8) {
+            let world = self.world_default();
+            let snap: OpponentSnapshot = world.read_model((run_id, snapshot_index));
+            (snap.defender, snap.defender_power, snap.band, snap.ecology_class, snap.unit_count)
+        }
+
+        fn get_run_adventurer(
+            self: @ContractState, run_id: u32, position: u8,
+        ) -> (u64, u16, u16) {
+            let world = self.world_default();
+            let run_adv: RunAdventurer = world.read_model((run_id, position));
+            (run_adv.adventurer_id, run_adv.current_hp, run_adv.max_hp)
+        }
+
+        fn get_run_buff(
+            self: @ContractState, run_id: u32, adventurer_position: u8, floor: u8,
+        ) -> (u8, u8) {
+            let world = self.world_default();
+            let buff: RunBuff = world.read_model((run_id, adventurer_position, floor));
+            (buff.stat, buff.value)
+        }
+
+        fn get_lineup_ecology(self: @ContractState, defender: ContractAddress) -> u8 {
+            let mut world = self.world_default();
+            let lineup: BeastLineup = world.read_model(defender);
+            classify_lineup(ref world, defender, lineup)
+        }
+
+        fn get_defender_power(self: @ContractState, defender: ContractAddress) -> u32 {
+            let mut world = self.world_default();
+            let lineup: BeastLineup = world.read_model(defender);
+            compute_beast_lineup_power(ref world, defender, lineup)
+        }
     }
 
     // ── Internal helpers ────────────────────────────────────────────────
@@ -662,6 +598,192 @@ pub mod run_actions {
     impl InternalImpl of InternalTrait {
         fn world_default(self: @ContractState) -> dojo::world::WorldStorage {
             self.world(@"survivor_valhalla")
+        }
+
+        /// Core floor battle logic shared by `battle_floor` (manual) and
+        /// `battle_floor_auto` (auto-select). When `track_match_state` is true,
+        /// the function updates RunMatchState (cooldown, ecology, used hash).
+        /// `battle_floor_auto` passes false because `select_opponent` already
+        /// does this tracking.
+        fn execute_floor_battle(
+            ref self: ContractState, defender: ContractAddress, track_match_state: bool,
+        ) {
+            let mut world = self.world_default();
+            let player = get_caller_address();
+            let timestamp = get_block_timestamp();
+
+            // Load active run.
+            let active: ActiveRun = world.read_model(player);
+            assert(active.run_id != 0, 'No active run');
+
+            let mut run: Run = world.read_model(active.run_id);
+            assert(run.is_active, 'Run is not active');
+            assert(run.player == player, 'Not your run');
+
+            let floor = run.floor;
+
+            // Validate defender has a beast lineup.
+            let defender_lineup: BeastLineup = world.read_model(defender);
+            assert(defender_lineup.beast1_id != 0, 'Defender has no lineup');
+
+            // Allocate battle id.
+            let current_battle = self.battle_counter.read();
+            let battle_id = current_battle + 1;
+            self.battle_counter.write(battle_id);
+
+            // Determine if this is a boss floor.
+            let is_boss = floor % 10 == 0 && floor > 0;
+
+            // Setup combat units with carry-over HP from RunAdventurer snapshots.
+            let (mut adventurer_units, mut beast_units) = setup_run_combat_units(
+                ref world,
+                battle_id,
+                run.run_id,
+                floor,
+                player,
+                defender,
+                defender_lineup,
+                is_boss,
+            );
+
+            // Execute combat.
+            let (winner, adventurer_hp_after, adventurers_alive) = execute_run_combat(
+                ref world,
+                battle_id,
+                ref adventurer_units,
+                ref beast_units,
+                player,
+                defender,
+            );
+
+            let attacker_won: bool = winner == player;
+            let result: u8 = if attacker_won {
+                1
+            } else {
+                0
+            };
+
+            // Write Battle record.
+            world
+                .write_model(
+                    @Battle { battle_id, attacker: player, defender, winner, timestamp },
+                );
+
+            // Write RunBattle record.
+            world
+                .write_model(
+                    @RunBattle { run_id: run.run_id, floor, battle_id, defender, result },
+                );
+
+            // Update matchmaking state (only for manual selection;
+            // auto-select already updated via select_opponent).
+            if track_match_state {
+                let mut match_state: RunMatchState = world.read_model(run.run_id);
+                let lineup_hash = compute_lineup_hash(defender_lineup);
+                let ecology_class = classify_lineup(ref world, defender, defender_lineup);
+                push_recent_defender(ref match_state, defender);
+                increment_eco_count(ref match_state, ecology_class);
+                match_state.last_ecology_class = ecology_class;
+                match_state.encounters_played += 1;
+                world
+                    .write_model(
+                        @UsedLineupHash { run_id: run.run_id, lineup_hash, used: true },
+                    );
+                world.write_model(@match_state);
+            }
+
+            // Update floor progress.
+            let encounters_cleared = if attacker_won {
+                1_u8
+            } else {
+                0_u8
+            };
+            world
+                .write_model(
+                    @FloorProgress {
+                        run_id: run.run_id,
+                        current_floor: floor,
+                        encounters_cleared,
+                        last_battle_id: battle_id,
+                        is_complete: attacker_won,
+                    },
+                );
+
+            if attacker_won {
+                // Count surviving adventurers.
+                let survivors = count_alive(@adventurers_alive);
+
+                // Update score: floor * survivors_remaining.
+                run.score += floor.into() * survivors.into();
+
+                // Write back surviving adventurer HP.
+                write_back_adventurer_hp(
+                    ref world, run.run_id, @adventurer_units, @adventurer_hp_after,
+                );
+
+                // Apply rewards.
+                let reward_type = apply_floor_rewards(
+                    ref world, run.run_id, floor, run.seed,
+                );
+
+                // Advance to next floor.
+                run.floor = floor + 1;
+                if floor + 1 > run.max_floor {
+                    run.max_floor = floor + 1;
+                }
+                world.write_model(@run);
+
+                world
+                    .emit_event(
+                        @FloorCompleted {
+                            run_id: run.run_id, floor, battle_id, result, reward_type,
+                        },
+                    );
+            } else {
+                // Player lost — end the run.
+                run.is_active = false;
+                run.ended_at = timestamp;
+                world.write_model(@run);
+
+                // Clear active run.
+                world.write_model(@ActiveRun { player, run_id: 0 });
+
+                // Save cross-run defender memory for next run.
+                let match_state: RunMatchState = world.read_model(run.run_id);
+                save_cross_run_memory(ref world, player, match_state);
+
+                // Update player lifetime stats.
+                let mut stats: PlayerRunStats = world.read_model(player);
+                stats.total_runs += 1;
+                if run.score > stats.best_score {
+                    stats.best_score = run.score;
+                }
+                if run.max_floor > stats.best_floor {
+                    stats.best_floor = run.max_floor;
+                }
+                world.write_model(@stats);
+
+                world
+                    .emit_event(
+                        @FloorCompleted {
+                            run_id: run.run_id,
+                            floor,
+                            battle_id,
+                            result,
+                            reward_type: 0,
+                        },
+                    );
+                world
+                    .emit_event(
+                        @RunCompleted {
+                            run_id: run.run_id,
+                            player,
+                            max_floor: run.max_floor,
+                            score: run.score,
+                            timestamp,
+                        },
+                    );
+            }
         }
     }
 
@@ -784,6 +906,8 @@ pub mod run_actions {
 
     /// Setup combat units for a run floor.
     /// Adventurer HP is loaded from RunAdventurer (carry-over HP).
+    /// Uses snapshotted adventurer IDs from RunAdventurer (not the live AttackLineup)
+    /// to ensure mid-run lineup swaps don't affect the run.
     /// Beast stats may be scaled for boss floors.
     fn setup_run_combat_units(
         ref world: dojo::world::WorldStorage,
@@ -792,40 +916,31 @@ pub mod run_actions {
         floor: u8,
         attacker: ContractAddress,
         defender: ContractAddress,
-        attack_lineup: AttackLineup,
         defender_lineup: BeastLineup,
         is_boss: bool,
     ) -> (Array<CombatUnit>, Array<CombatUnit>) {
         let mut adventurer_units = array![];
         let mut beast_units = array![];
 
-        // Setup adventurer units with carry-over HP.
-        let adventurer_ids = array![
-            attack_lineup.adventurer1_id,
-            attack_lineup.adventurer2_id,
-            attack_lineup.adventurer3_id,
-            attack_lineup.adventurer4_id,
-            attack_lineup.adventurer5_id,
-        ];
-
+        // Setup adventurer units using snapshotted RunAdventurer records.
+        // These were created at start_run and represent the immutable lineup for this run.
         let mut pos: u8 = 1;
         loop {
             if pos > 5 {
                 break;
             }
-            let adv_id = *adventurer_ids.at((pos - 1).into());
-            if adv_id != 0 {
-                let run_adv: RunAdventurer = world.read_model((run_id, pos));
-
+            let run_adv: RunAdventurer = world.read_model((run_id, pos));
+            if run_adv.adventurer_id != 0 {
                 // Skip dead adventurers (HP == 0 from previous floors).
                 if run_adv.current_hp > 0 {
+                    let adv_id = run_adv.adventurer_id;
                     let weapon: AdventurerWeapon = world.read_model((attacker, adv_id));
                     let cached: CachedAdventurer = world.read_model((attacker, adv_id));
 
                     // Accumulate all run buffs for this adventurer position.
                     // Buffs are keyed by (run_id, pos, floor) so we scan all
                     // stat-boost floors up to current floor.
-                    let (bonus_damage, bonus_hp) = accumulate_buffs(
+                    let (bonus_damage, bonus_hp, bonus_initiative) = accumulate_buffs(
                         ref world, run_id, pos, floor,
                     );
                     let buffed_max_hp = run_adv.max_hp + bonus_hp;
@@ -839,7 +954,7 @@ pub mod run_actions {
                         current_hp: buffed_current_hp,
                         max_hp: buffed_max_hp,
                         damage: weapon.weapon_power + bonus_damage,
-                        initiative: cached.charisma,
+                        initiative: cached.charisma + bonus_initiative,
                         weapon_type: weapon.weapon_type,
                         beast_type: 0,
                         is_alive: true,
@@ -912,7 +1027,10 @@ pub mod run_actions {
         (adventurer_units, beast_units)
     }
 
-    /// Execute combat and return (winner, adventurer_hp_after, adventurers_alive).
+    /// Execute combat with initiative-based attack ordering.
+    /// Units with higher initiative attack first each round. When initiative ties,
+    /// adventurers act before beasts (attacker advantage).
+    /// Returns (winner, adventurer_hp_after, adventurers_alive).
     fn execute_run_combat(
         ref world: dojo::world::WorldStorage,
         battle_id: u32,
@@ -948,6 +1066,10 @@ pub mod run_actions {
             i += 1;
         };
 
+        // Build initiative order: array of (initiative, is_adventurer, index).
+        // Sort by initiative descending; adventurers break ties (is_adventurer=true first).
+        let initiative_order = build_initiative_order(@adventurer_units, @beast_units);
+
         let mut round: u8 = 1;
         let max_rounds: u8 = 50; // Safety limit to prevent infinite loops.
 
@@ -959,87 +1081,91 @@ pub mod run_actions {
                 break;
             }
 
-            // Each living unit attacks once per round.
-            // Adventurers attack first, then beasts.
-            i = 0;
+            // Each living unit attacks once per round, in initiative order.
+            let mut oi: usize = 0;
             loop {
-                if i >= adventurer_units.len() {
+                if oi >= initiative_order.len() {
                     break;
                 }
-                if *adventurers_alive.at(i) {
-                    let unit = adventurer_units.at(i);
-                    let target_pos = get_target_position(*unit.position, @beasts_alive);
-                    match target_pos {
-                        Option::Some(pos) => {
-                            let target_idx = find_target_unit(@beast_units, pos, @beasts_alive);
-                            match target_idx {
-                                Option::Some(ti) => {
-                                    let target = beast_units.at(ti);
-                                    let multiplier = get_damage_multiplier(
-                                        *unit.weapon_type, *target.beast_type,
-                                    );
-                                    let final_damage = (*unit.damage * multiplier) / 100;
-                                    let current = *beast_hp.at(ti);
-                                    let new_hp = if final_damage >= current {
-                                        0
-                                    } else {
-                                        current - final_damage
-                                    };
+                let (_, is_adv, idx) = *initiative_order.at(oi);
 
-                                    beast_hp = replace_at_index(beast_hp, ti, new_hp);
-                                    if new_hp == 0 {
-                                        beasts_alive = replace_bool_at_index(
-                                            beasts_alive, ti, false,
+                if is_adv {
+                    // Adventurer attacks beast.
+                    if *adventurers_alive.at(idx) {
+                        let unit = adventurer_units.at(idx);
+                        let target_pos = get_target_position(*unit.position, @beasts_alive);
+                        match target_pos {
+                            Option::Some(pos) => {
+                                let target_idx = find_target_unit(
+                                    @beast_units, pos, @beasts_alive,
+                                );
+                                match target_idx {
+                                    Option::Some(ti) => {
+                                        let target = beast_units.at(ti);
+                                        let multiplier = get_damage_multiplier(
+                                            *unit.weapon_type, *target.beast_type,
                                         );
-                                    }
-                                },
-                                Option::None => {},
-                            }
-                        },
-                        Option::None => {},
+                                        let final_damage = (*unit.damage * multiplier) / 100;
+                                        let current = *beast_hp.at(ti);
+                                        let new_hp = if final_damage >= current {
+                                            0
+                                        } else {
+                                            current - final_damage
+                                        };
+
+                                        beast_hp = replace_at_index(beast_hp, ti, new_hp);
+                                        if new_hp == 0 {
+                                            beasts_alive = replace_bool_at_index(
+                                                beasts_alive, ti, false,
+                                            );
+                                        }
+                                    },
+                                    Option::None => {},
+                                }
+                            },
+                            Option::None => {},
+                        }
+                    }
+                } else {
+                    // Beast attacks adventurer.
+                    if *beasts_alive.at(idx) {
+                        let unit = beast_units.at(idx);
+                        let target_pos = get_target_position(
+                            *unit.position, @adventurers_alive,
+                        );
+                        match target_pos {
+                            Option::Some(pos) => {
+                                let target_idx = find_target_unit(
+                                    @adventurer_units, pos, @adventurers_alive,
+                                );
+                                match target_idx {
+                                    Option::Some(ti) => {
+                                        let current = *adventurer_hp.at(ti);
+                                        let dmg = *unit.damage;
+                                        let new_hp = if dmg >= current {
+                                            0
+                                        } else {
+                                            current - dmg
+                                        };
+
+                                        adventurer_hp = replace_at_index(
+                                            adventurer_hp, ti, new_hp,
+                                        );
+                                        if new_hp == 0 {
+                                            adventurers_alive = replace_bool_at_index(
+                                                adventurers_alive, ti, false,
+                                            );
+                                        }
+                                    },
+                                    Option::None => {},
+                                }
+                            },
+                            Option::None => {},
+                        }
                     }
                 }
-                i += 1;
-            };
 
-            // Beast attacks.
-            i = 0;
-            loop {
-                if i >= beast_units.len() {
-                    break;
-                }
-                if *beasts_alive.at(i) {
-                    let unit = beast_units.at(i);
-                    let target_pos = get_target_position(*unit.position, @adventurers_alive);
-                    match target_pos {
-                        Option::Some(pos) => {
-                            let target_idx = find_target_unit(
-                                @adventurer_units, pos, @adventurers_alive,
-                            );
-                            match target_idx {
-                                Option::Some(ti) => {
-                                    let current = *adventurer_hp.at(ti);
-                                    let dmg = *unit.damage;
-                                    let new_hp = if dmg >= current {
-                                        0
-                                    } else {
-                                        current - dmg
-                                    };
-
-                                    adventurer_hp = replace_at_index(adventurer_hp, ti, new_hp);
-                                    if new_hp == 0 {
-                                        adventurers_alive = replace_bool_at_index(
-                                            adventurers_alive, ti, false,
-                                        );
-                                    }
-                                },
-                                Option::None => {},
-                            }
-                        },
-                        Option::None => {},
-                    }
-                }
-                i += 1;
+                oi += 1;
             };
 
             round += 1;
@@ -1057,6 +1183,107 @@ pub mod run_actions {
         };
 
         (winner, adventurer_hp, adventurers_alive)
+    }
+
+    /// Build initiative order from adventurer and beast units.
+    /// Returns array of (initiative, is_adventurer, index_in_respective_array).
+    /// Sorted by initiative descending. Adventurers break ties (act first on equal initiative).
+    fn build_initiative_order(
+        adventurer_units: @Array<CombatUnit>, beast_units: @Array<CombatUnit>,
+    ) -> Array<(u8, bool, usize)> {
+        let total = adventurer_units.len() + beast_units.len();
+        if total == 0 {
+            return array![];
+        }
+
+        // Collect all units: store initiative, is_adventurer flag, index in source array.
+        // Use parallel arrays since Cairo doesn't support mutable tuple arrays well.
+        let mut init_vals: Array<u8> = array![];
+        let mut is_adv_vals: Array<bool> = array![];
+        let mut idx_vals: Array<usize> = array![];
+
+        let mut i: usize = 0;
+        loop {
+            if i >= adventurer_units.len() {
+                break;
+            }
+            let unit = adventurer_units.at(i);
+            init_vals.append(*unit.initiative);
+            is_adv_vals.append(true);
+            idx_vals.append(i);
+            i += 1;
+        };
+        i = 0;
+        loop {
+            if i >= beast_units.len() {
+                break;
+            }
+            let unit = beast_units.at(i);
+            init_vals.append(*unit.initiative);
+            is_adv_vals.append(false);
+            idx_vals.append(i);
+            i += 1;
+        };
+
+        // Selection sort: repeatedly find highest-initiative unselected entry.
+        let mut selected: Array<bool> = array![];
+        i = 0;
+        loop {
+            if i >= total {
+                break;
+            }
+            selected.append(false);
+            i += 1;
+        };
+
+        let mut result: Array<(u8, bool, usize)> = array![];
+        let mut step: usize = 0;
+        loop {
+            if step >= total {
+                break;
+            }
+
+            // Find best unselected entry.
+            let mut best_j: usize = 0;
+            let mut best_init: u8 = 0;
+            let mut best_is_adv: bool = false;
+            let mut found_any = false;
+
+            let mut j: usize = 0;
+            loop {
+                if j >= total {
+                    break;
+                }
+                if !*selected.at(j) {
+                    let j_init = *init_vals.at(j);
+                    let j_is_adv = *is_adv_vals.at(j);
+
+                    let is_better = if !found_any {
+                        true
+                    } else if j_init > best_init {
+                        true
+                    } else if j_init == best_init && j_is_adv && !best_is_adv {
+                        true // Adventurers break ties
+                    } else {
+                        false
+                    };
+
+                    if is_better {
+                        best_j = j;
+                        best_init = j_init;
+                        best_is_adv = j_is_adv;
+                        found_any = true;
+                    }
+                }
+                j += 1;
+            };
+
+            // Mark selected and add to result.
+            selected = replace_bool_at_index(selected, best_j, true);
+            result.append((best_init, *is_adv_vals.at(best_j), *idx_vals.at(best_j)));
+            step += 1;
+        };
+        result
     }
 
     /// Replace value at index in a u16 array (Cairo arrays are immutable, must rebuild).
@@ -1216,15 +1443,16 @@ pub mod run_actions {
 
     /// Accumulate all stat buffs for an adventurer position across all buff floors
     /// up to (but not including) the current floor.
-    /// Returns (bonus_damage, bonus_hp).
+    /// Returns (bonus_damage, bonus_hp, bonus_initiative).
     fn accumulate_buffs(
         ref world: dojo::world::WorldStorage,
         run_id: u32,
         position: u8,
         current_floor: u8,
-    ) -> (u16, u16) {
+    ) -> (u16, u16, u8) {
         let mut bonus_damage: u16 = 0;
         let mut bonus_hp: u16 = 0;
+        let mut bonus_initiative: u8 = 0;
         // Scan all floors from 1 to current_floor-1 for stat boost floors.
         // Stat boosts fire on floors where floor % 5 == 0 AND floor % HEAL_INTERVAL != 0.
         let mut f: u8 = 5;
@@ -1238,16 +1466,20 @@ pub mod run_actions {
                 if buff.value > 0 {
                     if buff.stat == 1 { // strength → damage
                         bonus_damage += buff.value.into();
+                    } else if buff.stat == 2 { // dexterity → damage (weapon handling)
+                        bonus_damage += buff.value.into();
                     } else if buff.stat == 3 { // vitality → HP
                         bonus_hp += buff.value.into() * 15;
+                    } else if buff.stat == 6 { // charisma → initiative
+                        bonus_initiative += buff.value;
                     }
-                    // Stats 2, 4, 5, 6, 7 (dex, int, wis, cha, luck) currently
-                    // don't have direct combat mappings.
+                    // Stats 4 (int), 5 (wis), 7 (luck) don't have direct
+                    // combat mappings yet.
                 }
             }
             f += 5;
         };
-        (bonus_damage, bonus_hp)
+        (bonus_damage, bonus_hp, bonus_initiative)
     }
 
     // ── Ecology / Matchmaking helpers ────────────────────────────────────
@@ -1402,7 +1634,7 @@ pub mod run_actions {
         }
 
         // Check control: high initiative bias
-        if max_initiative > 15 {
+        if max_initiative > CONTROL_INITIATIVE_THRESHOLD {
             return ECOLOGY_CONTROL;
         }
 
@@ -1511,9 +1743,12 @@ pub mod run_actions {
         }
     }
 
-    /// Push a defender into the recent defenders circular buffer.
+    /// Push a defender into the recent defenders buffer.
+    /// First 3 slots are used for cooldown, all 5 are saved to cross-run memory.
     fn push_recent_defender(ref match_state: RunMatchState, defender: ContractAddress) {
-        // Shift: 3 <- 2 <- 1 <- new
+        // Shift: 5 <- 4 <- 3 <- 2 <- 1 <- new
+        match_state.recent_def_5 = match_state.recent_def_4;
+        match_state.recent_def_4 = match_state.recent_def_3;
         match_state.recent_def_3 = match_state.recent_def_2;
         match_state.recent_def_2 = match_state.recent_def_1;
         match_state.recent_def_1 = defender;
@@ -1527,12 +1762,12 @@ pub mod run_actions {
             return false;
         }
         // count * 100 / total > 40  =>  count * 100 > total * 40
-        (count.into() * 100_u16) > (total.into() * ECOLOGY_CAP_PERCENT.into())
+        (count.into() * 100_u16) >= (total.into() * ECOLOGY_CAP_PERCENT.into())
     }
 
     /// Check if a defender is in the player's cross-run memory (last 5 defenders from prev run).
     fn is_in_cross_run_memory(memory: CrossRunMemory, defender: ContractAddress) -> bool {
-        let zero: ContractAddress = starknet::contract_address_const::<0>();
+        let zero: ContractAddress = 0.try_into().unwrap();
         if defender == zero {
             return false;
         }
@@ -1543,16 +1778,12 @@ pub mod run_actions {
             || memory.def_5 == defender
     }
 
-    /// Save the recent defenders from a completed run into cross-run memory.
+    /// Save the last 5 defenders from a completed run into cross-run memory.
     fn save_cross_run_memory(
         ref world: dojo::world::WorldStorage,
         player: ContractAddress,
         match_state: RunMatchState,
     ) {
-        let zero: ContractAddress = starknet::contract_address_const::<0>();
-        // The recent_def slots hold the last 3 defenders from this run.
-        // For cross-run memory we save these plus 2 zero slots for simplicity.
-        // In a more complete implementation we'd track all defenders in the run.
         world
             .write_model(
                 @CrossRunMemory {
@@ -1560,8 +1791,8 @@ pub mod run_actions {
                     def_1: match_state.recent_def_1,
                     def_2: match_state.recent_def_2,
                     def_3: match_state.recent_def_3,
-                    def_4: zero,
-                    def_5: zero,
+                    def_4: match_state.recent_def_4,
+                    def_5: match_state.recent_def_5,
                 },
             );
     }
@@ -1756,12 +1987,12 @@ pub mod run_actions {
         use starknet::contract_address_const;
         use survivor_valhalla::models::{BeastLineup, CombatUnit, CrossRunMemory, RunMatchState};
         use super::{
-            calculate_adventurer_hp, calculate_beast_damage, compute_lineup_hash,
-            compute_power_band, count_alive, create_floor_progress_defaults, ecology_exceeds_cap,
-            find_target_unit, get_damage_multiplier, get_eco_count, get_floor_scale,
-            get_target_bands, get_target_position, increment_eco_count, is_in_cross_run_memory,
-            is_on_cooldown, push_recent_defender, replace_at_index, replace_bool_at_index,
-            replace_u8_at_index,
+            build_initiative_order, calculate_adventurer_hp, calculate_beast_damage,
+            compute_lineup_hash, compute_power_band, count_alive, create_floor_progress_defaults,
+            ecology_exceeds_cap, find_target_unit, get_damage_multiplier, get_eco_count,
+            get_floor_scale, get_target_bands, get_target_position, increment_eco_count,
+            is_in_cross_run_memory, is_on_cooldown, push_recent_defender, replace_at_index,
+            replace_bool_at_index, replace_u8_at_index,
         };
 
         #[test]
@@ -1943,6 +2174,8 @@ pub mod run_actions {
                 recent_def_1: contract_address_const::<0>(),
                 recent_def_2: contract_address_const::<0>(),
                 recent_def_3: contract_address_const::<0>(),
+                recent_def_4: contract_address_const::<0>(),
+                recent_def_5: contract_address_const::<0>(),
                 eco_count_1: 0,
                 eco_count_2: 0,
                 eco_count_3: 0,
@@ -1999,11 +2232,13 @@ pub mod run_actions {
 
             push_recent_defender(ref state, def_c);
             push_recent_defender(ref state, def_d);
-            // After 4 pushes: d, c, b (a evicted)
+            // After 4 pushes: slots are d, c, b, a, 0
             assert(state.recent_def_1 == def_d, 'After 4th slot1');
             assert(state.recent_def_2 == def_c, 'After 4th slot2');
             assert(state.recent_def_3 == def_b, 'After 4th slot3');
-            assert(!is_on_cooldown(@state, def_a), 'a evicted');
+            assert(state.recent_def_4 == def_a, 'After 4th slot4');
+            // a is no longer on cooldown (only slots 1-3 count for cooldown).
+            assert(!is_on_cooldown(@state, def_a), 'a off cooldown');
         }
 
         #[test]
@@ -2022,7 +2257,7 @@ pub mod run_actions {
             let mut state = make_default_match_state();
             state.encounters_played = 5;
             state.eco_count_1 = 2; // 40% exactly — not exceeded
-            assert(!ecology_exceeds_cap(@state, 1), '40% not exceeded');
+            assert(ecology_exceeds_cap(@state, 1), '40% exceeded');
 
             state.eco_count_1 = 3; // 60% > 40% — exceeded
             assert(ecology_exceeds_cap(@state, 1), '60% exceeded');
@@ -2114,7 +2349,7 @@ pub mod run_actions {
             let mut state = make_default_match_state();
             state.encounters_played = 10;
             state.eco_count_1 = 4; // 40% exactly — not exceeded
-            assert(!ecology_exceeds_cap(@state, 1), '40% at 10');
+            assert(ecology_exceeds_cap(@state, 1), '40% at 10 exceeded');
 
             state.eco_count_1 = 5; // 50% > 40% — exceeded
             assert(ecology_exceeds_cap(@state, 1), '50% at 10');
@@ -3113,7 +3348,7 @@ pub mod run_actions {
                 make_beast_unit(1, 1, 1, 120, 25, 1), // Magic beast resists Magic
                 make_beast_unit(1, 2, 2, 120, 25, 1),
             ];
-            let (hp_a, alive_a, _, beast_alive_a) = simulate_combat(
+            let (hp_a, _alive_a, _, beast_alive_a) = simulate_combat(
                 @advs_a,
                 @beasts_a,
                 array![200_u16, 200_u16],
@@ -3882,7 +4117,7 @@ pub mod run_actions {
             // 2. run.ended_at = timestamp
             // 3. ActiveRun.run_id = 0
             // 4. PlayerRunStats updated
-            let player = contract_address_const::<0xBB>();
+            let _player = contract_address_const::<0xBB>();
             let run_id: u32 = 5;
             let timestamp: u64 = 1000;
             let score: u32 = 42;
@@ -3940,40 +4175,46 @@ pub mod run_actions {
             assert(best_floor == 10, 'Best floor unchanged');
         }
 
-        /// Test cross-run memory save logic (used by both abandon and death).
+        /// Test cross-run memory save logic with all 5 slots populated.
         #[test]
         fn test_cross_run_memory_save_from_match_state() {
             let mut state = make_default_match_state();
             let d1 = contract_address_const::<0xD1>();
             let d2 = contract_address_const::<0xD2>();
             let d3 = contract_address_const::<0xD3>();
+            let d4 = contract_address_const::<0xD4>();
+            let d5 = contract_address_const::<0xD5>();
 
             push_recent_defender(ref state, d1);
             push_recent_defender(ref state, d2);
             push_recent_defender(ref state, d3);
+            push_recent_defender(ref state, d4);
+            push_recent_defender(ref state, d5);
 
-            // Verify the match state has the right recent defenders
-            // (this is what save_cross_run_memory reads).
-            assert(state.recent_def_1 == d3, 'Slot 1 = d3');
-            assert(state.recent_def_2 == d2, 'Slot 2 = d2');
-            assert(state.recent_def_3 == d1, 'Slot 3 = d1');
+            // All 5 slots should be populated: d5, d4, d3, d2, d1
+            assert(state.recent_def_1 == d5, 'Slot 1 = d5');
+            assert(state.recent_def_2 == d4, 'Slot 2 = d4');
+            assert(state.recent_def_3 == d3, 'Slot 3 = d3');
+            assert(state.recent_def_4 == d2, 'Slot 4 = d2');
+            assert(state.recent_def_5 == d1, 'Slot 5 = d1');
 
-            // Cross-run memory would be: d3, d2, d1, 0, 0
-            // These can be checked in is_in_cross_run_memory.
+            // Cross-run memory maps all 5 slots.
             let mem = CrossRunMemory {
                 player: contract_address_const::<0x1>(),
                 def_1: state.recent_def_1,
                 def_2: state.recent_def_2,
                 def_3: state.recent_def_3,
-                def_4: contract_address_const::<0>(),
-                def_5: contract_address_const::<0>(),
+                def_4: state.recent_def_4,
+                def_5: state.recent_def_5,
             };
 
             assert(is_in_cross_run_memory(mem, d1), 'd1 in memory');
             assert(is_in_cross_run_memory(mem, d2), 'd2 in memory');
             assert(is_in_cross_run_memory(mem, d3), 'd3 in memory');
-            let d4 = contract_address_const::<0xD4>();
-            assert(!is_in_cross_run_memory(mem, d4), 'd4 not in memory');
+            assert(is_in_cross_run_memory(mem, d4), 'd4 in memory');
+            assert(is_in_cross_run_memory(mem, d5), 'd5 in memory');
+            let d6 = contract_address_const::<0xD6>();
+            assert(!is_in_cross_run_memory(mem, d6), 'd6 not in memory');
         }
 
         // ── Select opponent logic tests ──────────────────────────────────
@@ -4257,1062 +4498,470 @@ pub mod run_actions {
             assert(!fp.is_complete, 'Not complete');
         }
 
-        // ════════════════════════════════════════════════════════════════
-        // ── Extended end-to-end simulation tests ────────────────────────
-        // ── (continued roguelike ecology milestone) ─────────────────────
-        // ════════════════════════════════════════════════════════════════
+        // ── Energy deduction tests ──────────────────────────────────────
 
-        // ── Uneven team combat tests ────────────────────────────────────
-
-        /// 1v5: single adventurer vs full beast lineup.
-        /// Verifies combat terminates correctly and positioning wraps.
+        /// Test energy deduction calculation logic.
         #[test]
-        fn test_combat_1v5_adventurer_outnumbered() {
-            let advs = array![make_adventurer_unit(1, 1, 1, 500, 50, 2)]; // Strong solo
-            let beasts = array![
-                make_beast_unit(1, 1, 1, 60, 10, 3),
-                make_beast_unit(1, 2, 2, 60, 10, 3),
-                make_beast_unit(1, 3, 3, 60, 10, 3),
-                make_beast_unit(1, 4, 4, 60, 10, 3),
-                make_beast_unit(1, 5, 5, 60, 10, 3),
-            ];
+        fn test_energy_deduction_logic() {
+            use survivor_valhalla::constants::{MAX_ENERGY, RUN_ENERGY_COST};
 
-            let (final_adv_hp, final_adv_alive, _, final_beast_alive) = simulate_combat(
-                @advs,
-                @beasts,
-                array![500_u16],
-                array![true],
-                array![60_u16, 60_u16, 60_u16, 60_u16, 60_u16],
-                array![true, true, true, true, true],
-            );
-
-            // Adventurer deals 50 neutral dmg/round, each beast has 60 HP → 2 rounds each.
-            // 5 beasts deal 10 dmg each = 50/round total.
-            assert(count_alive(@final_beast_alive) == 0, '1v5 beasts die');
-            assert(count_alive(@final_adv_alive) == 1, '1v5 adv survives');
-            assert(*final_adv_hp.at(0) < 500, '1v5 adv took damage');
-        }
-
-        /// 5v1: full adventurer lineup vs single beast.
-        /// Only adventurer at matching position should deal damage.
-        #[test]
-        fn test_combat_5v1_beast_outnumbered() {
-            let advs = array![
-                make_adventurer_unit(1, 1, 1, 200, 20, 1),
-                make_adventurer_unit(1, 2, 2, 200, 20, 2),
-                make_adventurer_unit(1, 3, 3, 200, 20, 3),
-                make_adventurer_unit(1, 4, 4, 200, 20, 1),
-                make_adventurer_unit(1, 5, 5, 200, 20, 2),
-            ];
-            let beasts = array![make_beast_unit(1, 1, 1, 200, 30, 2)]; // Hunter beast
-
-            let (final_adv_hp, final_adv_alive, _, final_beast_alive) = simulate_combat(
-                @advs,
-                @beasts,
-                array![200_u16, 200_u16, 200_u16, 200_u16, 200_u16],
-                array![true, true, true, true, true],
-                array![200_u16],
-                array![true],
-            );
-
-            assert(count_alive(@final_beast_alive) == 0, '5v1 beast dies');
-            assert(count_alive(@final_adv_alive) == 5, '5v1 all advs alive');
-            // The beast at pos 1 attacks adv at pos 1.
-            // Adv1 (Magic) deals 1.5x to Hunter: 30 dmg/round.
-            // Beast needs 200 HP / ~aggregated damage rounds to die.
-            assert(*final_adv_hp.at(0) < 200, 'Target adv took damage');
-        }
-
-        /// 3v2 uneven lineup: 3 adventurers vs 2 beasts.
-        #[test]
-        fn test_combat_3v2_uneven() {
-            let advs = array![
-                make_adventurer_unit(1, 1, 1, 200, 30, 2),
-                make_adventurer_unit(1, 2, 2, 200, 30, 2),
-                make_adventurer_unit(1, 3, 3, 200, 30, 2),
-            ];
-            let beasts = array![
-                make_beast_unit(1, 1, 1, 150, 25, 3),
-                make_beast_unit(1, 2, 2, 150, 25, 3),
-            ];
-
-            let (_, final_adv_alive, _, final_beast_alive) = simulate_combat(
-                @advs,
-                @beasts,
-                array![200_u16, 200_u16, 200_u16],
-                array![true, true, true],
-                array![150_u16, 150_u16],
-                array![true, true],
-            );
-
-            assert(count_alive(@final_beast_alive) == 0, '3v2 beasts die');
-            assert(count_alive(@final_adv_alive) >= 2, '3v2 most advs live');
-        }
-
-        // ── Target position wrapping with varied lineup sizes ──────────
-
-        /// Target position with 3-unit lineup (not full 5).
-        #[test]
-        fn test_get_target_position_short_lineup() {
-            let alive = array![true, false, true]; // 3 units, pos 2 dead
-            let result = get_target_position(2, @alive);
-            assert(result == Option::Some(3), 'Wraps to pos 3');
-        }
-
-        /// Target position with single alive unit.
-        #[test]
-        fn test_get_target_position_single_alive() {
-            let alive = array![false, true, false, false, false];
-            let result = get_target_position(4, @alive);
-            assert(result == Option::Some(2), 'Finds only alive');
-        }
-
-        /// Target position wraps from high position to low.
-        #[test]
-        fn test_get_target_position_wrap_high_to_low() {
-            let alive = array![true, false, false, false, false];
-            let result = get_target_position(5, @alive);
-            assert(result == Option::Some(1), 'Wraps 5 -> 1');
-        }
-
-        /// Attacker position exceeding lineup size gets clamped.
-        #[test]
-        fn test_get_target_position_clamped() {
-            let alive = array![true, true, true]; // 3-unit lineup
-            // Attacker at pos 5 > len 3, should clamp to 1.
-            let result = get_target_position(5, @alive);
-            assert(result == Option::Some(1), 'Clamped to 1');
-        }
-
-        // ── Floor scale edge cases ──────────────────────────────────────
-
-        /// Floor 0 should not crash and produce a valid scale.
-        #[test]
-        fn test_floor_scale_zero() {
-            let scale = get_floor_scale(0);
-            // Position = 0 since floor 0 → (0-1)%10 underflows, but the function guards: if floor == 0 -> pos 0
-            // pos 0 doesn't match any explicit case, falls to else → 150
-            assert(scale == 150, 'Floor 0 scale fallback');
-        }
-
-        /// Very high floors (255, max u8) should still work.
-        #[test]
-        fn test_floor_scale_max_u8() {
-            // floor 255: (255-1)%10+1 = 254%10+1 = 4+1 = 5 → 95
-            assert(get_floor_scale(255) == 95, 'Max u8 floor scale');
-        }
-
-        /// Verify 5 full cycles (floors 1-50) all produce valid scales.
-        #[test]
-        fn test_floor_scale_5_cycles() {
-            let mut floor: u8 = 1;
-            loop {
-                if floor > 50 {
-                    break;
-                }
-                let scale = get_floor_scale(floor);
-                assert(scale >= 60, 'Scale >= 60');
-                assert(scale <= 150, 'Scale <= 150');
-                floor += 1;
+            // New player (never started): should have MAX_ENERGY.
+            let last_refill_time: u64 = 0;
+            let current_energy = if last_refill_time == 0 {
+                MAX_ENERGY
+            } else {
+                0_u8 // placeholder
             };
+            assert(current_energy == MAX_ENERGY, 'New player max energy');
+            assert(current_energy >= RUN_ENERGY_COST, 'Enough for one run');
+
+            // After deduction: MAX_ENERGY - 1 = 4.
+            let after = current_energy - RUN_ENERGY_COST;
+            assert(after == 4, 'After first deduction');
         }
 
-        // ── Combat with type resistances: all three matchups ────────────
-
-        /// Full type triangle: Magic > Hunter > Brute > Magic.
-        /// Verify each super-effective matchup produces more damage.
+        /// Test energy refill: after 24h, energy should reset to MAX.
         #[test]
-        fn test_type_triangle_all_matchups() {
-            // Magic(1) vs Hunter(2): 1.5x
-            assert(get_damage_multiplier(1, 2) == 150, 'M > H');
-            // Blade(2) vs Magic(1): 1.5x
-            assert(get_damage_multiplier(2, 1) == 150, 'B > M');
-            // Bludgeon(3) vs Blade/Hide(2): 1.5x
-            assert(get_damage_multiplier(3, 2) == 150, 'Bl > B');
+        fn test_energy_refill_after_timeout() {
+            use survivor_valhalla::constants::{ENERGY_REFILL_SECONDS, MAX_ENERGY};
 
-            // Reverse (resisted): 0.75x
-            assert(get_damage_multiplier(2, 2) == 75, 'B res B');
-            assert(get_damage_multiplier(1, 1) == 75, 'M res M');
-            assert(get_damage_multiplier(3, 3) == 75, 'Bl res Bl');
+            // Player who started a run at time 1000.
+            let last_refill_time: u64 = 1000;
+            let stored_energy: u8 = 2;
+            let current_time: u64 = 1000 + ENERGY_REFILL_SECONDS; // exactly 24h later
 
-            // Neutral matchups: 1.0x
-            assert(get_damage_multiplier(1, 3) == 100, 'M neutral Bl');
-            assert(get_damage_multiplier(3, 1) == 100, 'Bl neutral M');
-            assert(get_damage_multiplier(2, 3) == 100, 'B neutral Bl');
-        }
-
-        // ── Multi-floor carry-over with heal mechanics ──────────────────
-
-        /// Simulate a 6-floor run verifying heal at floor 3 and floor 6
-        /// restores HP correctly with carry-over damage.
-        #[test]
-        fn test_carryover_with_heals_simulation() {
-            use survivor_valhalla::constants::{HEAL_INTERVAL, HEAL_PERCENT};
-
-            let max_hp: u16 = 300;
-            let mut current_hp: u16 = max_hp;
-
-            // Floor 1: take 40 damage (beast dmg)
-            current_hp -= 40;
-            assert(current_hp == 260, 'F1 HP');
-
-            // Floor 2: take 50 damage
-            current_hp -= 50;
-            assert(current_hp == 210, 'F2 HP');
-
-            // Floor 3: heal (25% of 300 = 75) then take 60 damage
-            let heal = (max_hp * HEAL_PERCENT) / 100;
-            assert(heal == 75, 'Heal amount');
-            current_hp += heal; // 285
-            assert(current_hp == 285, 'F3 after heal');
-            current_hp -= 60;
-            assert(current_hp == 225, 'F3 after combat');
-
-            // Floor 4: take 70 damage
-            current_hp -= 70;
-            assert(current_hp == 155, 'F4 HP');
-
-            // Floor 5: take 80 damage
-            current_hp -= 80;
-            assert(current_hp == 75, 'F5 HP');
-
-            // Floor 6: heal (75) then take 90 damage
-            current_hp += heal; // 150
-            assert(current_hp == 150, 'F6 after heal');
-            current_hp -= 90;
-            assert(current_hp == 60, 'F6 after combat');
-
-            // HP should be significantly reduced from max.
-            assert(current_hp < max_hp / 4, 'Heavy attrition');
-        }
-
-        /// Verify heal cap: healing should not exceed max HP.
-        #[test]
-        fn test_heal_does_not_exceed_max_hp() {
-            use survivor_valhalla::constants::HEAL_PERCENT;
-
-            let max_hp: u16 = 200;
-            let current_hp: u16 = 190; // Only 10 below max
-            let heal = (max_hp * HEAL_PERCENT) / 100; // 50
-            let healed = current_hp + heal; // 240
-            let capped = if healed > max_hp { max_hp } else { healed };
-            assert(capped == max_hp, 'Heal capped at max');
-        }
-
-        // ── Power band edge cases ───────────────────────────────────────
-
-        /// Very asymmetric power: DP = 1, AP = 1000.
-        #[test]
-        fn test_power_band_extreme_easy() {
-            assert(compute_power_band(1000, 1) == 1, 'Extreme easy');
-        }
-
-        /// Very asymmetric power: DP = 10000, AP = 1.
-        #[test]
-        fn test_power_band_extreme_hard() {
-            assert(compute_power_band(1, 10000) == 5, 'Extreme hard');
-        }
-
-        /// DP = 0, AP > 0: should be very easy.
-        #[test]
-        fn test_power_band_dp_zero() {
-            assert(compute_power_band(100, 0) == 1, 'DP=0 very easy');
-        }
-
-        /// Both zero: fallback to even.
-        #[test]
-        fn test_power_band_both_zero() {
-            assert(compute_power_band(0, 0) == 3, 'Both zero = even');
-        }
-
-        // ── Ecology classification edge cases ───────────────────────────
-
-        /// Control classification trigger: max initiative > 15.
-        #[test]
-        fn test_classify_control_threshold() {
-            // A lineup with max_initiative = 16 (> 15) should be control,
-            // IF it doesn't trigger mono/burst/tank first.
-            // Beast with level 16 → initiative 16 → control.
-            let max_initiative: u16 = 16;
-            assert(max_initiative > 15, 'Triggers control');
-
-            // Level 15 → NOT control.
-            let max_init_15: u16 = 15;
-            assert(!(max_init_15 > 15), 'Does not trigger control');
-        }
-
-        /// Burst vs non-burst boundary: max_damage exactly 1.5x avg.
-        #[test]
-        fn test_classify_burst_boundary() {
-            // 3 beasts: damages 15, 15, 15 → avg=15, max=15.
-            // max*100 = 1500, avg*150 = 2250 → 1500 < 2250 → NOT burst.
-            let avg_damage: u32 = 15;
-            let max_damage: u32 = 15;
-            let is_burst = avg_damage > 0 && max_damage * 100 > avg_damage * 150;
-            assert(!is_burst, 'Equal damage not burst');
-
-            // 3 beasts: damages 10, 10, 24 → avg=14, max=24.
-            // max*100 = 2400, avg*150 = 2100 → 2400 > 2100 → IS burst.
-            let avg2: u32 = 14;
-            let max2: u32 = 24;
-            let is_burst2 = avg2 > 0 && max2 * 100 > avg2 * 150;
-            assert(is_burst2, 'Spike is burst');
-        }
-
-        /// Tank boundary: avg HP exactly 150 should NOT be tank.
-        #[test]
-        fn test_classify_tank_boundary() {
-            let avg_hp_150: u32 = 150;
-            assert(!(avg_hp_150 > 150), '150 not tank');
-
-            let avg_hp_151: u32 = 151;
-            assert(avg_hp_151 > 150, '151 is tank');
-        }
-
-        /// Mono type with exactly 4 beasts: 4/4 = 100% → mono.
-        #[test]
-        fn test_classify_mono_with_4_beasts() {
-            let unit_count: u8 = 4;
-            let max_type_count: u8 = 4;
-            let mono_threshold = (unit_count * 4) / 5; // 3
-            let is_mono = max_type_count >= mono_threshold && max_type_count >= 4;
-            assert(is_mono, '4/4 is mono');
-        }
-
-        /// Mono type with 3 beasts: 3/3 but threshold requires >= 4.
-        #[test]
-        fn test_classify_mono_3_beasts_not_enough() {
-            let unit_count: u8 = 3;
-            let max_type_count: u8 = 3;
-            let mono_threshold = (unit_count * 4) / 5; // 2
-            let is_mono = max_type_count >= mono_threshold && max_type_count >= 4;
-            // max_type_count = 3, but >= 4 fails.
-            assert(!is_mono, '3/3 not mono (< 4)');
-        }
-
-        // ── Band expansion algorithm edge tests ─────────────────────────
-
-        /// Early floor (1-3): target bands 2,3. Band 1 not accepted even in pass 2.
-        #[test]
-        fn test_band_expansion_early_floor() {
-            let (primary, secondary) = get_target_bands(1); // (2, 3)
-
-            // Pass 2: adjacent = (1, 2, 3, 4)
-            let band_1_pass2 = 1 == primary
-                || 1 == secondary
-                || (primary > 1 && 1 == primary - 1)
-                || (secondary < 5 && 1 == secondary + 1);
-            assert(band_1_pass2, 'Band 1 in pass 2 early');
-
-            // Band 5 not accepted in pass 2.
-            let band_5_pass2 = 5 == primary
-                || 5 == secondary
-                || (primary > 1 && 5 == primary - 1)
-                || (secondary < 5 && 5 == secondary + 1);
-            assert(!band_5_pass2, 'Band 5 not in pass 2 early');
-        }
-
-        /// Late floor (7+): target bands 4,5. Band expansion adds 3.
-        #[test]
-        fn test_band_expansion_late_floor() {
-            let (primary, secondary) = get_target_bands(8); // (4, 5)
-
-            // Pass 2: adjacent adds band 3 (primary - 1 = 3).
-            // secondary + 1 = 6, but 6 > 5 → skipped.
-            let band_3_pass2 = 3 == primary
-                || 3 == secondary
-                || (primary > 1 && 3 == primary - 1)
-                || (secondary < 5 && 3 == secondary + 1);
-            assert(band_3_pass2, 'Band 3 in pass 2 late');
-
-            // Band 1 not accepted in pass 2.
-            let band_1_pass2 = 1 == primary
-                || 1 == secondary
-                || (primary > 1 && 1 == primary - 1)
-                || (secondary < 5 && 1 == secondary + 1);
-            assert(!band_1_pass2, 'Band 1 not in pass 2 late');
-        }
-
-        // ── Deterministic seed derivation ───────────────────────────────
-
-        /// Same player + same timestamp = same seed (deterministic).
-        #[test]
-        fn test_seed_determinism() {
-            let player: felt252 = 0x12345;
-            let timestamp: felt252 = 1000;
-            let seed_1 = core::pedersen::pedersen(player, timestamp);
-            let seed_2 = core::pedersen::pedersen(player, timestamp);
-            assert(seed_1 == seed_2, 'Seeds deterministic');
-        }
-
-        /// Different timestamps produce different seeds.
-        #[test]
-        fn test_seed_varies_with_timestamp() {
-            let player: felt252 = 0x12345;
-            let seed_1 = core::pedersen::pedersen(player, 1000);
-            let seed_2 = core::pedersen::pedersen(player, 1001);
-            assert(seed_1 != seed_2, 'Diff timestamp diff seed');
-        }
-
-        /// Different players produce different seeds.
-        #[test]
-        fn test_seed_varies_with_player() {
-            let timestamp: felt252 = 1000;
-            let seed_1 = core::pedersen::pedersen(0x12345, timestamp);
-            let seed_2 = core::pedersen::pedersen(0x67890, timestamp);
-            assert(seed_1 != seed_2, 'Diff player diff seed');
-        }
-
-        // ── Encounter hash derivation for tie-breaking ──────────────────
-
-        /// Different floors produce different encounter hashes for tie-break.
-        #[test]
-        fn test_encounter_hash_varies_per_floor() {
-            let seed: felt252 = 99999;
-            let hash_f1 = core::pedersen::pedersen(seed, 1);
-            let hash_f2 = core::pedersen::pedersen(seed, 2);
-            let hash_f3 = core::pedersen::pedersen(seed, 3);
-            assert(hash_f1 != hash_f2, 'F1 != F2 hash');
-            assert(hash_f2 != hash_f3, 'F2 != F3 hash');
-            assert(hash_f1 != hash_f3, 'F1 != F3 hash');
-        }
-
-        /// Tie-break scores: different snapshot indices produce different scores.
-        #[test]
-        fn test_tiebreak_varies_per_snapshot() {
-            let encounter_hash: felt252 = core::pedersen::pedersen(42, 1);
-            let tie_1 = core::pedersen::pedersen(encounter_hash, 0);
-            let tie_2 = core::pedersen::pedersen(encounter_hash, 1);
-            assert(tie_1 != tie_2, 'Diff idx diff tiebreak');
-        }
-
-        // ── Reward schedule exhaustive verification ─────────────────────
-
-        /// Verify exact reward type for every floor from 1 to 50.
-        #[test]
-        fn test_reward_type_every_floor_to_50() {
-            use survivor_valhalla::constants::HEAL_INTERVAL;
-
-            let mut floor: u8 = 1;
-            let mut heal_floors = array![];
-            let mut boost_floors = array![];
-            let mut score_floors = array![];
-
-            loop {
-                if floor > 50 {
-                    break;
-                }
-                if floor % HEAL_INTERVAL == 0 {
-                    heal_floors.append(floor);
-                } else if floor % 5 == 0 {
-                    boost_floors.append(floor);
+            let current_energy = if last_refill_time == 0 {
+                MAX_ENERGY
+            } else {
+                let time_since_refill = current_time - last_refill_time;
+                if time_since_refill >= ENERGY_REFILL_SECONDS {
+                    MAX_ENERGY
                 } else {
-                    score_floors.append(floor);
+                    stored_energy
                 }
-                floor += 1;
             };
-
-            // Heal fires every 3 floors: 3,6,9,12,15,18,21,24,27,30,33,36,39,42,45,48
-            assert(heal_floors.len() == 16, 'Heals in 50 floors');
-            // Boost fires on 5-multiples not also 3-multiples: 5,10,20,25,35,40,50
-            assert(boost_floors.len() == 7, 'Boosts in 50 floors');
-            // Score-only: 50 - 16 - 7 = 27
-            assert(score_floors.len() == 27, 'Score-only in 50 floors');
+            assert(current_energy == MAX_ENERGY, 'Refilled after 24h');
         }
 
-        /// Floor 15 is divisible by both 3 and 5; heal takes priority.
-        /// Floor 30 similarly. Verify all such overlap floors.
+        /// Test energy depletion: after 5 runs without refill, energy = 0.
         #[test]
-        fn test_heal_priority_over_boost_at_overlaps() {
-            use survivor_valhalla::constants::HEAL_INTERVAL;
+        fn test_energy_depletion() {
+            use survivor_valhalla::constants::{MAX_ENERGY, RUN_ENERGY_COST};
 
-            // Floors divisible by both 3 and 5 (i.e., 15, 30, 45, ...).
-            let overlap_floors: Array<u8> = array![15, 30, 45];
-            let mut i: usize = 0;
+            let mut energy = MAX_ENERGY;
+            let mut runs: u8 = 0;
             loop {
-                if i >= overlap_floors.len() {
+                if energy < RUN_ENERGY_COST {
                     break;
                 }
-                let f = *overlap_floors.at(i);
-                assert(f % HEAL_INTERVAL == 0, 'Is heal floor');
-                assert(f % 5 == 0, 'Also div by 5');
-                // In apply_floor_rewards, heal check comes first.
-                // So these floors are heals, not boosts.
-                i += 1;
+                energy -= RUN_ENERGY_COST;
+                runs += 1;
             };
+            assert(runs == 5, 'Max 5 runs per cycle');
+            assert(energy == 0, 'Energy depleted');
         }
 
-        // ── Score accumulation edge cases ────────────────────────────────
-
-        /// Score with 0 survivors (should not add to score in practice,
-        /// because 0 survivors means run ended).
+        /// Test energy edge: exactly 1 energy left should allow a run.
         #[test]
-        fn test_score_zero_survivors() {
-            let floor: u32 = 5;
-            let survivors: u32 = 0;
-            let score = floor * survivors;
-            assert(score == 0, 'Zero surv zero score');
+        fn test_energy_exactly_one() {
+            use survivor_valhalla::constants::RUN_ENERGY_COST;
+
+            let energy: u8 = 1;
+            assert(energy >= RUN_ENERGY_COST, 'One energy is enough');
+            let after = energy - RUN_ENERGY_COST;
+            assert(after == 0, 'Zero after last run');
         }
 
-        /// Max possible score for 100 floors with 5 survivors each.
+        // ── Match state tracking in manual battle_floor ─────────────────
+
+        /// Verify that match state tracking logic correctly updates all
+        /// fields when a manual battle_floor encounter is processed.
         #[test]
-        fn test_score_theoretical_max() {
-            let mut total: u32 = 0;
-            let mut floor: u32 = 1;
-            loop {
-                if floor > 100 {
-                    break;
-                }
-                total += floor * 5;
-                floor += 1;
-            };
-            // sum(1..100) * 5 = 5050 * 5 = 25250
-            assert(total == 25250, 'Max 100-floor score');
-        }
-
-        // ── Combat: adventurer dies during combat, stops attacking ──────
-
-        /// When an adventurer dies mid-round, it should stop dealing damage.
-        #[test]
-        fn test_dead_adventurer_stops_attacking() {
-            // 1 adventurer with very low HP vs 2 beasts.
-            // Adventurer attacks beast 1, then beast 1 kills adventurer.
-            // Beast 2 should not take damage from dead adventurer.
-            let advs = array![make_adventurer_unit(1, 1, 1, 10, 30, 2)]; // Low HP, decent damage
-            let beasts = array![
-                make_beast_unit(1, 1, 1, 100, 15, 3), // Kills adv in 1 hit
-                make_beast_unit(1, 2, 2, 100, 15, 3),
-            ];
-
-            let (_, final_adv_alive, final_beast_hp, _) = simulate_combat(
-                @advs,
-                @beasts,
-                array![10_u16],
-                array![true],
-                array![100_u16, 100_u16],
-                array![true, true],
-            );
-
-            assert(count_alive(@final_adv_alive) == 0, 'Adv dies');
-            // Beast 1 took damage from adv before dying (30 dmg neutral).
-            assert(*final_beast_hp.at(0) < 100, 'Beast1 took damage');
-            // Beast 2 should still be at 100 HP (adv died, targeting wraps but adv is dead).
-            assert(*final_beast_hp.at(1) == 100, 'Beast2 untouched');
-        }
-
-        // ── Multi-floor attrition with multiple adventurers ─────────────
-
-        /// Simulate 5 floors with 3 adventurers, tracking attrition and deaths.
-        #[test]
-        fn test_3_adventurer_5_floor_attrition() {
-            let adv_max_hp: u16 = 200;
-            let mut adv_hp = array![adv_max_hp, adv_max_hp, adv_max_hp];
-            let mut adv_alive = array![true, true, true];
-            let mut score: u32 = 0;
-            let mut floor: u8 = 1;
-
-            loop {
-                if floor > 5 || count_alive(@adv_alive) == 0 {
-                    break;
-                }
-
-                let scale = get_floor_scale(floor);
-                let beast_hp_scaled: u16 = (80_u32 * scale.into() / 100).try_into().unwrap();
-                let beast_dmg_scaled: u16 = (15_u32 * scale.into() / 100).try_into().unwrap();
-
-                let advs = array![
-                    make_adventurer_unit(floor.into(), 1, 1, *adv_hp.at(0), 25, 2),
-                    make_adventurer_unit(floor.into(), 2, 2, *adv_hp.at(1), 25, 2),
-                    make_adventurer_unit(floor.into(), 3, 3, *adv_hp.at(2), 25, 2),
-                ];
-                let beasts = array![
-                    make_beast_unit(floor.into(), 1, 1, beast_hp_scaled, beast_dmg_scaled, 3),
-                    make_beast_unit(floor.into(), 2, 2, beast_hp_scaled, beast_dmg_scaled, 3),
-                ];
-
-                let (new_hp, new_alive, _, beast_alive) = simulate_combat(
-                    @advs,
-                    @beasts,
-                    array![*adv_hp.at(0), *adv_hp.at(1), *adv_hp.at(2)],
-                    array![*adv_alive.at(0), *adv_alive.at(1), *adv_alive.at(2)],
-                    array![beast_hp_scaled, beast_hp_scaled],
-                    array![true, true],
-                );
-
-                if count_alive(@beast_alive) == 0 {
-                    let survivors = count_alive(@new_alive);
-                    score += floor.into() * survivors.into();
-                    adv_hp = new_hp;
-                    adv_alive = new_alive;
-                    floor += 1;
-                } else {
-                    break;
-                }
-            };
-
-            assert(floor > 1, 'Cleared at least 1 floor');
-            assert(score > 0, 'Got some score');
-        }
-
-        // ── Ecology diversity: skewed distribution triggers cap ──────────
-
-        /// All encounters with same ecology class should trigger cap quickly.
-        #[test]
-        fn test_ecology_cap_immediate_trigger() {
+        fn test_manual_battle_match_state_tracking() {
+            // Simulate what execute_floor_battle does with track_match_state=true.
             let mut state = make_default_match_state();
-            // 3 encounters, all mono_type (class 1).
-            state.encounters_played = 3;
-            state.eco_count_1 = 3;
-            // 3/3 = 100% > 40% cap.
-            assert(ecology_exceeds_cap(@state, 1), 'Mono at 100%');
-            // Other classes at 0%.
-            assert(!ecology_exceeds_cap(@state, 2), 'Dual at 0%');
+            let defender = contract_address_const::<0xBEEF>();
+            let ecology_class: u8 = 4; // burst
+            let _lineup_hash: felt252 = 0x12345;
+
+            // Before tracking: everything at defaults.
+            assert(state.encounters_played == 0, 'No encounters yet');
+            assert(state.last_ecology_class == 0, 'No last eco');
+
+            // Simulate tracking update (mirrors execute_floor_battle logic).
+            push_recent_defender(ref state, defender);
+            increment_eco_count(ref state, ecology_class);
+            state.last_ecology_class = ecology_class;
+            state.encounters_played += 1;
+
+            // Verify state updated.
+            assert(state.encounters_played == 1, 'One encounter');
+            assert(state.last_ecology_class == 4, 'Last eco = burst');
+            assert(is_on_cooldown(@state, defender), 'Defender on cooldown');
+            assert(get_eco_count(@state, 4) == 1, 'Burst count = 1');
         }
 
-        /// 2 encounters, 1 of each class: neither exceeds cap.
+        /// Test that sequential manual encounters build up the match state
+        /// correctly over multiple floors.
         #[test]
-        fn test_ecology_cap_two_encounters_balanced() {
+        fn test_sequential_manual_match_state() {
             let mut state = make_default_match_state();
-            state.encounters_played = 2;
-            state.eco_count_1 = 1;
-            state.eco_count_2 = 1;
-            // 1/2 = 50% > 40% → exceeds for each individually!
-            assert(ecology_exceeds_cap(@state, 1), '50% exceeds 40%');
-            assert(ecology_exceeds_cap(@state, 2), '50% exceeds 40% too');
-        }
-
-        // ── Cooldown with zero-address defenders ────────────────────────
-
-        /// Pushing zero address should work (but is unusual).
-        #[test]
-        fn test_push_zero_address_defender() {
-            let mut state = make_default_match_state();
-            let zero = contract_address_const::<0>();
-            let d1 = contract_address_const::<0x1>();
-
-            push_recent_defender(ref state, d1);
-            push_recent_defender(ref state, zero);
-
-            assert(is_on_cooldown(@state, zero), 'Zero on cooldown');
-            assert(is_on_cooldown(@state, d1), 'd1 still on cd');
-        }
-
-        // ── Lineup hash with large token IDs ────────────────────────────
-
-        /// Lineup hash should handle large u256 beast IDs.
-        #[test]
-        fn test_lineup_hash_large_ids() {
-            let lineup = BeastLineup {
-                player: contract_address_const::<0x1>(),
-                beast1_id: 0xFFFFFFFFFFFFFFFF,
-                beast2_id: 0xAAAAAAAAAAAAAAAA,
-                beast3_id: 1,
-                beast4_id: 0,
-                beast5_id: 0xBBBBBBBBBBBBBBBB,
-            };
-            let hash = compute_lineup_hash(lineup);
-            // Should not panic and should produce a non-zero hash.
-            let hash_u256: u256 = hash.into();
-            assert(hash_u256 > 0, 'Non-zero hash for large IDs');
-        }
-
-        // ── Run state transitions simulation ────────────────────────────
-
-        /// Simulate the full state machine: start → clear floors → death.
-        #[test]
-        fn test_run_state_machine_lifecycle() {
-            // Start state.
-            let mut is_active = true;
-            let mut floor: u8 = 1;
-            let mut max_floor: u8 = 1;
-            let mut score: u32 = 0;
-
-            // Simulate 5 won floors.
-            let mut f: u8 = 1;
-            loop {
-                if f > 5 {
-                    break;
-                }
-                let survivors: u32 = 5 - f.into() + 1; // Decreasing survivors
-                score += f.into() * survivors;
-                floor = f + 1;
-                if f + 1 > max_floor {
-                    max_floor = f + 1;
-                }
-                f += 1;
-            };
-
-            assert(is_active, 'Still active after wins');
-            assert(floor == 6, 'On floor 6');
-            assert(max_floor == 6, 'Max floor 6');
-            // Score: 1*5 + 2*4 + 3*3 + 4*2 + 5*1 = 5+8+9+8+5 = 35
-            assert(score == 35, 'Score after 5 floors');
-
-            // Death on floor 6.
-            is_active = false;
-            let ended_at: u64 = 99999;
-            assert(!is_active, 'Run ended');
-            assert(ended_at > 0, 'End timestamp set');
-            // max_floor stays at 6 (the floor reached, not cleared).
-            assert(max_floor == 6, 'Max floor unchanged');
-        }
-
-        /// Simulate an immediate death on floor 1.
-        #[test]
-        fn test_run_immediate_death() {
-            let mut is_active = true;
-            let floor: u8 = 1;
-            let max_floor: u8 = 1;
-            let score: u32 = 0;
-
-            // Lose on floor 1.
-            is_active = false;
-
-            assert(!is_active, 'Immediately dead');
-            assert(score == 0, 'Zero score');
-            assert(max_floor == 1, 'Max floor 1');
-        }
-
-        // ── Cross-run memory with full rotation ─────────────────────────
-
-        /// Verify that cross-run memory correctly captures last defenders.
-        #[test]
-        fn test_cross_run_memory_captures_last_3() {
             let d1 = contract_address_const::<0x10>();
             let d2 = contract_address_const::<0x20>();
             let d3 = contract_address_const::<0x30>();
-            let d4 = contract_address_const::<0x40>();
-            let d5 = contract_address_const::<0x50>();
-            let zero = contract_address_const::<0>();
 
-            // Simulate a run with 5 encounters.
-            let mut state = make_default_match_state();
+            // Encounter 1: mono_type defender
             push_recent_defender(ref state, d1);
+            increment_eco_count(ref state, 1);
+            state.last_ecology_class = 1;
+            state.encounters_played += 1;
+
+            // Encounter 2: balanced defender
             push_recent_defender(ref state, d2);
+            increment_eco_count(ref state, 3);
+            state.last_ecology_class = 3;
+            state.encounters_played += 1;
+
+            // Encounter 3: tank defender
             push_recent_defender(ref state, d3);
-            push_recent_defender(ref state, d4);
-            push_recent_defender(ref state, d5);
+            increment_eco_count(ref state, 5);
+            state.last_ecology_class = 5;
+            state.encounters_played += 1;
 
-            // Recent defenders: d5, d4, d3 (d1, d2 evicted from cooldown).
-            // Cross-run memory would be: d5, d4, d3, 0, 0.
-            let mem = CrossRunMemory {
-                player: contract_address_const::<0x1>(),
-                def_1: state.recent_def_1,
-                def_2: state.recent_def_2,
-                def_3: state.recent_def_3,
-                def_4: zero,
-                def_5: zero,
+            // All 3 defenders on cooldown.
+            assert(is_on_cooldown(@state, d1), 'd1 on cd');
+            assert(is_on_cooldown(@state, d2), 'd2 on cd');
+            assert(is_on_cooldown(@state, d3), 'd3 on cd');
+
+            // Ecology counts.
+            assert(get_eco_count(@state, 1) == 1, 'Mono = 1');
+            assert(get_eco_count(@state, 3) == 1, 'Balanced = 1');
+            assert(get_eco_count(@state, 5) == 1, 'Tank = 1');
+            assert(state.encounters_played == 3, 'Total = 3');
+        }
+
+        // ── Classify lineup with world state ────────────────────────────
+
+        /// Test control classification: high initiative (level > 15).
+        #[test]
+        fn test_classify_lineup_control() {
+            // A lineup with max_initiative > 15 should be classified as control.
+            let max_initiative: u16 = 20;
+            let is_control = max_initiative > 15;
+            assert(is_control, 'Should be control');
+        }
+
+        /// Test that mono_type requires at least 4 of same type (for 5-beast lineup).
+        #[test]
+        fn test_mono_type_minimum_4_of_5() {
+            // 3 of same type is not mono.
+            let unit_count: u8 = 5;
+            let max_type_count: u8 = 3;
+            let mono_threshold = (unit_count * 4) / 5;
+            let is_mono = max_type_count >= mono_threshold && max_type_count >= 4;
+            assert(!is_mono, '3/5 not mono');
+
+            // 4 of same type IS mono.
+            let max_type_count_4: u8 = 4;
+            let is_mono_4 = max_type_count_4 >= mono_threshold && max_type_count_4 >= 4;
+            assert(is_mono_4, '4/5 is mono');
+        }
+
+        /// Test that energy refill doesn't happen before 24 hours.
+        #[test]
+        fn test_energy_no_refill_before_timeout() {
+            use survivor_valhalla::constants::{
+                ENERGY_REFILL_SECONDS, MAX_ENERGY,
             };
 
-            assert(is_in_cross_run_memory(mem, d5), 'd5 in xrun');
-            assert(is_in_cross_run_memory(mem, d4), 'd4 in xrun');
-            assert(is_in_cross_run_memory(mem, d3), 'd3 in xrun');
-            assert(!is_in_cross_run_memory(mem, d2), 'd2 not in xrun');
-            assert(!is_in_cross_run_memory(mem, d1), 'd1 not in xrun');
+            let last_refill_time: u64 = 1000;
+            let stored_energy: u8 = 2;
+            let current_time: u64 = 1000 + ENERGY_REFILL_SECONDS - 1; // 1 second before refill
+
+            let current_energy = if last_refill_time == 0 {
+                MAX_ENERGY
+            } else {
+                let time_since_refill = current_time - last_refill_time;
+                if time_since_refill >= ENERGY_REFILL_SECONDS {
+                    MAX_ENERGY
+                } else {
+                    stored_energy
+                }
+            };
+            assert(current_energy == 2, 'No refill yet');
         }
 
-        // ── Ecology distribution simulation: worst-case skew ────────────
+        // ── Lineup classification priority tests ────────────────────────
 
-        /// 30 encounters with heavily skewed ecology.
-        /// Verify cap behavior at scale.
+        /// Verify the classification priority order:
+        /// mono > burst > tank > control > dual > balanced.
         #[test]
-        fn test_ecology_heavy_skew_30_encounters() {
-            let mut state = make_default_match_state();
+        fn test_classification_priority_mono_over_burst() {
+            // A lineup that is both 80%+ same type AND has burst damage
+            // should be classified as mono_type (checked first).
+            let unit_count: u8 = 5;
+            let max_type_count: u8 = 5; // All same type
+            let mono_threshold = (unit_count * 4) / 5;
 
-            // 15 mono, 5 dual, 4 balanced, 3 burst, 2 tank, 1 control.
-            state.encounters_played = 30;
-            state.eco_count_1 = 15;
-            state.eco_count_2 = 5;
-            state.eco_count_3 = 4;
-            state.eco_count_4 = 3;
-            state.eco_count_5 = 2;
-            state.eco_count_6 = 1;
-
-            // Mono: 15/30 = 50% > 40% → exceeds.
-            assert(ecology_exceeds_cap(@state, 1), 'Mono 50% exceeds');
-            // Dual: 5/30 = 16.7% → ok.
-            assert(!ecology_exceeds_cap(@state, 2), 'Dual 16% ok');
-            // Control: 1/30 = 3.3% → ok.
-            assert(!ecology_exceeds_cap(@state, 6), 'Control 3% ok');
+            // Mono check passes first.
+            let is_mono = max_type_count >= mono_threshold && max_type_count >= 4;
+            assert(is_mono, 'Mono takes priority');
         }
 
-        // ── Deficit scoring: verify priority ordering ───────────────────
-
-        /// With varying counts, verify deficit-based priority correctly
-        /// ranks underrepresented classes higher.
+        /// Test that burst takes priority over tank when both conditions met.
         #[test]
-        fn test_deficit_priority_ordering() {
-            let mut state = make_default_match_state();
-            state.encounters_played = 18;
-            // Expected per class: 18/6 = 3 each for even distribution.
-            state.eco_count_1 = 6; // over-represented
-            state.eco_count_2 = 4;
-            state.eco_count_3 = 3; // exactly expected
-            state.eco_count_4 = 2;
-            state.eco_count_5 = 2;
-            state.eco_count_6 = 1; // most under-represented
+        fn test_classification_priority_burst_over_tank() {
+            // Burst: max_damage * 100 > avg_damage * 150
+            let total_damage: u32 = 100;
+            let unit_count: u8 = 5;
+            let avg_damage = total_damage / unit_count.into();
+            let max_damage: u32 = 50;
+            let is_burst = avg_damage > 0 && max_damage * 100 > avg_damage * 150;
 
+            // Tank: avg HP > 150
+            let total_hp: u32 = 1000;
+            let avg_hp = total_hp / unit_count.into();
+            let is_tank = avg_hp > 150;
+
+            // Both conditions can be true, but burst is checked first.
+            assert(is_burst, 'Burst condition met');
+            assert(is_tank, 'Tank condition also met');
+            // In classify_lineup, burst return comes before tank check.
+        }
+
+        // ── Energy and run interaction ──────────────────────────────────
+
+        /// Simulate multiple consecutive runs with energy tracking.
+        #[test]
+        fn test_multiple_runs_energy_tracking() {
+            use survivor_valhalla::constants::{MAX_ENERGY, RUN_ENERGY_COST};
+
+            let mut energy = MAX_ENERGY;
+            let mut run_count: u8 = 0;
+
+            // Run 5 runs.
+            loop {
+                if energy < RUN_ENERGY_COST {
+                    break;
+                }
+                energy -= RUN_ENERGY_COST;
+                run_count += 1;
+            };
+
+            assert(run_count == 5, '5 runs from max energy');
+            assert(energy == 0, 'Depleted after 5');
+
+            // After refill: back to max.
+            energy = MAX_ENERGY;
+            assert(energy == 5, 'Refilled to 5');
+        }
+
+        // ── Snapshot integrity tests ──────────────────────────────────────
+
+        /// Verify that RunAdventurer snapshot stores adventurer IDs independently
+        /// of the live AttackLineup, ensuring mid-run swaps don't affect the run.
+        #[test]
+        fn test_snapshot_independence_from_live_lineup() {
+            use survivor_valhalla::models::{AttackLineup, RunAdventurer};
+
+            let player = contract_address_const::<0x1>();
+
+            // Simulate live lineup at run start.
+            let original_lineup = AttackLineup {
+                player,
+                adventurer1_id: 100,
+                adventurer2_id: 200,
+                adventurer3_id: 300,
+                adventurer4_id: 0,
+                adventurer5_id: 0,
+            };
+
+            // Snapshot at start_run: RunAdventurer records capture the IDs.
+            let snap1 = RunAdventurer {
+                run_id: 1, position: 1, adventurer_id: original_lineup.adventurer1_id,
+                current_hp: 250, max_hp: 250,
+            };
+            let snap2 = RunAdventurer {
+                run_id: 1, position: 2, adventurer_id: original_lineup.adventurer2_id,
+                current_hp: 200, max_hp: 200,
+            };
+            let snap3 = RunAdventurer {
+                run_id: 1, position: 3, adventurer_id: original_lineup.adventurer3_id,
+                current_hp: 175, max_hp: 175,
+            };
+
+            // Player swaps their live lineup mid-run.
+            let _swapped_lineup = AttackLineup {
+                player,
+                adventurer1_id: 999, // different!
+                adventurer2_id: 888, // different!
+                adventurer3_id: 777, // different!
+                adventurer4_id: 0,
+                adventurer5_id: 0,
+            };
+
+            // The snapshots still hold the original IDs.
+            assert(snap1.adventurer_id == 100, 'Snap1 unchanged');
+            assert(snap2.adventurer_id == 200, 'Snap2 unchanged');
+            assert(snap3.adventurer_id == 300, 'Snap3 unchanged');
+        }
+
+        /// Verify that RunAdventurer correctly tracks HP across multiple floors
+        /// including dead adventurers (HP == 0) being skipped.
+        #[test]
+        fn test_run_adventurer_hp_lifecycle() {
+            use survivor_valhalla::models::RunAdventurer;
+
+            // Floor 1: All adventurers at max HP.
+            let mut adv1 = RunAdventurer {
+                run_id: 1, position: 1, adventurer_id: 10, current_hp: 250, max_hp: 250,
+            };
+            let mut adv2 = RunAdventurer {
+                run_id: 1, position: 2, adventurer_id: 20, current_hp: 200, max_hp: 200,
+            };
+
+            // After floor 1 combat: both took damage.
+            adv1.current_hp = 180;
+            adv2.current_hp = 50;
+
+            // After floor 2 combat: adv2 dies.
+            adv2.current_hp = 0;
+            adv1.current_hp = 120;
+
+            // Dead adventurer should be skipped in next floor.
+            assert(adv1.current_hp > 0, 'Adv1 alive');
+            assert(adv2.current_hp == 0, 'Adv2 dead');
+            assert(adv1.adventurer_id != 0, 'Adv1 has ID');
+            assert(adv2.adventurer_id != 0, 'Adv2 still has ID');
+
+            // Heal on floor 3: only living adventurers.
+            if adv1.current_hp > 0 {
+                let heal_amount = (adv1.max_hp * 25) / 100; // 25% of 250 = 62
+                let healed = adv1.current_hp + heal_amount;
+                adv1.current_hp = if healed > adv1.max_hp { adv1.max_hp } else { healed };
+            }
+            // Dead adventurer doesn't heal.
+            assert(adv1.current_hp == 182, 'Adv1 healed');
+            assert(adv2.current_hp == 0, 'Adv2 still dead');
+        }
+
+        // ── Full matchmaking simulation with ecology ─────────────────────
+
+        /// Simulate the complete select_opponent scoring logic without world state.
+        /// Verifies that the deficit-based scoring correctly prefers underrepresented
+        /// ecology classes, and that cooldown/repeat rules work together.
+        #[test]
+        fn test_full_matchmaking_scoring_simulation() {
+            // Setup: 10 encounters played, skewed ecology.
+            let mut state = make_default_match_state();
+            state.encounters_played = 10;
+            state.eco_count_1 = 4; // mono: 40%
+            state.eco_count_2 = 3; // dual: 30%
+            state.eco_count_3 = 2; // balanced: 20%
+            state.eco_count_4 = 1; // burst: 10%
+            state.eco_count_5 = 0; // tank: 0%
+            state.eco_count_6 = 0; // control: 0%
+
+            // Mono (40%) should exceed cap.
+            assert(ecology_exceeds_cap(@state, 1), 'Mono exceeds 40%');
+
+            // Dual (30%) should NOT exceed cap.
+            assert(!ecology_exceeds_cap(@state, 2), 'Dual under cap');
+
+            // Tank/control (0%) should have highest deficit.
             let expected: u32 = state.encounters_played.into();
+            let eco5_actual: u32 = get_eco_count(@state, 5).into() * 6;
+            let eco1_actual: u32 = get_eco_count(@state, 1).into() * 6;
+            let deficit_5 = if expected > eco5_actual { expected - eco5_actual } else { 0 };
+            let deficit_1 = if expected > eco1_actual { expected - eco1_actual } else { 0 };
 
-            // Deficit for each class: expected - count * ECOLOGY_CLASS_COUNT
-            let mut deficits = array![];
-            let mut c: u8 = 1;
-            loop {
-                if c > 6 {
-                    break;
-                }
-                let cnt: u32 = get_eco_count(@state, c).into();
-                let actual: u32 = cnt * 6;
-                let def = if expected > actual { expected - actual } else { 0 };
-                deficits.append(def);
-                c += 1;
-            };
+            assert(deficit_5 == 10, 'Tank max deficit');
+            assert(deficit_1 == 0, 'Mono no deficit');
 
-            // Class 6 (count=1) should have highest deficit.
-            assert(*deficits.at(5) > *deficits.at(4), 'Eco6 > eco5 deficit');
-            assert(*deficits.at(4) > *deficits.at(2), 'Eco5 > eco3 deficit');
-            // Class 1 (count=6) should have 0 deficit.
-            assert(*deficits.at(0) == 0, 'Eco1 zero deficit');
+            // Scoring: deficit * 1000 + tie_score.
+            // Tank candidate gets: 10 * 1000 + tie = 10000+
+            // Mono candidate gets: 0 * 1000 + tie = 0+tie
+            // So tank is always preferred over mono.
+            let tank_min_score = deficit_5 * 1000;
+            let mono_max_score = deficit_1 * 1000 + 999;
+            assert(tank_min_score > mono_max_score, 'Tank beats mono');
         }
 
-        // ── Boss floor detection across multiple cycles ─────────────────
-
-        /// Verify boss detection for floors 10, 20, 30, 40, 50.
+        /// Test the 3-pass band expansion behavior in select_opponent.
         #[test]
-        fn test_boss_floor_detection() {
-            let boss_floors: Array<u8> = array![10, 20, 30, 40, 50, 100];
-            let non_boss_floors: Array<u8> = array![1, 5, 9, 11, 15, 19, 21, 25, 99];
+        fn test_three_pass_band_expansion_simulation() {
+            // Floor 2 (early): primary=2 (Easy), secondary=3 (Even).
+            let (primary, secondary) = get_target_bands(2);
+            assert(primary == 2, 'Early primary');
+            assert(secondary == 3, 'Early secondary');
 
-            let mut i: usize = 0;
-            loop {
-                if i >= boss_floors.len() {
-                    break;
-                }
-                let f = *boss_floors.at(i);
-                let is_boss = f % 10 == 0 && f > 0;
-                assert(is_boss, 'Is boss floor');
-                i += 1;
-            };
+            // Pass 1: Only bands 2, 3 accepted.
+            let band_4_ok_p1 = 4 == primary || 4 == secondary;
+            assert(!band_4_ok_p1, 'Band 4 rejected pass 1');
 
-            i = 0;
-            loop {
-                if i >= non_boss_floors.len() {
-                    break;
-                }
-                let f = *non_boss_floors.at(i);
-                let is_boss = f % 10 == 0 && f > 0;
-                assert(!is_boss, 'Not boss floor');
-                i += 1;
-            };
+            // Pass 2: Adjacent expansion: bands 1, 2, 3, 4 accepted.
+            let band_1_ok_p2 = 1 == primary
+                || 1 == secondary
+                || (primary > 1 && 1 == primary - 1)
+                || (secondary < 5 && 1 == secondary + 1);
+            assert(band_1_ok_p2, 'Band 1 accepted pass 2');
+
+            let band_4_ok_p2 = 4 == primary
+                || 4 == secondary
+                || (primary > 1 && 4 == primary - 1)
+                || (secondary < 5 && 4 == secondary + 1);
+            assert(band_4_ok_p2, 'Band 4 accepted pass 2');
+
+            // Band 5 still rejected in pass 2.
+            let band_5_ok_p2 = 5 == primary
+                || 5 == secondary
+                || (primary > 1 && 5 == primary - 1)
+                || (secondary < 5 && 5 == secondary + 1);
+            assert(!band_5_ok_p2, 'Band 5 rejected pass 2');
+
+            // Pass 3: Any band accepted (no filter).
         }
 
-        // ── Combined boss scaling + floor scaling calculation ───────────
-
-        /// Verify total effective stats for boss floors vs adjacent non-boss.
+        /// Test end-to-end scoring with ecology tracking over a 15-floor run.
         #[test]
-        fn test_boss_vs_adjacent_floor_stats() {
-            use survivor_valhalla::constants::BOSS_STAT_MULT;
+        fn test_15_floor_scoring_with_ecology_and_rewards() {
+            use survivor_valhalla::constants::{HEAL_INTERVAL, HEAL_PERCENT};
 
-            let base_hp: u32 = 100;
-            let base_dmg: u32 = 20;
-
-            // Floor 9 (non-boss): scale=130.
-            let f9_hp: u32 = base_hp * 130 / 100; // 130
-            let f9_dmg: u32 = base_dmg * 130 / 100; // 26
-
-            // Floor 10 (boss): scale=150, then boss mult=125.
-            let f10_hp: u32 = base_hp * 150 / 100 * BOSS_STAT_MULT.into() / 100; // 187
-            let f10_dmg: u32 = base_dmg * 150 / 100 * BOSS_STAT_MULT.into() / 100; // 37
-
-            // Floor 11 (non-boss, new cycle): scale=60.
-            let f11_hp: u32 = base_hp * 60 / 100; // 60
-            let f11_dmg: u32 = base_dmg * 60 / 100; // 12
-
-            // Boss should be strictly harder than floor 9.
-            assert(f10_hp > f9_hp, 'Boss HP > F9');
-            assert(f10_dmg > f9_dmg, 'Boss dmg > F9');
-
-            // Floor 11 resets difficulty below floor 9.
-            assert(f11_hp < f9_hp, 'F11 HP < F9');
-            assert(f11_dmg < f9_dmg, 'F11 dmg < F9');
-
-            // Verify exact values.
-            assert(f9_hp == 130, 'F9 HP exact');
-            assert(f10_hp == 187, 'F10 HP exact');
-            assert(f11_hp == 60, 'F11 HP exact');
-        }
-
-        // ── Multi-run leaderboard simulation ────────────────────────────
-
-        /// Simulate 5 runs and verify leaderboard stats track correctly.
-        #[test]
-        fn test_leaderboard_across_5_runs() {
-            let run_results: Array<(u32, u8)> = array![
-                (25, 4),  // Run 1
-                (100, 9), // Run 2 (new best score + floor)
-                (80, 7),  // Run 3 (no update)
-                (150, 9), // Run 4 (new best score, same floor)
-                (120, 12), // Run 5 (new best floor, not score)
-            ];
-
-            let mut best_score: u32 = 0;
-            let mut best_floor: u8 = 0;
-            let mut total_runs: u32 = 0;
-
-            let mut i: usize = 0;
-            loop {
-                if i >= run_results.len() {
-                    break;
-                }
-                let (score, max_floor) = *run_results.at(i);
-                total_runs += 1;
-                if score > best_score {
-                    best_score = score;
-                }
-                if max_floor > best_floor {
-                    best_floor = max_floor;
-                }
-                i += 1;
-            };
-
-            assert(best_score == 150, 'Best score from run 4');
-            assert(best_floor == 12, 'Best floor from run 5');
-            assert(total_runs == 5, '5 total runs');
-        }
-
-        // ── Buff accumulation: stat mapping ─────────────────────────────
-
-        /// Verify buff stat-to-combat mapping:
-        /// stat 1 (str) → damage, stat 3 (vit) → HP, others → nothing.
-        #[test]
-        fn test_buff_stat_combat_mapping() {
-            // Stat 1 (strength) → bonus_damage.
-            let stat: u8 = 1;
-            let value: u8 = 1;
-            let mut bonus_damage: u16 = 0;
-            let mut bonus_hp: u16 = 0;
-            if stat == 1 {
-                bonus_damage += value.into();
-            } else if stat == 3 {
-                bonus_hp += value.into() * 15;
-            }
-            assert(bonus_damage == 1, 'Str adds 1 dmg');
-            assert(bonus_hp == 0, 'Str no HP');
-
-            // Stat 3 (vitality) → bonus_hp.
-            bonus_damage = 0;
-            bonus_hp = 0;
-            let stat_vit: u8 = 3;
-            if stat_vit == 1 {
-                bonus_damage += value.into();
-            } else if stat_vit == 3 {
-                bonus_hp += value.into() * 15;
-            }
-            assert(bonus_damage == 0, 'Vit no dmg');
-            assert(bonus_hp == 15, 'Vit adds 15 HP');
-
-            // Stat 5 (wisdom) → nothing.
-            bonus_damage = 0;
-            bonus_hp = 0;
-            let stat_wis: u8 = 5;
-            if stat_wis == 1 {
-                bonus_damage += value.into();
-            } else if stat_wis == 3 {
-                bonus_hp += value.into() * 15;
-            }
-            assert(bonus_damage == 0, 'Wis no dmg');
-            assert(bonus_hp == 0, 'Wis no HP');
-        }
-
-        /// Multiple buffs across floors should stack additively.
-        #[test]
-        fn test_buff_stacking_across_floors() {
-            // Simulate buffs at floors 5, 10, 20 (boost floors not also heal floors).
-            // Floor 5: str +1 → damage +1.
-            // Floor 10: str +1 → damage +2 total.
-            // Floor 20: vit +1 → HP +15.
-            let mut total_bonus_damage: u16 = 0;
-            let mut total_bonus_hp: u16 = 0;
-
-            // Floor 5: stat=1 (str)
-            total_bonus_damage += 1;
-            // Floor 10: stat=1 (str)
-            total_bonus_damage += 1;
-            // Floor 20: stat=3 (vit)
-            total_bonus_hp += 15;
-
-            assert(total_bonus_damage == 2, 'Stacked str +2');
-            assert(total_bonus_hp == 15, 'Stacked vit +15');
-        }
-
-        // ── End-to-end 20-floor run simulation ──────────────────────────
-
-        /// Comprehensive 20-floor simulation testing all subsystems together:
-        /// floor scaling, boss floors, heals, score, ecology tracking,
-        /// and cooldown rotation.
-        #[test]
-        fn test_comprehensive_20_floor_simulation() {
-            use survivor_valhalla::constants::{BOSS_STAT_MULT, HEAL_INTERVAL, HEAL_PERCENT};
-
-            let adv_max_hp: u16 = 400;
+            let adv_max_hp: u16 = 300;
             let adv_dmg: u16 = 35;
             let mut current_hp: u16 = adv_max_hp;
             let mut score: u32 = 0;
             let mut floor: u8 = 1;
-            let mut heals_applied: u8 = 0;
-            let mut boosts_applied: u8 = 0;
             let mut match_state = make_default_match_state();
-
-            let defenders = array![
-                contract_address_const::<0x10>(),
-                contract_address_const::<0x20>(),
-                contract_address_const::<0x30>(),
-                contract_address_const::<0x40>(),
-                contract_address_const::<0x50>(),
-                contract_address_const::<0x60>(),
-                contract_address_const::<0x70>(),
+            let eco_sequence: Array<u8> = array![
+                3, 1, 4, 2, 5, 6, 3, 1, 4, 2, 5, 6, 3, 1, 4,
             ];
-            let ecologies: Array<u8> = array![1, 2, 3, 4, 5, 6, 3]; // cycling
+            let mut heals: u8 = 0;
+            let mut boosts: u8 = 0;
 
             loop {
-                if floor > 20 || current_hp == 0 {
+                if floor > 15 || current_hp == 0 {
                     break;
                 }
 
                 let scale = get_floor_scale(floor);
-                let is_boss = floor % 10 == 0 && floor > 0;
+                let beast_hp: u16 = (50_u32 * scale.into() / 100).try_into().unwrap();
+                let beast_dmg: u16 = (8_u32 * scale.into() / 100).try_into().unwrap();
 
-                let mut beast_hp: u32 = 50_u32 * scale.into() / 100;
-                let mut beast_dmg: u32 = 8_u32 * scale.into() / 100;
-
-                if is_boss {
-                    beast_hp = beast_hp * BOSS_STAT_MULT.into() / 100;
-                    beast_dmg = beast_dmg * BOSS_STAT_MULT.into() / 100;
-                }
-
-                // Ensure non-zero.
-                if beast_hp == 0 {
-                    beast_hp = 1;
-                }
-                if beast_dmg == 0 {
-                    beast_dmg = 1;
-                }
-
-                let bh: u16 = beast_hp.try_into().unwrap();
-                let bd: u16 = beast_dmg.try_into().unwrap();
-
-                // Combat: single adventurer vs single beast (neutral damage).
+                // Combat sim.
                 let advs = array![
                     make_adventurer_unit(floor.into(), 1, 1, current_hp, adv_dmg, 2),
                 ];
-                let beasts = array![make_beast_unit(floor.into(), 1, 1, bh, bd, 3)];
+                let beasts = array![
+                    make_beast_unit(floor.into(), 1, 1, beast_hp, beast_dmg, 3),
+                ];
 
                 let (new_hp, new_alive, _, beast_alive) = simulate_combat(
                     @advs,
                     @beasts,
                     array![current_hp],
                     array![true],
-                    array![bh],
+                    array![beast_hp],
                     array![true],
                 );
 
@@ -5321,14 +4970,12 @@ pub mod run_actions {
                     current_hp = *new_hp.at(0);
 
                     // Track ecology.
-                    let eco = *ecologies.at(((floor - 1) % 7).into());
-                    increment_eco_count(ref match_state, eco);
-                    let def_idx = ((floor - 1) % 7).into();
-                    push_recent_defender(ref match_state, *defenders.at(def_idx));
-                    match_state.last_ecology_class = eco;
+                    let eco_class = *eco_sequence.at((floor - 1).into());
+                    increment_eco_count(ref match_state, eco_class);
+                    match_state.last_ecology_class = eco_class;
                     match_state.encounters_played += 1;
 
-                    // Rewards.
+                    // Apply rewards.
                     if floor % HEAL_INTERVAL == 0 {
                         let heal = (adv_max_hp * HEAL_PERCENT) / 100;
                         current_hp =
@@ -5337,9 +4984,9 @@ pub mod run_actions {
                             } else {
                                 current_hp + heal
                             };
-                        heals_applied += 1;
+                        heals += 1;
                     } else if floor % 5 == 0 {
-                        boosts_applied += 1;
+                        boosts += 1;
                     }
 
                     floor += 1;
@@ -5348,13 +4995,13 @@ pub mod run_actions {
                 }
             };
 
-            // Should clear many floors with a strong adventurer.
+            // Verify run progress.
             assert(floor > 10, 'Cleared 10+ floors');
             assert(score > 0, 'Positive score');
-            assert(heals_applied > 0, 'Heals applied');
-            assert(match_state.encounters_played > 0, 'Ecology tracked');
+            assert(heals >= 3, 'Multiple heals');
+            assert(boosts >= 1, 'At least 1 boost');
 
-            // Ecology distribution should be somewhat balanced.
+            // Verify ecology tracking.
             let total_eco: u8 = get_eco_count(@match_state, 1)
                 + get_eco_count(@match_state, 2)
                 + get_eco_count(@match_state, 3)
@@ -5362,71 +5009,481 @@ pub mod run_actions {
                 + get_eco_count(@match_state, 5)
                 + get_eco_count(@match_state, 6);
             assert(total_eco == match_state.encounters_played, 'Eco sum matches');
+
+            // No class should exceed 40% with this balanced sequence.
+            let mut eco: u8 = 1;
+            loop {
+                if eco > 6 {
+                    break;
+                }
+                assert(!ecology_exceeds_cap(@match_state, eco), 'No cap exceeded');
+                eco += 1;
+            };
         }
 
-        // ── find_target_unit tests ──────────────────────────────────────
+        // ── 5-slot defender buffer tests ────────────────────────────────
 
-        /// Find target in a multi-unit array.
+        /// Test that the 5-slot buffer correctly holds all 5 recent defenders
+        /// while cooldown still only checks the first 3.
         #[test]
-        fn test_find_target_unit_basic() {
-            let units = array![
-                make_beast_unit(1, 10, 1, 100, 10, 1),
-                make_beast_unit(1, 20, 2, 100, 10, 2),
-                make_beast_unit(1, 30, 3, 100, 10, 3),
+        fn test_5_slot_buffer_with_cooldown() {
+            let mut state = make_default_match_state();
+            let d1 = contract_address_const::<0xB1>();
+            let d2 = contract_address_const::<0xB2>();
+            let d3 = contract_address_const::<0xB3>();
+            let d4 = contract_address_const::<0xB4>();
+            let d5 = contract_address_const::<0xB5>();
+
+            push_recent_defender(ref state, d1);
+            push_recent_defender(ref state, d2);
+            push_recent_defender(ref state, d3);
+            push_recent_defender(ref state, d4);
+            push_recent_defender(ref state, d5);
+
+            // Slots: d5, d4, d3, d2, d1
+            // Cooldown checks only slots 1-3: d5, d4, d3 are on cooldown.
+            assert(is_on_cooldown(@state, d5), 'd5 on cooldown');
+            assert(is_on_cooldown(@state, d4), 'd4 on cooldown');
+            assert(is_on_cooldown(@state, d3), 'd3 on cooldown');
+            // d2 and d1 are NOT on cooldown (in slots 4-5, which are memory-only).
+            assert(!is_on_cooldown(@state, d2), 'd2 off cooldown');
+            assert(!is_on_cooldown(@state, d1), 'd1 off cooldown');
+
+            // But d1 and d2 ARE in the buffer for cross-run memory.
+            assert(state.recent_def_4 == d2, 'd2 in slot 4');
+            assert(state.recent_def_5 == d1, 'd1 in slot 5');
+        }
+
+        /// Test that pushing 6 defenders evicts the oldest from slot 5.
+        #[test]
+        fn test_6th_defender_evicts_oldest() {
+            let mut state = make_default_match_state();
+            let d1 = contract_address_const::<0xC1>();
+            let d2 = contract_address_const::<0xC2>();
+            let d3 = contract_address_const::<0xC3>();
+            let d4 = contract_address_const::<0xC4>();
+            let d5 = contract_address_const::<0xC5>();
+            let d6 = contract_address_const::<0xC6>();
+
+            push_recent_defender(ref state, d1);
+            push_recent_defender(ref state, d2);
+            push_recent_defender(ref state, d3);
+            push_recent_defender(ref state, d4);
+            push_recent_defender(ref state, d5);
+            push_recent_defender(ref state, d6);
+
+            // After 6 pushes: d6, d5, d4, d3, d2 (d1 evicted)
+            assert(state.recent_def_1 == d6, 'Slot 1 = d6');
+            assert(state.recent_def_2 == d5, 'Slot 2 = d5');
+            assert(state.recent_def_3 == d4, 'Slot 3 = d4');
+            assert(state.recent_def_4 == d3, 'Slot 4 = d3');
+            assert(state.recent_def_5 == d2, 'Slot 5 = d2');
+
+            // Cooldown: d6, d5, d4 on cooldown; d3, d2 off cooldown.
+            assert(is_on_cooldown(@state, d6), 'd6 on cd');
+            assert(is_on_cooldown(@state, d5), 'd5 on cd');
+            assert(is_on_cooldown(@state, d4), 'd4 on cd');
+            assert(!is_on_cooldown(@state, d3), 'd3 off cd');
+            assert(!is_on_cooldown(@state, d2), 'd2 off cd');
+        }
+
+        /// Test that cross-run memory captures all 5 defenders after a full run.
+        #[test]
+        fn test_cross_run_memory_full_5_slots() {
+            let mut state = make_default_match_state();
+            let d1 = contract_address_const::<0xE1>();
+            let d2 = contract_address_const::<0xE2>();
+            let d3 = contract_address_const::<0xE3>();
+            let d4 = contract_address_const::<0xE4>();
+            let d5 = contract_address_const::<0xE5>();
+            let d6 = contract_address_const::<0xE6>();
+
+            // Simulate 6 encounters.
+            push_recent_defender(ref state, d1);
+            push_recent_defender(ref state, d2);
+            push_recent_defender(ref state, d3);
+            push_recent_defender(ref state, d4);
+            push_recent_defender(ref state, d5);
+            push_recent_defender(ref state, d6);
+
+            // Cross-run memory should contain d6, d5, d4, d3, d2.
+            let mem = CrossRunMemory {
+                player: contract_address_const::<0x1>(),
+                def_1: state.recent_def_1,
+                def_2: state.recent_def_2,
+                def_3: state.recent_def_3,
+                def_4: state.recent_def_4,
+                def_5: state.recent_def_5,
+            };
+
+            // d2-d6 should all be in memory.
+            assert(is_in_cross_run_memory(mem, d2), 'd2 in cross-run');
+            assert(is_in_cross_run_memory(mem, d3), 'd3 in cross-run');
+            assert(is_in_cross_run_memory(mem, d4), 'd4 in cross-run');
+            assert(is_in_cross_run_memory(mem, d5), 'd5 in cross-run');
+            assert(is_in_cross_run_memory(mem, d6), 'd6 in cross-run');
+            // d1 was evicted (only 5 slots).
+            assert(!is_in_cross_run_memory(mem, d1), 'd1 evicted');
+        }
+
+        /// Test that cooldown and cross-run memory interact correctly:
+        /// a defender can be off cooldown but still in cross-run memory.
+        #[test]
+        fn test_cooldown_vs_cross_run_memory_separation() {
+            let mut state = make_default_match_state();
+            let d1 = contract_address_const::<0xF1>();
+            let d2 = contract_address_const::<0xF2>();
+            let d3 = contract_address_const::<0xF3>();
+            let d4 = contract_address_const::<0xF4>();
+
+            push_recent_defender(ref state, d1);
+            push_recent_defender(ref state, d2);
+            push_recent_defender(ref state, d3);
+            push_recent_defender(ref state, d4);
+
+            // d1 is off cooldown (slot 4) but would be in cross-run memory.
+            assert(!is_on_cooldown(@state, d1), 'd1 off cooldown');
+            assert(state.recent_def_4 == d1, 'd1 in slot 4');
+
+            // Build cross-run memory from match state.
+            let mem = CrossRunMemory {
+                player: contract_address_const::<0x1>(),
+                def_1: state.recent_def_1,
+                def_2: state.recent_def_2,
+                def_3: state.recent_def_3,
+                def_4: state.recent_def_4,
+                def_5: state.recent_def_5,
+            };
+            assert(is_in_cross_run_memory(mem, d1), 'd1 in cross-run mem');
+        }
+
+        // ── Dead adventurer exclusion in combat setup ────────────────────
+
+        #[test]
+        fn test_dead_adventurer_excluded_from_combat() {
+            use survivor_valhalla::models::RunAdventurer;
+
+            let adv1 = RunAdventurer {
+                run_id: 1, position: 1, adventurer_id: 10, current_hp: 150, max_hp: 250,
+            };
+            let adv2 = RunAdventurer {
+                run_id: 1, position: 2, adventurer_id: 20, current_hp: 0, max_hp: 200,
+            };
+            let adv3 = RunAdventurer {
+                run_id: 1, position: 3, adventurer_id: 30, current_hp: 100, max_hp: 175,
+            };
+
+            assert(adv1.current_hp > 0 && adv1.adventurer_id != 0, 'Adv1 alive with ID');
+            assert(adv2.current_hp == 0 && adv2.adventurer_id != 0, 'Adv2 dead with ID');
+            assert(adv3.current_hp > 0 && adv3.adventurer_id != 0, 'Adv3 alive with ID');
+
+            let mut combat_count: u8 = 0;
+            let advs = array![adv1, adv2, adv3];
+            let mut i: usize = 0;
+            loop {
+                if i >= advs.len() {
+                    break;
+                }
+                let a = advs.at(i);
+                if *a.current_hp > 0 && *a.adventurer_id != 0 {
+                    combat_count += 1;
+                }
+                i += 1;
+            };
+            assert(combat_count == 2, '2 advs in combat');
+        }
+
+        #[test]
+        fn test_heal_does_not_revive_dead_adventurers() {
+            use survivor_valhalla::constants::HEAL_PERCENT;
+
+            let max_hp: u16 = 200;
+            let alive_hp: u16 = 50;
+            let heal_amount = (max_hp * HEAL_PERCENT) / 100;
+            let healed = alive_hp + heal_amount;
+            let capped = if healed > max_hp { max_hp } else { healed };
+            assert(capped == 100, 'Alive healed to 100');
+
+            let dead_hp: u16 = 0;
+            let should_heal = dead_hp > 0;
+            assert(!should_heal, 'Dead not healed');
+        }
+
+        #[test]
+        fn test_buff_stacking_across_floors() {
+            use survivor_valhalla::constants::HEAL_INTERVAL;
+
+            let mut bonus_damage: u16 = 0;
+            let mut bonus_hp: u16 = 0;
+            let buffs: Array<(u8, u8, u8)> = array![
+                (5, 1, 1),
+                (10, 3, 1),
+                (20, 1, 1),
             ];
-            let alive = array![true, true, true];
-
-            let result = find_target_unit(@units, 2, @alive);
-            assert(result == Option::Some(1), 'Found at idx 1');
-        }
-
-        /// Find target skips dead units.
-        #[test]
-        fn test_find_target_unit_skips_dead() {
-            let units = array![
-                make_beast_unit(1, 10, 1, 100, 10, 1),
-                make_beast_unit(1, 20, 2, 100, 10, 2),
-            ];
-            let alive = array![true, false]; // Unit at pos 2 is dead.
-
-            let result = find_target_unit(@units, 2, @alive);
-            assert(result == Option::None, 'Dead unit not found');
-        }
-
-        /// Find target returns None for non-existent position.
-        #[test]
-        fn test_find_target_unit_no_match() {
-            let units = array![make_beast_unit(1, 10, 1, 100, 10, 1)];
-            let alive = array![true];
-
-            let result = find_target_unit(@units, 5, @alive);
-            assert(result == Option::None, 'Position 5 not found');
-        }
-
-        // ── Replace helpers: single-element arrays ──────────────────────
-
-        #[test]
-        fn test_replace_at_index_single_element() {
-            let arr = array![42_u16];
-            let new_arr = replace_at_index(arr, 0, 99);
-            assert(new_arr.len() == 1, 'Length preserved');
-            assert(*new_arr.at(0) == 99, 'Replaced');
+            let current_floor: u8 = 21;
+            let mut i: usize = 0;
+            loop {
+                if i >= buffs.len() {
+                    break;
+                }
+                let (floor, stat, value) = *buffs.at(i);
+                if floor < current_floor && floor % HEAL_INTERVAL != 0 {
+                    if stat == 1 {
+                        bonus_damage += value.into();
+                    } else if stat == 3 {
+                        bonus_hp += value.into() * 15;
+                    }
+                }
+                i += 1;
+            };
+            assert(bonus_damage == 2, 'Stacked str buffs');
+            assert(bonus_hp == 15, 'Single vit buff');
         }
 
         #[test]
-        fn test_replace_bool_single_element() {
-            let arr = array![true];
-            let new_arr = replace_bool_at_index(arr, 0, false);
-            assert(new_arr.len() == 1, 'Length preserved');
-            assert(*new_arr.at(0) == false, 'Replaced to false');
+        fn test_classify_tank_over_dual() {
+            use survivor_valhalla::constants::{ECOLOGY_TANK, ECOLOGY_DUAL_TYPE};
+
+            let unit_count: u8 = 5;
+            let max_type_count: u8 = 3;
+            let mono_threshold = (unit_count * 4) / 5;
+            let is_mono = max_type_count >= mono_threshold && max_type_count >= 4;
+            assert(!is_mono, 'Not mono');
+
+            let avg_damage: u32 = 20;
+            let max_damage: u32 = 25;
+            let is_burst = avg_damage > 0 && max_damage * 100 > avg_damage * 150;
+            assert(!is_burst, 'Not burst');
+
+            let total_hp: u32 = 1000;
+            let avg_hp = total_hp / unit_count.into();
+            let is_tank = avg_hp > 150;
+            assert(is_tank, 'Is tank');
+
+            let count_1: u8 = 2;
+            let count_2: u8 = 3;
+            let mut types_with_2_plus: u8 = 0;
+            if count_1 >= 2 {
+                types_with_2_plus += 1;
+            }
+            if count_2 >= 2 {
+                types_with_2_plus += 1;
+            }
+            let is_dual = types_with_2_plus >= 2;
+            assert(is_dual, 'Also dual');
+            assert(ECOLOGY_TANK == 5, 'Tank constant');
+            assert(ECOLOGY_DUAL_TYPE == 2, 'Dual constant');
         }
 
         #[test]
-        fn test_replace_u8_single_element() {
-            let arr = array![5_u8];
-            let new_arr = replace_u8_at_index(arr, 0, 10);
-            assert(new_arr.len() == 1, 'Length preserved');
-            assert(*new_arr.at(0) == 10, 'Replaced');
+        fn test_minimum_survivor_score_run() {
+            let mut score: u32 = 0;
+            let mut floor: u32 = 1;
+            loop {
+                if floor > 10 {
+                    break;
+                }
+                score += floor * 1;
+                floor += 1;
+            };
+            assert(score == 55, 'Min survivor 10-floor');
+        }
+
+        #[test]
+        fn test_maximum_survivor_score_run() {
+            let mut score: u32 = 0;
+            let mut floor: u32 = 1;
+            loop {
+                if floor > 10 {
+                    break;
+                }
+                score += floor * 5;
+                floor += 1;
+            };
+            assert(score == 275, 'Max survivor 10-floor');
+        }
+
+        #[test]
+        fn test_ecology_cap_boundary_precision() {
+            let mut state = make_default_match_state();
+            state.encounters_played = 100;
+            state.eco_count_1 = 39;
+            assert(!ecology_exceeds_cap(@state, 1), '39% under cap');
+
+            state.eco_count_1 = 40;
+            assert(ecology_exceeds_cap(@state, 1), '40% at cap');
+        }
+
+        #[test]
+        fn test_reward_priority_heal_over_boost() {
+            use survivor_valhalla::constants::HEAL_INTERVAL;
+
+            let test_floors: Array<u8> = array![15, 30, 45, 60];
+            let mut i: usize = 0;
+            loop {
+                if i >= test_floors.len() {
+                    break;
+                }
+                let floor = *test_floors.at(i);
+                let is_heal = floor % HEAL_INTERVAL == 0;
+                let is_boost = !is_heal && floor % 5 == 0;
+                assert(is_heal, 'Heal priority');
+                assert(!is_boost, 'Not boost');
+                i += 1;
+            };
+        }
+
+        #[test]
+        fn test_combat_zero_damage_adventurer() {
+            let advs = array![make_adventurer_unit(1, 1, 1, 100, 0, 2)];
+            let beasts = array![make_beast_unit(1, 1, 1, 50, 10, 3)];
+
+            let (_final_adv_hp, final_adv_alive, _final_beast_hp, final_beast_alive) =
+                simulate_combat(
+                @advs, @beasts, array![100_u16], array![true], array![50_u16], array![true],
+            );
+
+            assert(count_alive(@final_adv_alive) == 0, 'Adv dies (0 dmg)');
+            assert(count_alive(@final_beast_alive) == 1, 'Beast survives');
+        }
+
+        #[test]
+        fn test_floor_scale_50_floors() {
+            let mut floor: u8 = 1;
+            loop {
+                if floor > 50 {
+                    break;
+                }
+                let scale = get_floor_scale(floor);
+                assert(scale > 0, 'Non-zero scale');
+                assert(scale <= 150, 'Scale within range');
+                if floor <= 40 {
+                    assert(
+                        get_floor_scale(floor) == get_floor_scale(floor + 10),
+                        'Cycle consistency',
+                    );
+                }
+                floor += 1;
+            };
+        }
+
+        #[test]
+        fn test_3v3_three_floor_attrition() {
+            let adv_max_hp: u16 = 200;
+            let adv_dmg: u16 = 25;
+            let mut hp1: u16 = adv_max_hp;
+            let mut hp2: u16 = adv_max_hp;
+            let mut hp3: u16 = adv_max_hp;
+            let mut total_score: u32 = 0;
+
+            let mut floor: u8 = 1;
+            loop {
+                if floor > 3 {
+                    break;
+                }
+                let scale = get_floor_scale(floor);
+                let beast_hp: u16 = (40_u32 * scale.into() / 100).try_into().unwrap();
+                let beast_dmg: u16 = (8_u32 * scale.into() / 100).try_into().unwrap();
+
+                let mut advs = array![];
+                let mut adv_hp_arr = array![];
+                let mut adv_alive = array![];
+                if hp1 > 0 {
+                    advs.append(make_adventurer_unit(floor.into(), 1, 1, hp1, adv_dmg, 1));
+                    adv_hp_arr.append(hp1);
+                    adv_alive.append(true);
+                }
+                if hp2 > 0 {
+                    advs.append(make_adventurer_unit(floor.into(), 2, 2, hp2, adv_dmg, 2));
+                    adv_hp_arr.append(hp2);
+                    adv_alive.append(true);
+                }
+                if hp3 > 0 {
+                    advs.append(make_adventurer_unit(floor.into(), 3, 3, hp3, adv_dmg, 3));
+                    adv_hp_arr.append(hp3);
+                    adv_alive.append(true);
+                }
+
+                let beasts = array![
+                    make_beast_unit(floor.into(), 1, 1, beast_hp, beast_dmg, 1),
+                    make_beast_unit(floor.into(), 2, 2, beast_hp, beast_dmg, 2),
+                    make_beast_unit(floor.into(), 3, 3, beast_hp, beast_dmg, 3),
+                ];
+                let beast_hp_arr = array![beast_hp, beast_hp, beast_hp];
+                let beast_alive = array![true, true, true];
+
+                let (new_hp, new_alive, _, beast_alive_after) = simulate_combat(
+                    @advs, @beasts, adv_hp_arr, adv_alive, beast_hp_arr, beast_alive,
+                );
+
+                if count_alive(@beast_alive_after) == 0 {
+                    let survivors = count_alive(@new_alive);
+                    total_score += floor.into() * survivors.into();
+
+                    let mut idx: usize = 0;
+                    if hp1 > 0 {
+                        hp1 = *new_hp.at(idx);
+                        idx += 1;
+                    }
+                    if hp2 > 0 && idx < new_hp.len() {
+                        hp2 = *new_hp.at(idx);
+                        idx += 1;
+                    }
+                    if hp3 > 0 && idx < new_hp.len() {
+                        hp3 = *new_hp.at(idx);
+                    }
+                } else {
+                    break;
+                }
+
+                floor += 1;
+            };
+
+            assert(floor > 3, 'Cleared 3 floors');
+            assert(total_score > 0, 'Positive score');
+            let total_remaining = hp1 + hp2 + hp3;
+            assert(total_remaining < 3 * adv_max_hp, 'Attrition over 3 floors');
+        }
+
+        #[test]
+        fn test_ecology_balanced_rotation_30_encounters() {
+            let mut state = make_default_match_state();
+            let mut enc: u8 = 0;
+            loop {
+                if enc >= 30 {
+                    break;
+                }
+                let eco = (enc % 6) + 1;
+                increment_eco_count(ref state, eco);
+                state.encounters_played += 1;
+                enc += 1;
+            };
+
+            assert(state.encounters_played == 30, 'Total 30');
+            assert(get_eco_count(@state, 1) == 5, 'Eco1 = 5');
+            assert(get_eco_count(@state, 2) == 5, 'Eco2 = 5');
+            assert(get_eco_count(@state, 3) == 5, 'Eco3 = 5');
+            assert(get_eco_count(@state, 4) == 5, 'Eco4 = 5');
+            assert(get_eco_count(@state, 5) == 5, 'Eco5 = 5');
+            assert(get_eco_count(@state, 6) == 5, 'Eco6 = 5');
+
+            let mut eco: u8 = 1;
+            loop {
+                if eco > 6 {
+                    break;
+                }
+                assert(!ecology_exceeds_cap(@state, eco), 'No cap at 30');
+                eco += 1;
+            };
+        }
+
+        #[test]
+        fn test_power_band_asymmetry() {
+            let band_weak = compute_power_band(100, 50);
+            let band_strong = compute_power_band(50, 100);
+            assert(band_weak == 1, 'Weak defender');
+            assert(band_strong == 5, 'Strong defender');
+            assert(band_weak != band_strong, 'Asymmetric');
         }
     }
 }

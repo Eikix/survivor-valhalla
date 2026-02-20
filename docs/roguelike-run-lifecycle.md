@@ -143,8 +143,15 @@ The run ends when the player **loses** a floor battle (all adventurers defeated)
 3. Emit `RunCompleted { run_id, player, max_floor, score, timestamp }`.
 4. No permanent penalty. Adventurers and lineups are unchanged (they are already dead Loot Survivor adventurers).
 
-### No run-abandon
-Players cannot voluntarily end a run early. They must either win or die. This simplifies state and prevents gaming the system.
+### Voluntary abandon
+Players may call `abandon_run()` to end a run early. The run is treated as a loss at the current floor:
+1. Set `Run.is_active = false`.
+2. Set `Run.ended_at = block_timestamp`.
+3. Save cross-run defender memory.
+4. Update `PlayerRunStats` (total_runs, best_score, best_floor).
+5. Emit `RunCompleted`.
+
+This allows players stuck in an unwinnable run to free their lineup for modifications without waiting for a guaranteed loss.
 
 ---
 
@@ -158,8 +165,8 @@ Players cannot voluntarily end a run early. They must either win or die. This si
 - Opponent history (can face same lineups again)
 
 ### What persists between runs
-- Attack lineup (adventurers) - player can swap between runs
-- Beast lineup (defense) - remains in world pool for others
+- Attack lineup (adventurers) - player can swap between runs (blocked during active run)
+- Beast lineup (defense) - remains in world pool for others (modifications blocked during active run)
 - Player energy (decremented on run start)
 - Historical run records for leaderboard / stats
 - Player's best score and max floor (for profile display)
@@ -174,16 +181,26 @@ Player simply calls `start_run()` again after a death. No cooldown beyond energy
 | Model | Keys | Purpose |
 |-------|------|---------|
 | `Run` | `run_id` | Core run state, carry-over HP, active flag |
+| `ActiveRun` | `player` | Current active run per player (0 = none) |
+| `RunAdventurer` | `run_id, position` | Adventurer HP snapshot per floor (carry-over HP) |
 | `RunBattle` | `run_id, floor` | Per-floor battle record |
-| `RunBuff` | `run_id, adventurer_position` | Temporary stat boosts |
+| `RunBuff` | `run_id, adventurer_position, floor` | Temporary stat boosts (run-scoped) |
 | `PlayerRunStats` | `player` | Best score, best floor, total runs |
+| `OpponentSnapshot` | `run_id, snapshot_index` | Defender snapshot for deterministic matchmaking |
+| `RunMatchState` | `run_id` | Per-run matchmaking state (cooldown, ecology, recent defenders) |
+| `UsedLineupHash` | `run_id, lineup_hash` | Anti-repeat lineup hash tracking |
+| `CrossRunMemory` | `player` | Last 5 defenders faced (cross-run soft avoidance) |
 
 ### New system: `run_actions`
 
 | Function | Description |
 |----------|-------------|
-| `start_run()` | Creates Run, snapshots lineup, initializes HP |
-| `battle_floor()` | Samples opponent, runs battle, applies rewards or death |
+| `start_run()` | Creates Run, snapshots lineup, initializes HP, deducts energy |
+| `battle_floor(defender)` | Manual opponent selection, runs battle, applies rewards or death |
+| `battle_floor_auto()` | Auto-select opponent from snapshot pool using ecology matchmaking |
+| `populate_run_pool(defenders)` | Batch snapshot defender lineups for deterministic matchmaking |
+| `abandon_run()` | Voluntarily end run as a loss at current floor |
+| `refresh_adventurer_stats()` | Refresh cached adventurer stats from Loot Survivor contracts |
 
 ### Events
 

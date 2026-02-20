@@ -21,7 +21,7 @@ pub mod beast_actions {
     use openzeppelin_token::erc721::interface::{IERC721Dispatcher, IERC721DispatcherTrait};
     use starknet::{ContractAddress, get_block_timestamp, get_caller_address};
     use survivor_valhalla::constants::{BEAST_TYPE_MAGICAL, BEAST_TYPE_HUNTER, BEAST_TYPE_BRUTE};
-    use survivor_valhalla::models::{Beast, BeastLineup, PlayerEnergy};
+    use survivor_valhalla::models::{ActiveRun, Beast, BeastLineup, PlayerEnergy};
     use super::IBeastActions;
 
     #[cfg(not(test))]
@@ -64,6 +64,10 @@ pub mod beast_actions {
         ) {
             let mut world = self.world_default();
             let player = get_caller_address();
+
+            // Cannot modify defense lineup during an active run (snapshot integrity).
+            let active: ActiveRun = world.read_model(player);
+            assert(active.run_id == 0, 'Cannot modify during run');
 
             // Verify ownership and fetch beast details
             if BEASTS_CONTRACT != 0x0 {
@@ -114,6 +118,10 @@ pub mod beast_actions {
         fn swap(ref self: ContractState, position: u8, new_beast_id: u256) {
             let mut world = self.world_default();
             let player = get_caller_address();
+
+            // Cannot modify defense lineup during an active run (snapshot integrity).
+            let active: ActiveRun = world.read_model(player);
+            assert(active.run_id == 0, 'Cannot modify during run');
 
             // Cannot swap to empty (0)
             assert(new_beast_id != 0, 'Cannot swap to empty');

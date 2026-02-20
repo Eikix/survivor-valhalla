@@ -24,7 +24,7 @@ pub mod battle_actions {
         IERC721DispatcherTrait, ILootSystemsDispatcher, ILootSystemsDispatcherTrait, ItemTrait,
     };
     use survivor_valhalla::models::{
-        AdventurerWeapon, AttackLineup, Battle, BattleState, Beast, BeastLineup, CachedAdventurer,
+        ActiveRun, AdventurerWeapon, AttackLineup, Battle, Beast, BeastLineup, CachedAdventurer,
         CombatUnit, PlayerEnergy,
     };
     use super::IBattleActions;
@@ -171,6 +171,10 @@ pub mod battle_actions {
         ) {
             let mut world = self.world_default();
             let player = get_caller_address();
+
+            // Cannot modify attack lineup during an active run (snapshot integrity).
+            let active: ActiveRun = world.read_model(player);
+            assert(active.run_id == 0, 'Cannot modify during run');
 
             // Get contract dispatchers
             let loot_survivor_address: ContractAddress = LOOT_SURVIVOR_ERC721.try_into().unwrap();

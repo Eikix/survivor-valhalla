@@ -78,6 +78,9 @@ pub const TANK_HP_THRESHOLD: u16 = 150; // avg HP > 1.5x median = tank
 // Cross-run defender memory size
 pub const CROSS_RUN_MEMORY_SIZE: u8 = 5;
 
+// Ecology: control classification threshold (beast level > this → control)
+pub const CONTROL_INITIATIVE_THRESHOLD: u16 = 15;
+
 // Soft rule break reasons
 pub const SOFT_BREAK_POOL_EXHAUSTED: u8 = 1;
 pub const SOFT_BREAK_BAND_CONSTRAINT: u8 = 2;

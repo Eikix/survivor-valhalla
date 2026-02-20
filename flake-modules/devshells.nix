@@ -31,6 +31,7 @@
         pkg-config
         openssl
         gcc
+        mkcert
 
         # Hardware wallet support
         node-gyp
