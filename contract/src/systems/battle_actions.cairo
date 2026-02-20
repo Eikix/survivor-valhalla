@@ -103,21 +103,21 @@ pub mod battle_actions {
             let attacker = get_caller_address();
             let current_time = get_block_timestamp();
 
-            assert(attacker != defender, 'ERR_SELF_BATTLE');
+            assert(attacker != defender, 'E_SELF_BTL');
 
             // Check attacker has an attack lineup (adventurers)
             let attack_lineup: AttackLineup = world.read_model(attacker);
-            assert(attack_lineup.adventurer1_id != 0, 'ERR_NO_ATK_LINEUP');
+            assert(attack_lineup.adventurer1_id != 0, 'E_NO_ATK');
 
             // Check defender has a defense lineup (beasts)
             let defender_lineup: BeastLineup = world.read_model(defender);
-            assert(defender_lineup.beast1_id != 0, 'ERR_NO_DEF_LINEUP');
+            assert(defender_lineup.beast1_id != 0, 'E_NO_DEF');
 
             // Check and update energy
             // @NOTICE: disabled for dev purposes
             // let mut energy: PlayerEnergy = world.read_model(attacker);
             // update_energy(ref energy, current_time);
-            // assert(energy.energy > 0, 'Not enough energy');
+            // assert(energy.energy > 0, 'E_NO_EN');
 
             // Deduct energy
             // energy.energy -= 1;
@@ -202,15 +202,15 @@ pub mod battle_actions {
                 if adventurer_id != 0 {
                     // Verify ownership
                     let owner = erc721_dispatcher.owner_of(adventurer_id.into());
-                    assert(owner == player, 'ERR_ADV_OWNER');
+                    assert(owner == player, 'E_ADV_OWN');
 
                     // Verify adventurer is from beastmode dungeon
                     let dungeon = adventurer_dispatcher.get_adventurer_dungeon(adventurer_id);
-                    assert(dungeon == beastmode_dungeon_address, 'ERR_ADV_DUNGEON');
+                    assert(dungeon == beastmode_dungeon_address, 'E_ADV_DGN');
 
                     // Get adventurer data
                     let adventurer = adventurer_dispatcher.get_adventurer(adventurer_id);
-                    assert(adventurer.health == 0, 'ERR_ADV_NOT_DEAD');
+                    assert(adventurer.health == 0, 'E_ADV_ALIVE');
 
                     // Calculate level from XP (roughly following Death Mountain logic)
                     let level = if adventurer.xp == 0 {

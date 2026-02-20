@@ -71,7 +71,7 @@ pub mod beast_actions {
 
                 // Store beast 1
                 if beast1_id != 0 {
-                    assert(erc721_dispatcher.owner_of(beast1_id) == player, 'ERR_BST1_OWNER');
+                    assert(erc721_dispatcher.owner_of(beast1_id) == player, 'E_B1_OWN');
                     let beast_data: PackableBeast = beasts_dispatcher.get_beast(beast1_id);
                     let beast = Beast {
                         player,
@@ -88,7 +88,7 @@ pub mod beast_actions {
 
                 // Store beast 2
                 if beast2_id != 0 {
-                    assert(erc721_dispatcher.owner_of(beast2_id) == player, 'ERR_BST2_OWNER');
+                    assert(erc721_dispatcher.owner_of(beast2_id) == player, 'E_B2_OWN');
                     let beast_data: PackableBeast = beasts_dispatcher.get_beast(beast2_id);
                     let beast = Beast {
                         player,
@@ -105,7 +105,7 @@ pub mod beast_actions {
 
                 // Store beast 3
                 if beast3_id != 0 {
-                    assert(erc721_dispatcher.owner_of(beast3_id) == player, 'ERR_BST3_OWNER');
+                    assert(erc721_dispatcher.owner_of(beast3_id) == player, 'E_B3_OWN');
                     let beast_data: PackableBeast = beasts_dispatcher.get_beast(beast3_id);
                     let beast = Beast {
                         player,
@@ -122,7 +122,7 @@ pub mod beast_actions {
 
                 // Store beast 4
                 if beast4_id != 0 {
-                    assert(erc721_dispatcher.owner_of(beast4_id) == player, 'ERR_BST4_OWNER');
+                    assert(erc721_dispatcher.owner_of(beast4_id) == player, 'E_B4_OWN');
                     let beast_data: PackableBeast = beasts_dispatcher.get_beast(beast4_id);
                     let beast = Beast {
                         player,
@@ -139,7 +139,7 @@ pub mod beast_actions {
 
                 // Store beast 5
                 if beast5_id != 0 {
-                    assert(erc721_dispatcher.owner_of(beast5_id) == player, 'ERR_BST5_OWNER');
+                    assert(erc721_dispatcher.owner_of(beast5_id) == player, 'E_B5_OWN');
                     let beast_data: PackableBeast = beasts_dispatcher.get_beast(beast5_id);
                     let beast = Beast {
                         player,
@@ -181,15 +181,15 @@ pub mod beast_actions {
             let player = get_caller_address();
 
             // Cannot swap to empty (0)
-            assert(new_beast_id != 0, 'ERR_SWAP_EMPTY');
-            assert(position <= 4, 'ERR_SWAP_POS');
+            assert(new_beast_id != 0, 'E_SWP_EMP');
+            assert(position <= 4, 'E_SWP_POS');
 
             // Verify ownership and update beast details
             if BEASTS_CONTRACT != 0x0 {
                 let beasts_contract: ContractAddress = BEASTS_CONTRACT.try_into().unwrap();
                 let beasts_dispatcher = IBeastsDispatcher { contract_address: beasts_contract };
                 let erc721_dispatcher = IERC721Dispatcher { contract_address: beasts_contract };
-                assert(erc721_dispatcher.owner_of(new_beast_id) == player, 'ERR_SWAP_OWNER');
+                assert(erc721_dispatcher.owner_of(new_beast_id) == player, 'E_SWP_OWN');
 
                 // Fetch and store new beast details
                 let beast_data: PackableBeast = beasts_dispatcher.get_beast(new_beast_id);

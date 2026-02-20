@@ -114,7 +114,7 @@ pub mod run_actions {
             assert(floor_progress.current_floor == 1, 'T_FP_CURR');
             assert(floor_progress.encounters_cleared == 0, 'T_FP_CLEAR');
             assert(floor_progress.last_battle_id == 0, 'T_FP_BATTLE');
-            assert(!floor_progress.is_complete, 'ERR_FLOOR_NOT_DONE');
+            assert(!floor_progress.is_complete, 'E_FLR_NDONE');
         }
     }
 }

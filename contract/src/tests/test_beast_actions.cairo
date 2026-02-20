@@ -102,7 +102,7 @@ mod test_beast_actions {
     }
 
     #[test]
-    #[should_panic(expected: ('ERR_SWAP_EMPTY', 'ENTRYPOINT_FAILED'))]
+    #[should_panic(expected: ('E_SWP_EMP', 'ENTRYPOINT_FAILED'))]
     fn test_swap_to_empty_fails() {
         let (_world, beast_actions, _player1) = setup_test();
 
@@ -114,7 +114,7 @@ mod test_beast_actions {
     }
 
     #[test]
-    #[should_panic(expected: ('ERR_SWAP_POS', 'ENTRYPOINT_FAILED'))]
+    #[should_panic(expected: ('E_SWP_POS', 'ENTRYPOINT_FAILED'))]
     fn test_swap_invalid_position_fails() {
         let (_world, beast_actions, _player1) = setup_test();
 
