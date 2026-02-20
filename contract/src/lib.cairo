@@ -2,6 +2,7 @@ pub mod systems {
     pub mod battle_actions;
     pub mod beast_actions;
     pub mod energy_actions;
+    pub mod run_actions;
 }
 pub mod constants;
 pub mod interfaces;
@@ -17,4 +18,3 @@ pub mod models;
 //     mod test_integration;
 //     mod test_adventurer_integration;
 // }
-

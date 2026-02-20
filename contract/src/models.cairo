@@ -119,3 +119,27 @@ pub struct CombatUnit {
     pub beast_type: u8, // For beasts (1=Magic_or_Cloth, 2=Blade_or_Hide, 3=Bludgeon_or_Metal)
     pub is_alive: bool,
 }
+
+#[derive(Copy, Drop, Serde, Debug)]
+#[dojo::model]
+pub struct Run {
+    #[key]
+    pub run_id: u32,
+    pub player: ContractAddress,
+    pub floor: u8,
+    pub max_floor: u8,
+    pub is_active: bool,
+    pub started_at: u64,
+    pub ended_at: u64,
+}
+
+#[derive(Copy, Drop, Serde, Debug)]
+#[dojo::model]
+pub struct FloorProgress {
+    #[key]
+    pub run_id: u32,
+    pub current_floor: u8,
+    pub encounters_cleared: u8,
+    pub last_battle_id: u32,
+    pub is_complete: bool,
+}
