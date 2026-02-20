@@ -1,2 +1,2 @@
-mode = "stack"
-# Graphite-first flow (requested): submit/stack via gt
+mode = "merge"
+# merge-as-you-go for rapid roguelike iteration
