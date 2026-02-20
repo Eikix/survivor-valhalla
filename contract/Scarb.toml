@@ -13,13 +13,20 @@ spawn = "sozo execute survivor_valhalla-actions spawn --wait"
 move = "sozo execute survivor_valhalla-actions move -c 1 --wait"
 
 [dependencies]
-dojo = "1.7.1"
+dojo = { path = "vendor/dojo" }
 starknet = "2.12.2"
 beasts_nft = { path = "vendor/beasts_nft" }
-openzeppelin_token = "1.0.0"
+openzeppelin_token = { path = "vendor/openzeppelin_token" }
 
 [patch."https://scarbs.xyz"]
 snforge_std = { path = "vendor/snforge_std" }
+dojo = { path = "vendor/dojo" }
+dojo_cairo_macros = { path = "vendor/dojo_cairo_macros" }
+openzeppelin_token = { path = "vendor/openzeppelin_token" }
+openzeppelin_access = { path = "vendor/openzeppelin_access" }
+openzeppelin_account = { path = "vendor/openzeppelin_account" }
+openzeppelin_introspection = { path = "vendor/openzeppelin_introspection" }
+openzeppelin_utils = { path = "vendor/openzeppelin_utils" }
 
 [[target.starknet-contract]]
 build-external-contracts = [
