@@ -143,3 +143,17 @@ pub struct FloorProgress {
     pub last_battle_id: u32,
     pub is_complete: bool,
 }
+
+#[derive(Copy, Drop, Serde, Debug)]
+#[dojo::model]
+pub struct OpponentCandidate {
+    #[key]
+    pub run_id: u32,
+    #[key]
+    pub defender: ContractAddress,
+    pub lineup_hash: felt252,
+    pub unit_count: u8,
+    pub defender_power: u32,
+    pub band: u8,
+    pub ecology_class: u8,
+}
