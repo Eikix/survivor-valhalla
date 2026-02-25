@@ -1,0 +1,1 @@
+nix develop -c bash -lc 'cd contract && scarb test'
